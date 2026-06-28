@@ -29,7 +29,8 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.actions}>
-        <PrimaryButton onPress={() => router.push("/send")}>Send a package</PrimaryButton>
+        <PrimaryButton onPress={() => router.push("/login")}>Sign in with email</PrimaryButton>
+        <PrimaryButton variant="secondary" onPress={() => router.push("/send")}>Send a package</PrimaryButton>
         <PrimaryButton variant="secondary" onPress={() => router.push("/travel")}>
           I&apos;m traveling
         </PrimaryButton>
@@ -87,3 +88,4 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
 });
+
