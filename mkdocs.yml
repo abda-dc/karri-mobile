@@ -1,0 +1,57 @@
+site_name: Karri Mobile Handbook
+site_description: Documentation for Karri Mobile, a trusted peer-to-peer cross-border shipping platform.
+site_author: Karri
+repo_name: karri-mobile
+repo_url: https://github.com/abda-dc/karri-mobile
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: teal
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mermaid2
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:mermaid2.fence_mermaid_custom
+
+nav:
+  - Home: index.md
+  - Vision & Mission: vision-mission.md
+  - Product Constitution: product/product-constitution.md
+  - Architecture:
+      - Overview: architecture/technical-architecture.md
+      - ADR Index: adr/index.md
+  - Engineering:
+      - Standards: engineering/engineering-standards.md
