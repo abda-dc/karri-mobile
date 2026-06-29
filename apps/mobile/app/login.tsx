@@ -7,7 +7,7 @@ import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
 import { SectionHeader } from "../src/components/SectionHeader";
 import { TextField } from "../src/components/TextField";
-import { isFirebaseConfigured } from "../src/lib/firebase";
+import { isFirebaseConfigured } from "../src/infrastructure/firebase/client";
 import { spacing } from "../src/theme/tokens";
 
 export default function LoginScreen() {

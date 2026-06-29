@@ -2,34 +2,38 @@
 
 ## Purpose
 
-Chain of custody answers: who was responsible for the package, during which period, and what evidence supports each handoff? It is a record of claimed and confirmed events, not an absolute guarantee about physical reality.
+Chain of custody answers who recorded responsibility for a package, when, and with what limited context. It is evidence of platform actions, not a guarantee about physical reality.
 
 ## Current status
 
-The repository includes a typed `custodyEvents` placeholder and deny-by-default client rules. No custody UI, upload, or transition is implemented.
+Milestone 4 adds a readonly `CustodyEvent`, an append/read-only repository interface, a Firestore mapper, and `FirebaseCustodyRepository`. No custody UI, upload flow, trusted command, participant rule, or index is enabled. Current Firestore rules deny all access.
 
-## Planned event sequence
+## Event sequence foundation
 
-- **Pickup pending:** booking accepted; sender still holds the package.
-- **Picked up:** sender-to-traveler handoff recorded.
-- **In transit:** traveler confirms journey progress where appropriate.
-- **Arrived:** package reached the destination region and delivery is pending.
-- **Delivered:** traveler-to-recipient handoff recorded.
-- **Exception:** a documented interruption requiring follow-up.
+- Shipment Created
+- Traveler Accepted
+- Pickup Confirmed
+- Airport Departure
+- Airport Arrival
+- Delivery Confirmed
+- Completed
+
+The exact product sequence must remain compatible with the booking state machine. Not every informational airport event changes booking status.
 
 ## Event fields
 
-Each event needs an ID, booking ID, actor UID, event type, server timestamp, optional location label, previous-event reference, evidence references, and schema version. Exact coordinates should not be collected by default.
+Each event has an ID, booking ID, event type, server timestamp, performer UID, optional location label, and schema-controlled metadata. Exact coordinates are not collected by default.
 
 ## Integrity rules
 
-- Events are append-only and functions-owned.
-- The actor must be an eligible booking participant for the transition.
-- The prior booking/custody state must permit the next event.
-- Duplicate commands produce one result.
-- Corrections link to the earlier event and explain the correction.
+- Events are append-only; no update/delete repository methods exist.
+- A trusted command validates participant, booking state, expected prior event, and idempotency.
+- Corrections append a new linked fact rather than changing an earlier event.
 - Evidence access is participant-limited and retention-controlled.
+- Pending client intent must be visually distinct from server-confirmed custody.
 
-## User experience
+## Future user experience
 
-The timeline should emphasize current responsibility and next action, then allow a user to inspect evidence. It should distinguish pending client submission from server-confirmed custody and avoid implying that a photo alone proves contents or delivery.
+The timeline emphasizes current responsibility and next action, then allows authorized evidence inspection. It avoids claiming that a photo, timestamp, or location label alone proves package contents or delivery.
+
+See [Custody Model](../architecture/custody-model.md), [Booking Lifecycle](booking-lifecycle.md), and [Chain of Custody ADR](../adr/adr-0006-why-chain-of-custody.md).

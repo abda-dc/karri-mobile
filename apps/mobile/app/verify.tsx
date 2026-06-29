@@ -7,8 +7,11 @@ import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
 import { SectionHeader } from "../src/components/SectionHeader";
 import { TrustBadge } from "../src/components/TrustBadge";
-import { getFriendlyAuthError, startMvpAuthSession } from "../src/lib/auth";
-import { isFirebaseConfigured } from "../src/lib/firebase";
+import {
+  getFriendlyAuthError,
+  startMvpAuthSession,
+} from "../src/infrastructure/firebase/auth";
+import { isFirebaseConfigured } from "../src/infrastructure/firebase/client";
 import { spacing } from "../src/theme/tokens";
 
 export default function VerifyScreen() {

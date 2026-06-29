@@ -2,38 +2,33 @@
 
 ## Current status
 
-Karri does not calculate or display a trust score in the current MVP. Models reserve a simple placeholder field for future compatibility, but no client can write an authoritative score.
+Milestone 4 adds a pure, versioned TrustRule/TrustCalculator/TrustScore foundation and a TrustService/TrustRepository boundary. The calculator is not connected to UI or a trusted backend trigger. Current Firestore rules do not expose `trustScores`, and clients cannot set the reserved profile trust field.
 
 ## Product intent
 
-A future trust score will summarize verified platform history so users can compare context quickly. It will not label a person safe, replace judgment, grant authorization, or hide the underlying evidence.
+A future score summarizes eligible platform history. It does not label a person safe, replace judgment, grant authorization, or hide underlying evidence. New users should receive neutral “new” treatment rather than a punitive public number.
 
-## Candidate signals
+## Formula version 1
 
-- Identity/contact verification state.
-- Completed bookings and role-specific history.
-- Custody-event completeness.
-- On-time and successful handoffs.
-- Cancellations or validated exceptions.
-- Eligible review patterns and volume.
-- Account age and recent activity, used carefully.
+The foundation uses completed deliveries, cancellations, average eligible review, account age, and verification level. Contributions are individually explained and the result is clamped to 0-100. The exact point formula is documented in [Trust Engine](../architecture/trust-engine.md).
 
-Package value, protected characteristics, private messages, and social popularity are not appropriate shortcuts for trustworthiness.
-
-## Explainability
-
-The UI should present a score band or summary alongside contributing signals, number of eligible journeys, recency, and a “how this works” explanation. New users receive a neutral “new” state rather than a punitive low score.
+Excluded inputs include protected characteristics, package value, private messages, and social popularity.
 
 ## Calculation boundary
 
-Only trusted server code updates the score from versioned, auditable inputs. A calculation record should capture formula version, input references, timestamp, and outcome. Formula changes require backfill planning and bias/abuse monitoring.
+`TrustService` validates non-negative counts and review bounds, then asks the pure calculator for a result and persists through `TrustRepository`. Production calculation belongs in trusted code using durable evidence references, a server timestamp, and formula version.
 
-## Governance questions before launch
+## Explainability
 
-- What evidence can a user inspect or challenge?
-- How are reversals, moderation, and exceptions handled?
-- How does history decay or recover?
-- Which signals differ between sender and traveler roles?
-- What minimum history supports a displayed score?
+Any display should show eligible journey count, review count, recency, verification meaning, factor contributions, and a “how this works” explanation. Users need a path to inspect and challenge eligible evidence.
 
-Until these questions are answered with real corridor research, a simple review/history display is safer than premature scoring.
+## Governance before launch
+
+- Define eligible completion, cancellation, and verified-exception evidence.
+- Define identity verification levels and regional availability.
+- Decide role-specific scoring, history decay, recovery, and minimum display history.
+- Establish appeals, moderation, backfill, bias, abuse, privacy, and retention review.
+
+Until those questions are answered with corridor research, review/history display is safer than exposing the calculated foundation.
+
+See [Trust Engine](../architecture/trust-engine.md), [Reviews](reviews.md), and [Trust Score ADR](../adr/adr-0005-why-trust-score.md).

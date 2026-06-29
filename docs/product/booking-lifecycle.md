@@ -2,52 +2,56 @@
 
 ## Current status
 
-Bookings are not implemented. The codebase defines placeholder types and denies direct client access to booking records. A possible match does not create a booking request.
+Milestone 4 implements the portable booking/request models, forward-only state guards, application orchestration, domain events, and a Firebase repository skeleton. No booking UI or callable function exists, and current Firestore rules still deny booking records. A possible match does not create a booking.
 
-## Planned lifecycle
+## Lifecycle
 
 ```mermaid
 stateDiagram-v2
-    [*] --> requested
-    requested --> accepted
-    requested --> declined
-    requested --> cancelled
-    accepted --> pickup_pending
-    pickup_pending --> in_custody
-    in_custody --> in_transit
-    in_transit --> delivery_pending
-    delivery_pending --> delivered
-    accepted --> cancelled
-    in_custody --> exception
-    in_transit --> exception
-    exception --> delivered
-    delivered --> [*]
-    declined --> [*]
-    cancelled --> [*]
+    [*] --> Pending
+    Pending --> Accepted
+    Pending --> Declined
+    Pending --> Cancelled
+    Pending --> Expired
+    Accepted --> InTransit
+    InTransit --> Delivered
+    Delivered --> Completed
+    Completed --> [*]
+    Declined --> [*]
+    Cancelled --> [*]
+    Expired --> [*]
 ```
 
-Exact state names may change when booking and operations requirements are implemented. They must remain finite, documented, and server-validated.
+No backward or additional transitions are permitted. The code stores lowercase values: `pending`, `accepted`, `in_transit`, `delivered`, `completed`, `cancelled`, `declined`, and `expired`.
+
+## Actor rules
+
+- The sender creates and may cancel a pending request.
+- The traveler accepts or declines, starts transit, and marks delivery.
+- The sender completes a delivered booking.
+- Only a trusted system actor expires a request.
+- Production commands derive actor identity from Firebase Auth; they never trust an actor ID sent by the client.
 
 ## Invariants
 
 - A booking links one shipment, one trip, one sender UID, and one traveler UID.
-- The sender owns the shipment and the traveler owns the trip at request time.
-- Both listing records remain compatible and active when a request is created.
-- Only the traveler can accept or decline the request.
-- A transition validates the current version/state and is idempotent.
-- Accepted terms are snapshotted so later listing edits cannot rewrite the agreement.
-- Custody changes append events; they do not overwrite history.
-- Reviews become eligible only after an accepted completion policy is met.
+- Sender and traveler are different accounts.
+- Listing ownership, active state, corridor, dates, category, and capacity must be revalidated by trusted code.
+- Request and booking state change transactionally.
+- Accepted terms are snapshotted so listing edits cannot rewrite the agreement.
+- Custody changes append events rather than overwrite history.
+- Reviews require `completed` state.
 
 ## Command boundary
 
-Request, accept, decline, cancellation, pickup, and delivery are future Cloud Function commands. Firestore rules will deny clients from setting authoritative booking state directly.
+The current mobile `BookingService` demonstrates validation and event behavior, but production request/transition execution belongs in callable Cloud Functions with transactions, version checks, idempotency, and durable events.
 
 ## Open decisions
 
-- Booking expiration and response time.
-- Capacity reservation and competing requests.
-- Cancellation reasons and policy.
-- Recipient confirmation.
-- Exception/support workflow.
-- Payment or fee handling, which remains outside the current MVP.
+- Expiration duration and capacity reservation.
+- Recipient confirmation and completion policy.
+- Cancellation reasons and exception handling.
+- Terms snapshot shape and supported package categories.
+- Payment policy, which remains outside this milestone.
+
+See [Booking State Machine](../architecture/booking-state-machine.md), [Custody Model](../architecture/custody-model.md), and [API Design](../engineering/api-design.md).

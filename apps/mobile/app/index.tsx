@@ -6,7 +6,7 @@ import { Card } from "../src/components/Card";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
 import { TrustBadge } from "../src/components/TrustBadge";
-import { isFirebaseConfigured } from "../src/lib/firebase";
+import { isFirebaseConfigured } from "../src/infrastructure/firebase/client";
 import { colors, radii, spacing, typography } from "../src/theme/tokens";
 
 export default function WelcomeScreen() {

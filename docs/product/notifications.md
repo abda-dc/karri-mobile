@@ -2,32 +2,40 @@
 
 ## Current status
 
-Notifications are not implemented. The data model includes a placeholder notification record, the rules draft permits a recipient to read their own notification, and clients cannot create notifications. Firebase Cloud Messaging is a future integration placeholder only.
+Milestone 4 implements a centralized in-app notification foundation: business services publish typed domain events, `NotificationService` subscribes through the synchronous event bus, and `NotificationRepository` stores recipient records. Templates cover shipment/trip creation, booking outcomes, pickup, delivery, and reviews.
 
-## Notification goals
+The framework is not started by current UI. Current Firestore rules allow recipients to read notification records but deny every client write, so `FirebaseNotificationRepository` remains a compile-safe adapter for future trusted execution. Firebase Cloud Messaging is still uninitialized.
 
-- Tell the right participant that a meaningful action completed or needs attention.
+## Flow
+
+```text
+Application service
+  -> completed domain event
+    -> NotificationService handler
+      -> in-app NotificationRepository record
+        -> future optional push hint
+```
+
+Business services do not directly send notifications.
+
+## Goals
+
+- Tell the right participant that an action completed or needs attention.
 - Explain the next action in plain language.
 - Avoid leaking package, route, identity, or contact details on a lock screen.
-- Remain useful when push delivery is delayed or disabled.
+- Remain useful when push is delayed or disabled.
 
-## Planned triggers
+## Current triggers
 
-- Booking requested, accepted, declined, cancelled, or expiring.
-- Pickup or delivery action required.
-- Custody event recorded.
-- Journey exception reported.
-- Review becomes eligible.
-- Security-sensitive account change.
+- Shipment or trip created.
+- Booking requested, accepted, declined, cancelled, or expired.
+- Package picked up or delivered.
+- Review submitted.
 
-## Delivery design
+## Production direction
 
-Cloud Functions consume validated domain events, apply preferences and templates, create an in-app notification, and optionally send a minimal FCM push. Handlers use deterministic effect IDs so retries do not create duplicate notifications.
+Durable Cloud Function handlers consume validated server events, use deterministic effect IDs, apply preferences/templates, create in-app records, and optionally send minimal FCM hints. Push is not the system of record; opening the app reloads authoritative state.
 
-## Preferences and privacy
+Quiet hours, localization, preference policy, invalid-token cleanup, retry monitoring, and delivery metrics are required before launch. Push, email, and SMS remain outside Milestone 4.
 
-Transactional custody and security notices may have different opt-out rules from product updates. Push previews use generic text such as “A booking needs your attention”; authenticated in-app views show authorized detail.
-
-## Reliability
-
-Push is a convenience channel, not the system of record. The app reads authoritative booking/custody state after opening. Delivery metrics, invalid-token cleanup, quiet-hour policy, localization, and retry failure handling are required before launch.
+See [Event Bus](../architecture/event-bus.md), [Event Architecture](../engineering/event-architecture.md), and [Application Services](../architecture/application-services.md).

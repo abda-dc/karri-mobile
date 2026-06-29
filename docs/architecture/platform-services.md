@@ -1,85 +1,64 @@
-﻿# Platform Services
+# Platform Services
 
-Karri Mobile uses a lean, mobile-first service stack. This document tracks external services, why they exist, when they should be added, and whether they are replaceable.
+## Purpose
 
-## Core principle
+Define the managed services Karri Mobile uses now, the services it intends to add, and the boundary each service must respect.
 
-Use as few services as possible during MVP.
+## Scope
 
-A service should only be added when it clearly improves reliability, trust, safety, delivery speed, or user communication.
+This document covers the Expo mobile runtime, Firebase platform services, source control, documentation hosting, and observability candidates. It does not authorize a service merely by listing it.
 
-## Current foundation
+## Current implementation
 
-| Service | Purpose | Status | Replaceable? | Notes |
-|---|---|---:|---:|---|
-| Expo | Mobile app runtime and development | Active | No | Core mobile framework |
-| Expo Router | App navigation | Active | Yes | Standard Expo routing layer |
-| EAS Build | Android/iOS builds | Planned | No | Needed for release builds |
-| EAS Update | Safe app updates | Planned | No | Use after MVP stabilizes |
-| Supabase | Backend, database, auth, storage | Planned | No | Primary backend platform |
-| GitHub | Source control | Active | No | Repository and collaboration |
-| GitHub Actions | CI checks | Planned | Yes | Typecheck, lint, test, docs validation |
+| Service | Purpose | Status |
+| --- | --- | --- |
+| Expo and React Native | Mobile runtime and development | Active |
+| Expo Router | File-based application navigation | Active |
+| Firebase Authentication | Identity and persisted mobile session | Active; anonymous MVP bridge only |
+| Cloud Firestore | Shipment and trip persistence and realtime reads | Active |
+| Cloud Storage | Future evidence storage | Initialized but unused; rules deny access |
+| GitHub | Source control and collaboration | Active |
+| GitHub Actions | MkDocs validation and publication | Active for documentation only |
+| MkDocs Material | Platform handbook | Active |
 
-## Recommended MVP additions
+Firebase is the authoritative backend direction. Firebase initialization, Auth operations, Firestore access, mappers, and repository adapters all live under `apps/mobile/src/infrastructure/firebase`. Existing listing screens still call the narrow infrastructure helper directly until migration behind application services is intentional and tested.
 
-| Service | Purpose | Priority | When to add | Notes |
-|---|---|---:|---|---|
-| Sentry | Crash and exception reporting | High | Before real user testing | Helps identify device-specific crashes |
-| PostHog | Product analytics and funnels | High | Before beta | Track onboarding, listings, trips, bookings |
-| Expo Push Notifications | Mobile alerts | High | MVP alerts phase | Booking and custody status updates |
-| Resend | Transactional email | Medium | When Karri sends its own email | Supabase auth email may be enough at first |
-| Better Stack | Uptime monitoring | Medium | Before public beta | Useful for backend and public status checks |
+## Design principles
 
-## Future services
+- Add a service only when it improves safety, reliability, delivery speed, or user communication.
+- Keep business rules in the domain and application layers; managed services persist or transport outcomes.
+- Keep secrets and service-account credentials out of the mobile bundle.
+- Treat client devices as untrusted and enforce sensitive commands in rules and trusted backend code.
+- Prefer one provider per capability during the MVP.
+- Record whether a service is active, initialized, planned, or merely a candidate.
 
-| Service | Purpose | Phase | Notes |
-|---|---|---|---|
-| MapLibre + OpenStreetMap | Maps and route display | Later | Avoid paid map dependency early |
-| Cloudinary or ImageKit | Image optimization and media processing | Later | Useful for IDs, package photos, delivery proof |
-| Stripe | Payments | Future | Delay until booking flow is proven |
-| Twilio or MessageBird | SMS/phone verification | Future | Delay until phone trust becomes required |
-| Translation service | Multilingual support | Future | Useful for diaspora growth |
+## Future direction
 
-## Services to avoid during MVP
+| Service | Intended use | Adoption gate |
+| --- | --- | --- |
+| Firebase Cloud Functions | Trusted booking, custody, review, notification, and trust commands | Emulator tests and command contracts |
+| Firebase Cloud Messaging | Minimal push hints for in-app records | Preferences, privacy copy, token lifecycle, and retries |
+| Firebase Remote Config | Validated non-secret operational configuration | Provider adapter and schema validation |
+| Firebase App Check | Abuse resistance | Platform configuration and enforcement rollout |
+| EAS Build and EAS Update | Signed releases and compatible updates | Release policy and environment separation |
+| Sentry | Crash and exception reporting | Privacy review before beta |
+| Product analytics | Funnel learning | Event taxonomy, consent, and data-minimization review |
+| Uptime monitoring | Function and public health monitoring | A deployed backend surface to monitor |
 
-Avoid adding these early unless there is a clear product need:
+Every candidate remains replaceable at the application boundary. Firebase-specific code stays in infrastructure so domain rules do not need to change if persistence changes later.
 
-- Extra backend platforms besides Supabase
-- Multiple analytics tools
-- Separate auth providers
-- Dedicated CMS
-- Separate logging stack
-- Complex feature flag service
-- Payment provider
-- SMS verification provider
-- Admin dashboard platform
+## Out of scope
 
-## Decision checklist
+- Payments, Stripe, mobile money, SMS, chat, and transactional email.
+- An admin portal or a second backend platform.
+- Claiming that planned Firebase services are deployed.
+- Selecting analytics, monitoring, or email vendors in this milestone.
 
-Before adding a service, answer:
+## Related documents
 
-1. What MVP problem does it solve?
-2. Can Supabase, Expo, or GitHub already solve it?
-3. Does it introduce user data or compliance risk?
-4. Can it be removed later without rewriting the app?
-5. Is the free tier enough for beta usage?
-6. Does it improve trust, safety, reliability, or delivery speed?
-
-## Current recommended stack
-
-For the first serious beta, Karri Mobile should use:
-
-- Expo
-- Expo Router
-- TypeScript
-- Supabase
-- EAS Build
-- EAS Update
-- GitHub Actions
-- Sentry
-- PostHog
-- Expo Push Notifications
-- Resend
-- Better Stack
-
-This keeps Karri simple while still giving the project professional visibility into crashes, user behavior, alerts, and production health.
+- [Architecture Overview](README.md)
+- [Technical Architecture](technical-architecture.md)
+- [Repository Pattern](repository-pattern.md)
+- [Remote Configuration](remote-config.md)
+- [Technology Roadmap](technology-roadmap.md)
+- [Firebase ADR](../adr/adr-0002-why-firebase.md)

@@ -77,7 +77,19 @@ nav:
       - Accessibility: design/accessibility.md
       - UX Patterns: design/ux-patterns.md
   - Architecture:
+      - Overview: architecture/README.md
       - Technical Architecture: architecture/technical-architecture.md
+      - Platform Services: architecture/platform-services.md
+      - Technology Roadmap: architecture/technology-roadmap.md
+      - Domain Model: architecture/domain-model.md
+      - Repository Pattern: architecture/repository-pattern.md
+      - Application Services: architecture/application-services.md
+      - Event Bus: architecture/event-bus.md
+      - Booking State Machine: architecture/booking-state-machine.md
+      - Custody Model: architecture/custody-model.md
+      - Trust Engine: architecture/trust-engine.md
+      - Offline Strategy: architecture/offline-strategy.md
+      - Remote Configuration: architecture/remote-config.md
       - ADRs:
           - Index: adr/index.md
           - ADR-0001 - Expo: adr/adr-0001-why-expo.md

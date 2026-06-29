@@ -2,7 +2,7 @@ import { FirebaseApp, getApp, getApps, initializeApp } from "firebase/app";
 import { Auth, getAuth, initializeAuth } from "firebase/auth";
 import { Firestore, getFirestore } from "firebase/firestore";
 import { FirebaseStorage, getStorage } from "firebase/storage";
-import { firebaseAuthPersistence } from "./firebase-auth-persistence";
+import { firebaseAuthPersistence } from "./authPersistence";
 
 const firebaseEnvironment = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -78,8 +78,8 @@ export function getFirebaseServices(): FirebaseServices {
   };
 }
 
-// FCM and App Check are intentionally not initialized until their product flows,
-// native configuration, consent, and enforcement plans are implemented.
+// FCM and App Check remain uninitialized until their product flows, native
+// configuration, consent, and enforcement plans are implemented.
 export const futureFirebaseServices = {
   appCheck: "not-initialized",
   cloudMessaging: "not-initialized",

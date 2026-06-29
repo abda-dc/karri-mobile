@@ -5,44 +5,60 @@
 - Expo React Native and TypeScript.
 - Expo Router for file-based navigation.
 - Firebase modular JavaScript SDK.
-- React state and effects; no external state-management library in the current slice.
+- React state and Firebase listeners in the current UI; Zustand is not installed.
+- Plain TypeScript domain and application foundations.
 - Shared visual tokens and small presentational components.
 
 ## Source layout
 
 ```text
 apps/mobile/
-  app/                  Expo Router screens and layouts
-    (tabs)/             Signed-in product tabs
+  app/                         Expo Router screens and layouts
   src/
-    components/         Reusable mobile UI primitives
-    lib/                Firebase, Auth, and Firestore helpers
-    theme/              Color, spacing, and typography tokens
-    types/              Firestore-facing domain models
+    application/
+      dto/                     Presentation-to-service command shapes
+      services/                Validation and orchestration
+    components/                Reusable mobile UI primitives
+    domain/
+      booking/                 Booking model, repository port, state machine
+      configuration/           Typed operational configuration
+      custody/                 Immutable custody model and append/read port
+      events/                  Domain events and synchronous event bus
+      notification/            In-app notification model and port
+      profile/ user/           Account models and ports
+      review/ trust/           Review and explainable trust foundations
+      shipment/ trip/          Listing models and ports
+    infrastructure/firebase/
+      mappers/                 Firestore-to-domain conversion
+      repositories/            Firebase repository skeletons
+    presentation/hooks/        React-facing Auth session bridge
+    presentation/stores/       Future thin feature stores if coordination warrants them
+    theme/                     Design tokens
+    types/                     Provider-independent compatibility aliases and inputs
 ```
 
-## Screen responsibilities
+## Dependency direction
 
-Screens own form state, lightweight client validation, loading/error/empty presentation, and subscription lifecycle. Firebase configuration and data access are kept out of JSX through `src/lib` helpers. Models provide a shared vocabulary without creating a general repository framework before it is needed.
+Presentation should call application services. Services depend on domain models and repository interfaces. Firebase implementations point inward to those interfaces. Domain and application code do not import Firestore.
 
-## Navigation
-
-The root stack contains the landing, login, verification, profile setup, and tab group. Tabs contain Home, Send, Travel, Tracking, and Profile. Production route guards are not yet implemented; data helpers still require Auth so direct navigation cannot create ownerless data.
+The existing shipment/trip screens still call the narrow infrastructure Firestore helper. This preserves the working slice while the service seam is tested; it is an explicit migration state, not the final architecture.
 
 ## State approach
 
-- Auth state is observed with a small hook around Firebase Auth.
+- Auth state is observed with the existing Firebase hook.
 - Firestore records arrive through `onSnapshot` subscriptions.
-- Each screen owns `loading`, `error`, and records for its listener.
-- Forms disable submission while a write is pending.
-- Matching is derived with `useMemo`; it is not persisted.
+- Screens own loading, error, records, and short-lived form state.
+- Matching remains derived locally.
+- Business rules introduced in Milestone 4 live in services/domain, not stores.
 
-This keeps the first slice legible. A global state library should be added only when several screens genuinely coordinate the same client state beyond Firebase listeners.
+Zustand was evaluated and deferred. Add small feature stores only when multiple routes coordinate client-owned service state beyond Firebase listeners. Avoid one global store and keep Auth, Booking, Shipment, Trip, Notification, and Settings state separate if adopted.
 
-## Mobile quality rules
+## Quality rules
 
-- Forms scroll on small devices and identify keyboard types.
-- Numeric and date input remain strings until validation succeeds.
-- Errors use plain language and do not expose configuration values.
-- Buttons expose disabled/loading state.
-- Device testing remains required even when TypeScript and Expo Doctor pass.
+- Keep Firebase imports out of domain/application code.
+- Detach subscriptions and event handlers.
+- Distinguish pending local state from server confirmation.
+- Expose disabled/loading/error states in plain language.
+- Test on devices; TypeScript and Expo Doctor cannot prove runtime behavior.
+
+See [Application Services](../architecture/application-services.md), [Offline Strategy](../architecture/offline-strategy.md), and [Technical Architecture](../architecture/technical-architecture.md).

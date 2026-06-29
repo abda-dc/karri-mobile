@@ -2,48 +2,54 @@
 
 ## Purpose
 
-Events will preserve the fact that an important business transition completed and allow notifications, audit, analytics, and later integrations to react independently. The listing MVP does not yet produce domain events.
+Events preserve the fact that an important business transition completed and let notifications, audit, analytics, and later integrations react independently.
+
+## Current local implementation
+
+Milestone 4 introduces a synchronous, in-memory `EventBus` and typed domain events. Shipment, Trip, Booking, and Review services publish after repository persistence. `NotificationService` can subscribe and materialize in-app records when a composition root starts it.
+
+The bus has no network, Firebase, React, or Expo dependency. It is not durable, is not started by the current UI, and does not make unfinished Firestore writes legal.
 
 ## Event envelope
 
 ```json
 {
-  "id": "event-id",
-  "type": "booking.requested",
-  "aggregateType": "booking",
+  "id": "booking.accepted:booking-id:timestamp",
+  "type": "booking.accepted",
   "aggregateId": "booking-id",
-  "actorId": "firebase-uid",
-  "occurredAt": "server timestamp",
+  "actorId": "participant-or-system-id",
+  "occurredAt": "ISO timestamp",
   "schemaVersion": 1,
-  "payload": {}
+  "payload": {
+    "recipientIds": ["firebase-uid"]
+  }
 }
 ```
 
-Payloads carry the minimum data needed by consumers. Consumers load sensitive authoritative records only when their authorization and purpose require it.
+## Current vocabulary
 
-## Initial event vocabulary
-
+- `shipment.created`
+- `trip.created`
 - `booking.requested`
 - `booking.accepted`
 - `booking.declined`
 - `booking.cancelled`
-- `custody.picked_up`
-- `custody.in_transit`
-- `custody.arrived`
-- `custody.delivered`
+- `booking.expired`
+- `package.picked_up`
+- `package.delivered`
 - `review.submitted`
-- `trust.updated`
 
-## Production rules
+## Production direction
 
-- Emit after a validated state transition in the same trusted operation where practical.
-- Use completed-tense business names.
-- Treat handlers as at-least-once and idempotent.
-- Store a handler receipt or deterministic effect key for side effects.
-- Version schemas instead of changing old meaning.
-- Do not use an event as the sole source of current screen state in the early architecture.
-- Avoid package content, contact details, tokens, and evidence URLs in payloads.
+Trusted functions will record durable events after validated transactional changes. Durable handlers use deterministic effect IDs, at-least-once semantics, bounded retries, observability, and failed-effect storage. Payloads remain minimal; consumers load authorized records when needed.
 
-## Failure handling
+## Rules
 
-Retries should use exponential backoff and a bounded attempt policy. Persistent failures need an observable dead-letter or failed-effect record and an operations runbook before event-driven notification delivery is considered production-ready.
+- Use completed-tense business language.
+- Publish only after persistence succeeds.
+- Version schemas rather than changing old meaning.
+- Never include package content, contact details, tokens, or evidence URLs by default.
+- Do not use local events as the sole source of authoritative screen state.
+- Treat push as a reaction, not the system of record.
+
+See [Event Bus](../architecture/event-bus.md), [Application Services](../architecture/application-services.md), and [Event Architecture ADR](../adr/adr-0004-why-event-architecture.md).

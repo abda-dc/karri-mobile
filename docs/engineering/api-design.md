@@ -2,41 +2,44 @@
 
 ## Current interfaces
 
-The current mobile slice has no HTTP API. It uses typed local helpers around Firebase Auth and Firestore:
+The current mobile listing slice has no HTTP API. Existing screens use typed helpers around Firebase Auth and Firestore to create and subscribe to shipment/trip records.
 
-- Start or reuse the temporary Firebase Auth session.
-- Create a shipment or trip for an authenticated UID.
-- Subscribe to owned shipments or trips.
-- Subscribe to active shipment and trip inventory.
+Milestone 4 adds internal application contracts:
 
-These helpers keep collection names, timestamps, and mapping logic outside screens while staying smaller than a generic data-access framework.
+- Presentation-facing service methods for shipment, trip, booking, review, trust, notification, and configuration behavior.
+- Domain repository interfaces that contain no Firebase types.
+- Firebase/Firestore implementation skeletons and mappers under infrastructure.
+- A local event publisher/subscriber contract.
+
+These interfaces are not an authorization boundary. Existing rules still deny booking, custody, review, notification writes, and trust-score records.
 
 ## Future command API
 
-Trust-sensitive actions will use versioned callable Cloud Functions. A command accepts the minimum identifiers and user decisions needed; it does not trust client-supplied owner, status, score, or timestamp fields.
-
-Example shape:
+Trust-sensitive actions use versioned callable Cloud Functions. Commands accept the minimum identifiers and decisions needed; they do not trust client-supplied owner, status, score, actor, or server timestamps.
 
 ```json
 {
   "version": 1,
   "idempotencyKey": "client-generated-unique-key",
-  "shipmentId": "shipment-id",
-  "tripId": "trip-id",
-  "message": "Optional short note"
+  "bookingId": "booking-id",
+  "expectedStatus": "accepted",
+  "action": "start_transit"
 }
 ```
 
-Success returns authoritative IDs and state. Errors return stable codes such as `unauthenticated`, `forbidden`, `invalid-state`, `not-found`, `conflict`, or `rate-limited` with safe user-facing messages.
+Success returns authoritative IDs and state. Errors use stable codes such as `unauthenticated`, `forbidden`, `invalid-state`, `not-found`, `conflict`, or `rate-limited`, with safe user-facing messages.
 
 ## Design rules
 
-- Authenticate and validate App Check before business logic when enforcement is enabled.
-- Do not accept actor UID or server timestamps from clients.
-- Validate size, type, enumeration, and cross-record state.
-- Make retries safe with idempotency keys and transactions.
-- Version inputs/events when compatibility changes.
-- Keep list queries bounded and paginated before corridor volume grows.
-- Document every callable function next to the feature that consumes it.
+- Authenticate and validate App Check when enforcement is enabled.
+- Derive actor UID from Firebase Auth.
+- Validate size, type, enumeration, participants, and current state.
+- Use transactions and idempotency keys for competing commands.
+- Record authoritative server timestamps and durable events after success.
+- Keep list queries bounded and participant-scoped.
+- Map provider data at infrastructure boundaries.
+- Document every callable function beside its consuming feature.
 
-REST endpoints are not introduced without a consumer that cannot use Firebase callable functions or direct authorized reads.
+REST endpoints remain out of scope until a consumer cannot use callable functions or authorized direct reads.
+
+See [Application Services](../architecture/application-services.md), [Repository Pattern](../architecture/repository-pattern.md), and [Booking State Machine](../architecture/booking-state-machine.md).

@@ -11,12 +11,12 @@ import { SectionHeader } from "../../src/components/SectionHeader";
 import { StatusChip } from "../../src/components/StatusChip";
 import { TextField } from "../../src/components/TextField";
 import { TrustBadge } from "../../src/components/TrustBadge";
-import { useAuthSession } from "../../src/lib/auth";
+import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
 import {
   createShipment,
   getFriendlyFirestoreError,
   subscribeToUserShipments,
-} from "../../src/lib/firestore";
+} from "../../src/infrastructure/firebase/firestore";
 import { colors, spacing, typography } from "../../src/theme/tokens";
 import type { Shipment } from "../../src/types/models";
 

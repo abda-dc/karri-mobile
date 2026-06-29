@@ -1,6 +1,5 @@
 import {
-  QueryDocumentSnapshot,
-  Unsubscribe,
+  type Unsubscribe,
   addDoc,
   collection,
   limit,
@@ -10,8 +9,10 @@ import {
   serverTimestamp,
   where,
 } from "firebase/firestore";
-import type { Shipment, ShipmentInput, Trip, TripInput } from "../types/models";
-import { getFirebaseServices } from "./firebase";
+import type { Shipment, ShipmentInput, Trip, TripInput } from "../../types/models";
+import { mapShipment } from "./mappers/shipmentMapper";
+import { mapTrip } from "./mappers/tripMapper";
+import { getFirebaseServices } from "./client";
 
 const MATCH_INVENTORY_LIMIT = 100;
 
@@ -19,51 +20,9 @@ function cleanText(value: string): string {
   return value.trim().replace(/\s+/g, " ");
 }
 
-function mapShipment(snapshot: QueryDocumentSnapshot): Shipment {
-  const data = snapshot.data();
-
-  return {
-    id: snapshot.id,
-    ownerId: data.ownerId,
-    originCountry: data.originCountry,
-    originCity: data.originCity,
-    destinationCountry: data.destinationCountry,
-    destinationCity: data.destinationCity,
-    packageCategory: data.packageCategory,
-    packageDescription: data.packageDescription,
-    weightKg: data.weightKg,
-    deliveryWindow: data.deliveryWindow,
-    rewardAmount: data.rewardAmount,
-    rewardCurrency: data.rewardCurrency,
-    status: data.status,
-    createdAt: data.createdAt ?? null,
-    updatedAt: data.updatedAt ?? null,
-  };
-}
-
-function mapTrip(snapshot: QueryDocumentSnapshot): Trip {
-  const data = snapshot.data();
-
-  return {
-    id: snapshot.id,
-    ownerId: data.ownerId,
-    originCountry: data.originCountry,
-    originCity: data.originCity,
-    destinationCountry: data.destinationCountry,
-    destinationCity: data.destinationCity,
-    departureDate: data.departureDate,
-    arrivalDate: data.arrivalDate,
-    availableCapacityKg: data.availableCapacityKg,
-    notes: data.notes,
-    status: data.status,
-    createdAt: data.createdAt ?? null,
-    updatedAt: data.updatedAt ?? null,
-  };
-}
-
-function newestFirst<T extends { createdAt: Shipment["createdAt"] }>(records: T[]): T[] {
-  return records.sort(
-    (left, right) => (right.createdAt?.toMillis() ?? 0) - (left.createdAt?.toMillis() ?? 0),
+function newestFirst<T extends { createdAt: string | null }>(records: T[]): T[] {
+  return records.sort((left, right) =>
+    (right.createdAt ?? "").localeCompare(left.createdAt ?? ""),
   );
 }
 

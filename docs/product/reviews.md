@@ -2,28 +2,30 @@
 
 ## Current status
 
-Reviews are not implemented. A typed placeholder exists and client access remains denied until booking eligibility and moderation rules are defined.
+Milestone 4 implements a portable Review model, repository contract and Firebase mapper/adapter, plus `ReviewService` eligibility checks and rating aggregation. No review UI or trusted write command exists, and current Firestore rules deny review access.
 
 ## Purpose
 
-Reviews help future participants understand completed behavior. They should capture specific journey qualities without becoming an unmoderated venue for personal attacks or private information.
+Reviews let a sender review a traveler and a traveler review a sender after a completed booking. They describe participant experience; they do not guarantee safety.
 
-## Planned eligibility
+## Implemented domain rules
 
-- The reviewer and subject were participants in the same eligible booking.
-- The booking reached the required completion state.
-- Each participant may submit at most one review of the other for that booking.
-- A review cannot directly set its own trust-score impact.
-- Submission occurs through trusted backend logic.
+- The booking must be `completed`.
+- Reviewer and reviewee must be the two different booking participants.
+- Direction is explicitly `sender_reviews_traveler` or `traveler_reviews_sender`.
+- A participant may submit at most one review for the booking.
+- Rating is an integer from 1 to 5.
+- Comment is required and limited to 1,000 characters in the service foundation.
+- A review publishes `review.submitted` after persistence.
 
-## Review content
+The current service checks duplicates through repository reads. Production enforcement needs a transaction and deterministic uniqueness key in trusted code.
 
-An initial design should use a small rating scale plus structured signals such as communication, punctuality, description accuracy, and handoff reliability. Optional text has a strict length limit and content policy.
+## Display and aggregation
 
-## Display
-
-Show review count and recency with any aggregate. A five-star result from one journey should not appear equivalent to extensive history. Explain that reviews reflect participant experience rather than a guarantee.
+`ReviewService` can calculate average rating and count. Any UI must show both count and context so one review does not resemble extensive history. A review cannot assign its own trust impact.
 
 ## Safety and operations
 
-The launch plan needs reporting, moderation status, appeals, private-data redaction, and retention rules. Removed content should not silently leave trust calculations inconsistent; moderation decisions and derived-score changes require auditable server behavior.
+Launch requires reporting, moderation, appeals, private-data redaction, retention rules, and auditable treatment of removed content. These remain future work.
+
+See [Trust Engine](../architecture/trust-engine.md), [Trust Score](trust-score.md), and [Booking Lifecycle](booking-lifecycle.md).
