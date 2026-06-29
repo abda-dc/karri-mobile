@@ -30,7 +30,7 @@ apps/mobile/
 
 - Home watches active listings through `ShipmentService`/`TripService` and calls `BookingService.request`.
 - Send and Travel create and watch owner listings through services.
-- Tracking watches participant bookings, composes shipment/trip/custody/review detail, and calls booking/custody/review services.
+- Tracking uses one combined `BookingService` subscription for participant bookings and booking requests, composes shipment/trip/custody/review detail, and calls booking/custody/review services.
 - Profile watches bookings and in-app notifications and requests trust summaries.
 - No prioritized Milestone 5 screen imports the legacy Firestore helper; that helper was removed.
 
@@ -38,7 +38,7 @@ Screens decide presentation and available controls, while services and domain gu
 
 ## State approach
 
-Realtime Firestore snapshots feed small screen-local arrays. Form, loading, error, and pending-action state stays local. The singleton event bus and services live in the presentation composition module. No global store is justified yet.
+Realtime Firestore snapshots feed small screen-local arrays. Tracking's combined activity watch owns one cleanup callback that stops its booking and booking-request listeners together. Form, loading, error, and pending-action state stays local. The singleton event bus and services live in the presentation composition module. No global store is justified yet.
 
 ## Quality and limitations
 

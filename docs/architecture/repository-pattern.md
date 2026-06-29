@@ -14,7 +14,7 @@ Repository interfaces live beside their domain models for users, profiles, shipm
 
 Firebase implementations live under `apps/mobile/src/infrastructure/firebase/repositories`, and Firestore conversion lives under `infrastructure/firebase/mappers`. The required implementations are present for User, Profile, Shipment, Trip, Booking, Notification, Review, and Trust; an additional Custody implementation preserves the append/read-only contract.
 
-Firebase adapters now power realtime shipment/trip, participant booking, custody, review, and notification flows. Firestore rules permit only documented actor/state operations and keep custody/review destructive writes and trust-score persistence denied. Production sensitive commands remain a Cloud Functions responsibility.
+Firebase adapters now power realtime shipment/trip, participant booking and booking-request, custody, review, and notification flows. Firestore rules permit only documented actor/state operations and keep custody/review destructive writes and trust-score persistence denied. Production sensitive commands remain a Cloud Functions responsibility.
 
 ## Design principles
 

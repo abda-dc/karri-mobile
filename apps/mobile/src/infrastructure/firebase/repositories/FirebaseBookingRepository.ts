@@ -103,11 +103,19 @@ export class FirebaseBookingRepository implements BookingRepository {
     const { db } = getFirebaseServices();
     let senderBookings: ReadonlyArray<Booking> = [];
     let travelerBookings: ReadonlyArray<Booking> = [];
-    const emit = () => onData(this.mergeBookings(senderBookings, travelerBookings));
+    let senderReady = false;
+    let travelerReady = false;
+    let active = true;
+    const emit = () => {
+      if (active && senderReady && travelerReady) {
+        onData(this.mergeBookings(senderBookings, travelerBookings));
+      }
+    };
     const unsubscribeSender = onSnapshot(
       query(collection(db, "bookings"), where("senderId", "==", userId)),
       (snapshot) => {
         senderBookings = snapshot.docs.map(mapBooking);
+        senderReady = true;
         emit();
       },
       onError,
@@ -116,12 +124,64 @@ export class FirebaseBookingRepository implements BookingRepository {
       query(collection(db, "bookings"), where("travelerId", "==", userId)),
       (snapshot) => {
         travelerBookings = snapshot.docs.map(mapBooking);
+        travelerReady = true;
         emit();
       },
       onError,
     );
 
     return () => {
+      if (!active) {
+        return;
+      }
+
+      active = false;
+      unsubscribeSender();
+      unsubscribeTraveler();
+    };
+  }
+
+  watchRequestsByParticipant(
+    userId: string,
+    onData: (requests: ReadonlyArray<BookingRequest>) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    const { db } = getFirebaseServices();
+    let senderRequests: ReadonlyArray<BookingRequest> = [];
+    let travelerRequests: ReadonlyArray<BookingRequest> = [];
+    let senderReady = false;
+    let travelerReady = false;
+    let active = true;
+    const emit = () => {
+      if (active && senderReady && travelerReady) {
+        onData(this.mergeRequests(senderRequests, travelerRequests));
+      }
+    };
+    const unsubscribeSender = onSnapshot(
+      query(collection(db, "bookingRequests"), where("senderId", "==", userId)),
+      (snapshot) => {
+        senderRequests = snapshot.docs.map(mapBookingRequest);
+        senderReady = true;
+        emit();
+      },
+      onError,
+    );
+    const unsubscribeTraveler = onSnapshot(
+      query(collection(db, "bookingRequests"), where("travelerId", "==", userId)),
+      (snapshot) => {
+        travelerRequests = snapshot.docs.map(mapBookingRequest);
+        travelerReady = true;
+        emit();
+      },
+      onError,
+    );
+
+    return () => {
+      if (!active) {
+        return;
+      }
+
+      active = false;
       unsubscribeSender();
       unsubscribeTraveler();
     };
@@ -179,6 +239,14 @@ export class FirebaseBookingRepository implements BookingRepository {
     travelerBookings: ReadonlyArray<Booking>,
   ): ReadonlyArray<Booking> {
     return [...new Map([...senderBookings, ...travelerBookings].map((booking) => [booking.id, booking])).values()]
+      .sort((left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? ""));
+  }
+
+  private mergeRequests(
+    senderRequests: ReadonlyArray<BookingRequest>,
+    travelerRequests: ReadonlyArray<BookingRequest>,
+  ): ReadonlyArray<BookingRequest> {
+    return [...new Map([...senderRequests, ...travelerRequests].map((request) => [request.id, request])).values()]
       .sort((left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? ""));
   }
 }

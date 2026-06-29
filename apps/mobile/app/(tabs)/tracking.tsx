@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Banner } from "../../src/components/Banner";
 import { Card } from "../../src/components/Card";
@@ -9,7 +9,7 @@ import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
 import { StatusChip } from "../../src/components/StatusChip";
 import { TrustBadge } from "../../src/components/TrustBadge";
-import type { Booking } from "../../src/domain/booking/Booking";
+import type { Booking, BookingRequest } from "../../src/domain/booking/Booking";
 import { BookingDetailCard } from "../../src/presentation/components/BookingDetailCard";
 import { getFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
@@ -19,6 +19,7 @@ import { colors, spacing, typography } from "../../src/theme/tokens";
 export default function TrackingScreen() {
   const auth = useAuthSession();
   const [bookings, setBookings] = useState<ReadonlyArray<Booking>>([]);
+  const [bookingRequests, setBookingRequests] = useState<ReadonlyArray<BookingRequest>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +30,7 @@ export default function TrackingScreen() {
 
     if (!auth.user) {
       setBookings([]);
+      setBookingRequests([]);
       setLoading(false);
       return;
     }
@@ -37,10 +39,11 @@ export default function TrackingScreen() {
     setError(null);
 
     try {
-      return mobileServices.booking.watchForParticipant(
+      return mobileServices.booking.watchActivityForParticipant(
         auth.user.uid,
-        (nextBookings) => {
-          setBookings(nextBookings);
+        (activity) => {
+          setBookings(activity.bookings);
+          setBookingRequests(activity.requests);
           setLoading(false);
         },
         (watchError) => {
@@ -54,6 +57,11 @@ export default function TrackingScreen() {
       return;
     }
   }, [auth.loading, auth.user]);
+
+  const requestsById = useMemo(
+    () => new Map(bookingRequests.map((request) => [request.id, request])),
+    [bookingRequests],
+  );
 
   return (
     <Screen contentStyle={styles.page} withTabBar>
@@ -106,6 +114,7 @@ export default function TrackingScreen() {
             <BookingDetailCard
               key={booking.id}
               booking={booking}
+              bookingRequest={requestsById.get(booking.bookingRequestId)}
               currentUserId={auth.user!.uid}
             />
           ))}

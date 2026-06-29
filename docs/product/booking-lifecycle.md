@@ -31,7 +31,7 @@ Expired remains a trusted-system state with no current client action.
 
 ## Tracking experience
 
-The Tracking tab displays current status, sender/traveler IDs, shipment and trip summaries, next expected action, append-only status history, custody timeline, trust context, and eligible actions. Completed bookings expose one review form per participant.
+The Tracking tab uses a single service-level activity subscription for participant bookings and their booking requests. It displays current request status/message, booking status, sender/traveler IDs, shipment and trip summaries, next expected action, append-only status history, custody timeline, trust context, and eligible actions. Completed bookings expose one review form per participant.
 
 ## Current trust boundary
 

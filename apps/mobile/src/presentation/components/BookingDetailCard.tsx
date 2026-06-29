@@ -5,7 +5,11 @@ import { Card } from "../../components/Card";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { StatusChip } from "../../components/StatusChip";
 import { TextField } from "../../components/TextField";
-import { BookingStatus, type Booking } from "../../domain/booking/Booking";
+import {
+  BookingStatus,
+  type Booking,
+  type BookingRequest,
+} from "../../domain/booking/Booking";
 import {
   CustodyEventType,
   type CustodyEvent,
@@ -20,6 +24,7 @@ import { TrustSummaryCard } from "./TrustSummaryCard";
 
 interface BookingDetailCardProps {
   readonly booking: Booking;
+  readonly bookingRequest?: BookingRequest;
   readonly currentUserId: string;
 }
 
@@ -54,7 +59,11 @@ function nextAction(booking: Booking): string {
   }
 }
 
-export function BookingDetailCard({ booking, currentUserId }: BookingDetailCardProps) {
+export function BookingDetailCard({
+  booking,
+  bookingRequest,
+  currentUserId,
+}: BookingDetailCardProps) {
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [trip, setTrip] = useState<Trip | null>(null);
   const [custody, setCustody] = useState<ReadonlyArray<CustodyEvent>>([]);
@@ -228,6 +237,16 @@ export function BookingDetailCard({ booking, currentUserId }: BookingDetailCardP
           </Text>
         </View>
       </View>
+
+      {bookingRequest ? (
+        <View style={styles.summaryBlock}>
+          <Text style={styles.label}>Booking request</Text>
+          <Text style={styles.muted}>Status: {bookingRequest.status.replace("_", " ")}</Text>
+          {bookingRequest.message ? (
+            <Text style={styles.muted}>Message: {bookingRequest.message}</Text>
+          ) : null}
+        </View>
+      ) : null}
 
       <Banner compact message={nextAction(booking)} title="Next expected action" variant="info" />
 

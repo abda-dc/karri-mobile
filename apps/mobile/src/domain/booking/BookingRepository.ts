@@ -27,6 +27,11 @@ export interface BookingRepository {
     onData: (bookings: ReadonlyArray<Booking>) => void,
     onError: (error: Error) => void,
   ): () => void;
+  watchRequestsByParticipant(
+    userId: string,
+    onData: (requests: ReadonlyArray<BookingRequest>) => void,
+    onError: (error: Error) => void,
+  ): () => void;
   saveTransition(
     booking: Booking,
     request: BookingRequest | null,

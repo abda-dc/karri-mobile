@@ -39,6 +39,11 @@ const requestStatusByBookingStatus: Partial<
   [BookingStatus.Expired]: BookingRequestStatus.Expired,
 };
 
+export interface ParticipantBookingActivity {
+  readonly bookings: ReadonlyArray<Booking>;
+  readonly requests: ReadonlyArray<BookingRequest>;
+}
+
 export class BookingService {
   constructor(
     private readonly bookings: BookingRepository,
@@ -199,6 +204,80 @@ export class BookingService {
     onError: (error: Error) => void,
   ): () => void {
     return this.bookings.watchByParticipant(userId, onData, onError);
+  }
+
+  watchRequestsForParticipant(
+    userId: string,
+    onData: (requests: ReadonlyArray<BookingRequest>) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    return this.bookings.watchRequestsByParticipant(userId, onData, onError);
+  }
+
+  watchActivityForParticipant(
+    userId: string,
+    onData: (activity: ParticipantBookingActivity) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    let bookings: ReadonlyArray<Booking> = [];
+    let requests: ReadonlyArray<BookingRequest> = [];
+    let bookingsReady = false;
+    let requestsReady = false;
+    let active = true;
+    const unsubscribers: Array<() => void> = [];
+    const stop = () => {
+      if (!active) {
+        return;
+      }
+
+      active = false;
+      for (const unsubscribe of unsubscribers.splice(0)) {
+        unsubscribe();
+      }
+    };
+    const emit = () => {
+      if (active && bookingsReady && requestsReady) {
+        onData({ bookings, requests });
+      }
+    };
+    const fail = (error: Error) => {
+      if (!active) {
+        return;
+      }
+
+      stop();
+      onError(error);
+    };
+
+    try {
+      unsubscribers.push(
+        this.watchForParticipant(
+          userId,
+          (nextBookings) => {
+            bookings = nextBookings;
+            bookingsReady = true;
+            emit();
+          },
+          fail,
+        ),
+      );
+      unsubscribers.push(
+        this.watchRequestsForParticipant(
+          userId,
+          (nextRequests) => {
+            requests = nextRequests;
+            requestsReady = true;
+            emit();
+          },
+          fail,
+        ),
+      );
+    } catch (error) {
+      stop();
+      throw error;
+    }
+
+    return stop;
   }
 
   private assertActorCanTransition(
