@@ -1,11 +1,11 @@
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Text, View } from "react-native";
-import { AppScreen } from "../src/components/AppScreen";
-import { InfoCard } from "../src/components/InfoCard";
-import { PrimaryButton } from "../src/components/PrimaryButton";
-import { StatusPill } from "../src/components/StatusPill";
-import { colors, spacing, typography } from "../src/theme/tokens";
+import { AppScreen } from "../../src/components/AppScreen";
+import { InfoCard } from "../../src/components/InfoCard";
+import { PrimaryButton } from "../../src/components/PrimaryButton";
+import { StatusPill } from "../../src/components/StatusPill";
+import { colors, spacing, typography } from "../../src/theme/tokens";
 
 export default function TrackingScreen() {
   return (
@@ -45,3 +45,4 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 });
+

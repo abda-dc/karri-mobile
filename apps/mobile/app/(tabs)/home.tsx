@@ -1,10 +1,10 @@
 import { router } from "expo-router";
 import { StyleSheet, View } from "react-native";
-import { AppScreen } from "../src/components/AppScreen";
-import { InfoCard } from "../src/components/InfoCard";
-import { PrimaryButton } from "../src/components/PrimaryButton";
-import { ScreenHeader } from "../src/components/ScreenHeader";
-import { spacing } from "../src/theme/tokens";
+import { AppScreen } from "../../src/components/AppScreen";
+import { InfoCard } from "../../src/components/InfoCard";
+import { PrimaryButton } from "../../src/components/PrimaryButton";
+import { ScreenHeader } from "../../src/components/ScreenHeader";
+import { spacing } from "../../src/theme/tokens";
 
 export default function AppHomeScreen() {
   return (
@@ -16,11 +16,11 @@ export default function AppHomeScreen() {
       />
 
       <View style={styles.actions}>
-        <PrimaryButton onPress={() => router.push("/send")}>Send a package</PrimaryButton>
-        <PrimaryButton variant="secondary" onPress={() => router.push("/travel")}>
+        <PrimaryButton onPress={() => router.push("/(tabs)/send")}>Send a package</PrimaryButton>
+        <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/travel")}>
           I&apos;m traveling
         </PrimaryButton>
-        <PrimaryButton variant="secondary" onPress={() => router.push("/tracking")}>
+        <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/tracking")}>
           Track a booking
         </PrimaryButton>
       </View>
@@ -52,3 +52,5 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
 });
+
+

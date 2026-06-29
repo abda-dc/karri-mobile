@@ -30,8 +30,8 @@ export default function HomeScreen() {
 
       <View style={styles.actions}>
         <PrimaryButton onPress={() => router.push("/login")}>Sign in with email</PrimaryButton>
-        <PrimaryButton variant="secondary" onPress={() => router.push("/send")}>Send a package</PrimaryButton>
-        <PrimaryButton variant="secondary" onPress={() => router.push("/travel")}>
+        <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/send")}>Send a package</PrimaryButton>
+        <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/travel")}>
           I&apos;m traveling
         </PrimaryButton>
       </View>
@@ -51,7 +51,7 @@ export default function HomeScreen() {
         />
       </View>
 
-      <PrimaryButton variant="secondary" onPress={() => router.push("/tracking")}>
+      <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/tracking")}>
         View tracking placeholder
       </PrimaryButton>
     </AppScreen>
@@ -88,4 +88,5 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
 });
+
 

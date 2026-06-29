@@ -49,7 +49,7 @@ export default function ProfileSetupScreen() {
           body="Identity, contact verification, and stronger safety checks will come later. For now, this is UI-only."
         />
 
-        <PrimaryButton onPress={() => router.push("/home")}>Finish setup</PrimaryButton>
+        <PrimaryButton onPress={() => router.push("/(tabs)/home")}>Finish setup</PrimaryButton>
       </FormCard>
     </AppScreen>
   );
@@ -81,3 +81,4 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
 });
+
