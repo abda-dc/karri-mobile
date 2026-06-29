@@ -71,9 +71,10 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   logo: {
+    alignSelf: "center",
     borderRadius: radii.xl,
-    height: 84,
-    width: 84,
+    height: 132,
+    width: 132,
   },
   heroCopy: {
     gap: spacing.sm,
@@ -126,3 +127,4 @@ const styles = StyleSheet.create({
     width: 1,
   },
 });
+
