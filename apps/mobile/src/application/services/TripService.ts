@@ -60,4 +60,23 @@ export class TripService {
 
     return created;
   }
+
+  findById(tripId: string): Promise<Trip | null> {
+    return this.trips.findById(tripId);
+  }
+
+  watchOwned(
+    ownerId: string,
+    onData: (trips: ReadonlyArray<Trip>) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    return this.trips.watchByOwner(ownerId, onData, onError);
+  }
+
+  watchActive(
+    onData: (trips: ReadonlyArray<Trip>) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    return this.trips.watchActive(onData, onError);
+  }
 }

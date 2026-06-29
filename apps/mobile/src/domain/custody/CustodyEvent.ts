@@ -20,6 +20,7 @@ export interface CustodyEvent {
   readonly timestamp: DomainTimestamp;
   readonly performedBy: string;
   readonly location: string | null;
+  readonly note: string | null;
   readonly metadata: Readonly<Record<string, unknown>>;
 }
 

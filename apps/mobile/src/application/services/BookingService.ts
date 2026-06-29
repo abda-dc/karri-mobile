@@ -22,6 +22,10 @@ import {
 import { ListingStatus } from "../../domain/shipment/Shipment";
 import type { ShipmentRepository } from "../../domain/shipment/ShipmentRepository";
 import type { TripRepository } from "../../domain/trip/TripRepository";
+import {
+  CustodyEventType,
+  type NewCustodyEvent,
+} from "../../domain/custody/CustodyEvent";
 import type { Clock } from "./Clock";
 import { systemClock } from "./Clock";
 import { DomainValidationError, requireText } from "./validation";
@@ -108,6 +112,16 @@ export class BookingService {
         senderId,
         travelerId,
         status: BookingStatus.Pending,
+        statusHistory: [
+          { status: BookingStatus.Pending, changedAt: this.clock.now(), changedBy: senderId },
+        ],
+      },
+      initialCustodyEvent: {
+        eventType: CustodyEventType.ShipmentCreated,
+        performedBy: senderId,
+        location: null,
+        note: "Booking request created for this shipment.",
+        metadata: { bookingStatus: BookingStatus.Pending },
       },
     });
     const occurredAt = created.booking.createdAt ?? this.clock.now();
@@ -140,7 +154,12 @@ export class BookingService {
     this.assertActorCanTransition(booking, input.actorId, input.nextStatus);
 
     const occurredAt = this.clock.now();
-    const transitioned = transitionBooking(booking, input.nextStatus, occurredAt);
+    const transitioned = transitionBooking(
+      booking,
+      input.nextStatus,
+      occurredAt,
+      input.actorId,
+    );
     const requestStatus = requestStatusByBookingStatus[input.nextStatus];
     let request: BookingRequest | null = null;
 
@@ -151,7 +170,12 @@ export class BookingService {
         : null;
     }
 
-    const saved = await this.bookings.saveTransition(transitioned, request);
+    const lifecycleCustodyEvent = this.createLifecycleCustody(transitioned, input);
+    const saved = await this.bookings.saveTransition(
+      transitioned,
+      request,
+      lifecycleCustodyEvent,
+    );
     const event = this.createTransitionEvent(saved.booking, input.actorId, occurredAt);
 
     if (event) {
@@ -159,6 +183,22 @@ export class BookingService {
     }
 
     return saved.booking;
+  }
+
+  findById(bookingId: string): Promise<Booking | null> {
+    return this.bookings.findById(bookingId);
+  }
+
+  listForParticipant(userId: string): Promise<ReadonlyArray<Booking>> {
+    return this.bookings.listByParticipant(userId);
+  }
+
+  watchForParticipant(
+    userId: string,
+    onData: (bookings: ReadonlyArray<Booking>) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    return this.bookings.watchByParticipant(userId, onData, onError);
   }
 
   private assertActorCanTransition(
@@ -201,24 +241,73 @@ export class BookingService {
       aggregateId: booking.id,
       actorId,
       occurredAt,
-      payload: { recipientIds: [booking.senderId, booking.travelerId] },
     };
 
     switch (booking.status) {
       case BookingStatus.Accepted:
-        return createPlatformEvent<BookingAccepted>({ type: "booking.accepted", ...common });
+        return createPlatformEvent<BookingAccepted>({
+          type: "booking.accepted",
+          ...common,
+          payload: { recipientIds: [booking.senderId] },
+        });
       case BookingStatus.Declined:
-        return createPlatformEvent<BookingDeclined>({ type: "booking.declined", ...common });
+        return createPlatformEvent<BookingDeclined>({
+          type: "booking.declined",
+          ...common,
+          payload: { recipientIds: [booking.senderId] },
+        });
       case BookingStatus.Cancelled:
-        return createPlatformEvent<BookingCancelled>({ type: "booking.cancelled", ...common });
+        return createPlatformEvent<BookingCancelled>({
+          type: "booking.cancelled",
+          ...common,
+          payload: { recipientIds: [booking.travelerId] },
+        });
       case BookingStatus.Expired:
-        return createPlatformEvent<BookingExpired>({ type: "booking.expired", ...common });
+        return createPlatformEvent<BookingExpired>({
+          type: "booking.expired",
+          ...common,
+          payload: { recipientIds: [booking.senderId, booking.travelerId] },
+        });
       case BookingStatus.InTransit:
-        return createPlatformEvent<PackagePickedUp>({ type: "package.picked_up", ...common });
+        return createPlatformEvent<PackagePickedUp>({
+          type: "package.picked_up",
+          ...common,
+          payload: { recipientIds: [booking.senderId] },
+        });
       case BookingStatus.Delivered:
-        return createPlatformEvent<PackageDelivered>({ type: "package.delivered", ...common });
+        return createPlatformEvent<PackageDelivered>({
+          type: "package.delivered",
+          ...common,
+          payload: { recipientIds: [booking.senderId] },
+        });
       default:
         return null;
     }
+  }
+
+  private createLifecycleCustody(
+    booking: Booking,
+    input: TransitionBookingDto,
+  ): NewCustodyEvent | null {
+    const eventTypeByStatus: Partial<Record<BookingStatus, CustodyEventType>> = {
+      [BookingStatus.Accepted]: CustodyEventType.TravelerAccepted,
+      [BookingStatus.InTransit]: CustodyEventType.PickupConfirmed,
+      [BookingStatus.Delivered]: CustodyEventType.DeliveryConfirmed,
+      [BookingStatus.Completed]: CustodyEventType.Completed,
+    };
+    const eventType = eventTypeByStatus[booking.status];
+
+    if (!eventType) {
+      return null;
+    }
+
+    return {
+      bookingId: booking.id,
+      eventType,
+      performedBy: input.actorId,
+      location: input.location?.trim() || null,
+      note: input.note?.trim() || null,
+      metadata: { bookingStatus: booking.status },
+    };
   }
 }

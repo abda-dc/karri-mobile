@@ -1,5 +1,7 @@
 import { router } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { Banner } from "../../src/components/Banner";
 import { Card } from "../../src/components/Card";
 import { EmptyState } from "../../src/components/EmptyState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
@@ -7,52 +9,108 @@ import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
 import { StatusChip } from "../../src/components/StatusChip";
 import { TrustBadge } from "../../src/components/TrustBadge";
+import type { Booking } from "../../src/domain/booking/Booking";
+import { BookingDetailCard } from "../../src/presentation/components/BookingDetailCard";
+import { getFriendlyError } from "../../src/presentation/errors/getFriendlyError";
+import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
+import { mobileServices } from "../../src/presentation/services/mobileServices";
 import { colors, spacing, typography } from "../../src/theme/tokens";
 
-const plannedStages = ["Pickup", "In transit", "Delivered"];
-
 export default function TrackingScreen() {
+  const auth = useAuthSession();
+  const [bookings, setBookings] = useState<ReadonlyArray<Booking>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (auth.loading) {
+      return;
+    }
+
+    if (!auth.user) {
+      setBookings([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      return mobileServices.booking.watchForParticipant(
+        auth.user.uid,
+        (nextBookings) => {
+          setBookings(nextBookings);
+          setLoading(false);
+        },
+        (watchError) => {
+          setError(getFriendlyError(watchError));
+          setLoading(false);
+        },
+      );
+    } catch (watchError) {
+      setError(getFriendlyError(watchError));
+      setLoading(false);
+      return;
+    }
+  }, [auth.loading, auth.user]);
+
   return (
     <Screen contentStyle={styles.page} withTabBar>
       <SectionHeader
-        eyebrow="Chain of custody"
-        subtitle="A future Karri journey will make responsibility and handoffs easy to understand."
+        action={!loading && auth.user ? <StatusChip label={`${bookings.length} bookings`} tone="info" /> : undefined}
+        eyebrow="Booking and custody"
+        subtitle="Follow each accepted agreement from request through completion."
         title="Tracking with clarity"
       />
 
       <TrustBadge
-        detail="Every important handoff is designed to become visible and understandable."
-        label="Custody-first experience"
+        detail="Every lifecycle change is guarded, and custody records are appended rather than rewritten."
+        label="Visible responsibility"
       />
 
-      <EmptyState
-        action={
-          <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/home")}>
-            Back to home
-          </PrimaryButton>
-        }
-        description="There are no trackable journeys in this MVP. Booking and custody workflows are not active yet."
-        marker="C"
-        title="Nothing to track yet"
-      />
+      {auth.loading || loading ? (
+        <Card style={styles.loadingCard} variant="outlined">
+          <ActivityIndicator color={colors.primary} />
+          <Text style={styles.muted}>Loading your bookings...</Text>
+        </Card>
+      ) : null}
 
-      <Card variant="outlined">
-        <SectionHeader
-          subtitle="The eventual timeline will prioritize current responsibility and the next expected action."
-          title="Planned journey view"
+      {!auth.loading && !auth.user ? (
+        <EmptyState
+          action={<PrimaryButton onPress={() => router.push("/login")}>Get started</PrimaryButton>}
+          description="Start a Karri session to view bookings and custody history."
+          marker="C"
+          title="Sign in to track a booking"
         />
-        <View style={styles.stages}>
-          {plannedStages.map((stage, index) => (
-            <View key={stage} style={styles.stageRow}>
-              <StatusChip label="Planned" tone="neutral" />
-              <View style={styles.stageCopy}>
-                <Text style={styles.stageTitle}>{stage}</Text>
-                <Text style={styles.stageBody}>Step {index + 1} of the custody journey.</Text>
-              </View>
-            </View>
+      ) : null}
+
+      {error ? <Banner message={error} title="Bookings could not load" variant="error" /> : null}
+
+      {!loading && auth.user && !error && bookings.length === 0 ? (
+        <EmptyState
+          action={
+            <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/home")}>
+              View route matches
+            </PrimaryButton>
+          }
+          description="Request a booking from an eligible route match. Traveler requests appear here too."
+          marker="B"
+          title="No bookings yet"
+        />
+      ) : null}
+
+      {!loading && auth.user && !error ? (
+        <View style={styles.list}>
+          {bookings.map((booking) => (
+            <BookingDetailCard
+              key={booking.id}
+              booking={booking}
+              currentUserId={auth.user!.uid}
+            />
           ))}
         </View>
-      </Card>
+      ) : null}
     </Screen>
   );
 }
@@ -61,26 +119,15 @@ const styles = StyleSheet.create({
   page: {
     gap: spacing.xl,
   },
-  stages: {
-    gap: spacing.md,
+  list: {
+    gap: spacing.xl,
   },
-  stageRow: {
-    alignItems: "flex-start",
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
+  loadingCard: {
+    alignItems: "center",
     flexDirection: "row",
-    gap: spacing.md,
-    paddingTop: spacing.md,
+    justifyContent: "center",
   },
-  stageCopy: {
-    flex: 1,
-    gap: spacing.xxs,
-  },
-  stageTitle: {
-    color: colors.text,
-    ...typography.label,
-  },
-  stageBody: {
+  muted: {
     color: colors.textSecondary,
     ...typography.caption,
   },

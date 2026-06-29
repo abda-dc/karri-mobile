@@ -11,8 +11,11 @@ Firebase Authentication proves which account is making a request. Firestore and 
 - Owners can update their own shipment/trip while owner and creation time remain immutable.
 - Signed-in users can read active shipment/trip records for matching.
 - Owners can read their own inactive records.
-- Booking requests, bookings, custody events, and reviews default to denied until their workflows are implemented.
-- Notification recipients may read their own records, while clients cannot create or mutate notifications.
+- Booking requests/bookings are participant-readable; only the expected sender/traveler can perform an allowlisted forward transition.
+- Custody events are participant-readable and append-only for the expected actor/state.
+- Completed-booking participants create one deterministic review per direction; updates/deletes are denied.
+- Notification recipients read/mark their own records; validated event actors create deterministic in-app records.
+- `trustScores` and client profile trust mutation remain denied.
 
 ## Query/rule relationship
 
@@ -20,7 +23,7 @@ Firestore rules do not filter result sets. An owner list query must constrain `o
 
 ## Future participant authorization
 
-Bookings will name sender and traveler UIDs. Participant reads can then require membership, while state transitions remain functions-only. Custody events will validate the actor against both booking participation and the expected transition. Reviews will require an eligible completed booking and one review per reviewer/subject pair.
+The current rules implement participant membership and expected transitions for the MVP. Production Cloud Functions will add transactional command validation, idempotency, durable events, and capacity coordination without broadening client permissions.
 
 ## Administrative access
 

@@ -20,7 +20,7 @@ This document covers the implemented service foundations for shipments, trips, b
 | `TrustService` | Validate evidence inputs, invoke the versioned calculator, persist the result |
 | `RemoteConfigService` | Serve safe typed defaults and optionally refresh from a provider |
 
-Services import repository interfaces and domain types; they do not import Firestore. Existing screens are not yet wired to them, so the currently visible listing flow remains unchanged.
+Services import repository interfaces and domain types; they do not import Firestore. A singleton presentation composition now injects Firebase adapters and the event bus. Home, Send, Travel, Tracking, and Profile use the service layer.
 
 ## Design principles
 
@@ -33,9 +33,9 @@ Services import repository interfaces and domain types; they do not import Fires
 
 ## Future direction
 
-Create a composition root that injects repositories and the event bus, then migrate shipment/trip screens one flow at a time. Implement sensitive services behind callable Cloud Functions with transactions and idempotency. Add unit tests with in-memory repositories before connecting new UI.
+Keep the service contracts while moving sensitive persistence behind callable Cloud Functions with transactions, idempotency, and durable events. Add unit tests with in-memory repositories and Emulator Suite integration coverage.
 
-Zustand remains deferred. The current app uses screen-local state and Firebase listeners, and no cross-screen client-owned state currently justifies another dependency. When services are wired and multiple routes coordinate the same pending data, add small feature stores such as Auth, Booking, Shipment, Trip, Notification, and Settings stores. Stores may cache state and actions but must not absorb domain rules.
+Zustand remains deferred. Screens use thin local state and service-backed realtime watches. Add small feature stores only when multiple routes genuinely coordinate the same client-owned pending state; stores must not absorb domain rules.
 
 ## Out of scope
 

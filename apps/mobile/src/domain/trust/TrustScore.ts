@@ -29,3 +29,9 @@ export interface TrustScore {
   readonly factors: ReadonlyArray<TrustFactorResult>;
   readonly calculatedAt: string;
 }
+
+export interface TrustSummary {
+  readonly score: TrustScore;
+  readonly inputs: TrustInputs;
+  readonly evidenceScope: "participant_history" | "reviews_only";
+}

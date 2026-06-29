@@ -12,7 +12,7 @@ The central trust question in peer-to-peer delivery is who possessed the package
 
 Represent custody as an append-only collection of events tied to a booking. Cloud Functions will validate the participant, expected prior state, event type, timestamp, and permitted evidence before append. The booking may hold a derived current status for efficient display, but custody events remain the audit history.
 
-No custody transition is implemented in the current listing slice.
+Milestone 5 implements an append-only MVP timeline guarded by application rules and Firestore participant/state policy. No update or delete path exists. Trusted transactional functions, deterministic effect IDs, evidence policy, and correction linkage remain future hardening.
 
 ## Consequences
 

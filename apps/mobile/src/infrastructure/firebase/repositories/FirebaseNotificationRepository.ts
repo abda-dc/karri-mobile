@@ -1,12 +1,12 @@
 import {
-  addDoc,
   collection,
   doc,
-  getDoc,
   getDocs,
+  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -25,13 +25,26 @@ import {
 export class FirebaseNotificationRepository implements NotificationRepository {
   async create(notification: NewNotification): Promise<Notification> {
     const { db } = getFirebaseServices();
-    const reference = await addDoc(collection(db, "notifications"), {
+    const effectId = [
+      notification.type.replace(/[^a-z0-9]+/gi, "_"),
+      notification.relatedEntityId ?? "none",
+      notification.recipientId,
+    ].join("__");
+    const reference = doc(db, "notifications", effectId);
+    await setDoc(reference, {
       ...toFirestoreNotification(notification),
       readAt: null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
-    return mapNotification(await getDoc(reference));
+    const occurredAt = new Date().toISOString();
+    return {
+      ...notification,
+      id: reference.id,
+      readAt: null,
+      createdAt: occurredAt,
+      updatedAt: occurredAt,
+    };
   }
 
   async listByRecipient(recipientId: string): Promise<ReadonlyArray<Notification>> {
@@ -44,6 +57,23 @@ export class FirebaseNotificationRepository implements NotificationRepository {
       ),
     );
     return snapshot.docs.map(mapNotification);
+  }
+
+  watchByRecipient(
+    recipientId: string,
+    onData: (notifications: ReadonlyArray<Notification>) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    const { db } = getFirebaseServices();
+    return onSnapshot(
+      query(
+        collection(db, "notifications"),
+        where("userId", "==", recipientId),
+        orderBy("createdAt", "desc"),
+      ),
+      (snapshot) => onData(snapshot.docs.map(mapNotification)),
+      onError,
+    );
   }
 
   async markRead(notificationId: string, _readAt: string): Promise<void> {

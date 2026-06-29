@@ -12,22 +12,27 @@ The mobile app accesses Auth and Firestore through the Firebase client SDK. Ther
 
 ## Direct client operations
 
-Direct writes are limited to records where one authenticated owner controls the content:
+Direct writes cover owner-controlled listing data plus the Milestone 5 participant workflow constrained by Firestore rules:
 
 - Create and update that user's shipment listing.
 - Create and update that user's trip listing.
 - Read owned listings.
 - Read active shipment/trip inventory for matching.
+- Create one deterministic pending booking/request for an eligible match.
+- Apply role/state-guarded forward booking transitions.
+- Append expected custody events; never update/delete them.
+- Submit one deterministic completed-booking review per direction.
+- Create validated in-app notification effects and let recipients mark them read.
 
 The owner UID comes from Firebase Auth. Rules verify ownership and the permitted document shape.
 
-## Planned Cloud Function operations
+## Planned Cloud Function migration
 
 Cloud Functions will own commands that coordinate participants or create trust evidence:
 
 | Command | Why trusted execution is required |
 | --- | --- |
-| Request booking | Links sender, traveler, shipment, and trip consistently |
+| Request booking | Moves current rule-validated batch into trusted command code |
 | Accept/decline booking | Validates traveler role and current state |
 | Record custody | Enforces transition order and append-only evidence |
 | Confirm delivery | Prevents unilateral status overwrite |

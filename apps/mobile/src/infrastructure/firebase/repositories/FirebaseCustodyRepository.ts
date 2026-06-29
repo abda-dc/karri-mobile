@@ -1,10 +1,12 @@
 import {
-  addDoc,
   collection,
+  doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   serverTimestamp,
+  setDoc,
   where,
 } from "firebase/firestore";
 import type {
@@ -21,7 +23,8 @@ import {
 export class FirebaseCustodyRepository implements CustodyRepository {
   async append(event: NewCustodyEvent): Promise<CustodyEvent> {
     const { db } = getFirebaseServices();
-    const reference = await addDoc(collection(db, "custodyEvents"), {
+    const reference = doc(db, "custodyEvents", `${event.bookingId}__${event.eventType}`);
+    await setDoc(reference, {
       ...toFirestoreCustodyEvent(event),
       timestamp: serverTimestamp(),
     });
@@ -36,5 +39,25 @@ export class FirebaseCustodyRepository implements CustodyRepository {
     return snapshot.docs
       .map(mapCustodyEvent)
       .sort((left, right) => (left.timestamp ?? "").localeCompare(right.timestamp ?? ""));
+  }
+
+  watchByBooking(
+    bookingId: string,
+    onData: (events: ReadonlyArray<CustodyEvent>) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    const { db } = getFirebaseServices();
+    return onSnapshot(
+      query(collection(db, "custodyEvents"), where("bookingId", "==", bookingId)),
+      (snapshot) =>
+        onData(
+          snapshot.docs
+            .map(mapCustodyEvent)
+            .sort((left, right) =>
+              (left.timestamp ?? "").localeCompare(right.timestamp ?? ""),
+            ),
+        ),
+      onError,
+    );
   }
 }

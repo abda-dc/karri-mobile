@@ -1,55 +1,35 @@
 # Event Architecture
 
-## Purpose
+## Current implementation
 
-Events preserve the fact that an important business transition completed and let notifications, audit, analytics, and later integrations react independently.
+Application services publish typed completed facts to one synchronous in-memory `EventBus` created by the mobile composition root. `NotificationService` subscribes once and materializes Firestore in-app notifications.
 
-## Current local implementation
-
-Milestone 4 introduces a synchronous, in-memory `EventBus` and typed domain events. Shipment, Trip, Booking, and Review services publish after repository persistence. `NotificationService` can subscribe and materialize in-app records when a composition root starts it.
-
-The bus has no network, Firebase, React, or Expo dependency. It is not durable, is not started by the current UI, and does not make unfinished Firestore writes legal.
-
-## Event envelope
+Current events are `shipment.created`, `trip.created`, `booking.requested`, `booking.accepted`, `booking.declined`, `booking.cancelled`, `booking.expired`, `package.picked_up`, `package.delivered`, and `review.submitted`. Notification handlers subscribe only to booking, package, and review events required by Milestone 5.
 
 ```json
 {
   "id": "booking.accepted:booking-id:timestamp",
   "type": "booking.accepted",
   "aggregateId": "booking-id",
-  "actorId": "participant-or-system-id",
+  "actorId": "firebase-uid",
   "occurredAt": "ISO timestamp",
   "schemaVersion": 1,
-  "payload": {
-    "recipientIds": ["firebase-uid"]
-  }
+  "payload": { "recipientIds": ["firebase-uid"] }
 }
 ```
 
-## Current vocabulary
+## Delivery behavior
 
-- `shipment.created`
-- `trip.created`
-- `booking.requested`
-- `booking.accepted`
-- `booking.declined`
-- `booking.cancelled`
-- `booking.expired`
-- `package.picked_up`
-- `package.delivered`
-- `review.submitted`
+- Services publish only after their primary repository operation succeeds.
+- The local bus invokes subscribers synchronously.
+- Notification writes begin asynchronously and report failure to the composition root logger.
+- Deterministic notification IDs prevent duplicate effects after a retry.
+- Firestore rules validate the source state before accepting a notification.
 
-## Production direction
+## Limitations and future direction
 
-Trusted functions will record durable events after validated transactional changes. Durable handlers use deterministic effect IDs, at-least-once semantics, bounded retries, observability, and failed-effect storage. Payloads remain minimal; consumers load authorized records when needed.
+The bus is not durable and does not provide replay, cross-device delivery, retry queues, atomic business/effect transactions, or dead-letter handling. Cloud Functions should eventually record durable events in trusted transactions and run idempotent consumers.
 
-## Rules
+Payloads remain identifier-only and exclude package content, contact details, tokens, and evidence URLs.
 
-- Use completed-tense business language.
-- Publish only after persistence succeeds.
-- Version schemas rather than changing old meaning.
-- Never include package content, contact details, tokens, or evidence URLs by default.
-- Do not use local events as the sole source of authoritative screen state.
-- Treat push as a reaction, not the system of record.
-
-See [Event Bus](../architecture/event-bus.md), [Application Services](../architecture/application-services.md), and [Event Architecture ADR](../adr/adr-0004-why-event-architecture.md).
+See [Event Bus](../architecture/event-bus.md), [Notifications](../product/notifications.md), and [Event Architecture ADR](../adr/adr-0004-why-event-architecture.md).

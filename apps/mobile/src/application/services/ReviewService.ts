@@ -10,7 +10,7 @@ import type { Review } from "../../domain/review/Review";
 import type { ReviewRepository } from "../../domain/review/ReviewRepository";
 import type { Clock } from "./Clock";
 import { systemClock } from "./Clock";
-import { DomainValidationError, requireText } from "./validation";
+import { DomainValidationError, optionalText } from "./validation";
 
 export class ReviewService {
   constructor(
@@ -60,7 +60,7 @@ export class ReviewService {
       revieweeId: input.revieweeId,
       direction: input.direction,
       rating: input.rating,
-      comment: requireText(input.comment, "comment", 1000),
+      comment: optionalText(input.comment, "comment", 1000),
     });
     const occurredAt = review.createdAt ?? this.clock.now();
 
@@ -89,5 +89,9 @@ export class ReviewService {
 
     const average = reviews.reduce((total, review) => total + review.rating, 0) / reviews.length;
     return { average: Math.round(average * 100) / 100, count: reviews.length };
+  }
+
+  listForBooking(bookingId: string): Promise<ReadonlyArray<Review>> {
+    return this.reviews.listByBooking(bookingId);
   }
 }

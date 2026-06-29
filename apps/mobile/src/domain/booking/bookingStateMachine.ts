@@ -34,6 +34,7 @@ export function transitionBooking(
   booking: Booking,
   nextStatus: BookingStatus,
   occurredAt: string,
+  changedBy: string,
 ): Booking {
   if (!canTransitionBooking(booking.status, nextStatus)) {
     throw new InvalidBookingTransitionError(booking.status, nextStatus);
@@ -42,6 +43,10 @@ export function transitionBooking(
   return {
     ...booking,
     status: nextStatus,
+    statusHistory: [
+      ...booking.statusHistory,
+      { status: nextStatus, changedAt: occurredAt, changedBy },
+    ],
     updatedAt: occurredAt,
   };
 }

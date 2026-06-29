@@ -2,10 +2,15 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
+  onSnapshot,
+  query,
   serverTimestamp,
+  where,
   writeBatch,
 } from "firebase/firestore";
 import type { Booking, BookingRequest } from "../../../domain/booking/Booking";
+import type { NewCustodyEvent } from "../../../domain/custody/CustodyEvent";
 import type {
   BookingRepository,
   CreatedBookingRecords,
@@ -18,16 +23,24 @@ import {
   toFirestoreBooking,
   toFirestoreBookingRequest,
 } from "../mappers/bookingMapper";
+import { toFirestoreCustodyEvent } from "../mappers/custodyMapper";
 
 export class FirebaseBookingRepository implements BookingRepository {
   async createRequest(records: NewBookingRecords): Promise<CreatedBookingRecords> {
     const { db } = getFirebaseServices();
-    const requestReference = doc(collection(db, "bookingRequests"));
-    const bookingReference = doc(collection(db, "bookings"));
+    const bookingKey = `${records.booking.shipmentId}__${records.booking.tripId}`;
+    const requestReference = doc(db, "bookingRequests", `request__${bookingKey}`);
+    const bookingReference = doc(db, "bookings", `booking__${bookingKey}`);
+    const custodyReference = doc(
+      db,
+      "custodyEvents",
+      `${bookingReference.id}__${records.initialCustodyEvent.eventType}`,
+    );
     const batch = writeBatch(db);
 
     batch.set(requestReference, {
       ...toFirestoreBookingRequest(records.request),
+      bookingId: bookingReference.id,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -38,6 +51,13 @@ export class FirebaseBookingRepository implements BookingRepository {
       }),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+    });
+    batch.set(custodyReference, {
+      ...toFirestoreCustodyEvent({
+        ...records.initialCustodyEvent,
+        bookingId: bookingReference.id,
+      }),
+      timestamp: serverTimestamp(),
     });
     await batch.commit();
 
@@ -63,9 +83,54 @@ export class FirebaseBookingRepository implements BookingRepository {
     return snapshot.exists() ? mapBookingRequest(snapshot) : null;
   }
 
+  async listByParticipant(userId: string): Promise<ReadonlyArray<Booking>> {
+    const { db } = getFirebaseServices();
+    const [senderSnapshot, travelerSnapshot] = await Promise.all([
+      getDocs(query(collection(db, "bookings"), where("senderId", "==", userId))),
+      getDocs(query(collection(db, "bookings"), where("travelerId", "==", userId))),
+    ]);
+    return this.mergeBookings(
+      senderSnapshot.docs.map(mapBooking),
+      travelerSnapshot.docs.map(mapBooking),
+    );
+  }
+
+  watchByParticipant(
+    userId: string,
+    onData: (bookings: ReadonlyArray<Booking>) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    const { db } = getFirebaseServices();
+    let senderBookings: ReadonlyArray<Booking> = [];
+    let travelerBookings: ReadonlyArray<Booking> = [];
+    const emit = () => onData(this.mergeBookings(senderBookings, travelerBookings));
+    const unsubscribeSender = onSnapshot(
+      query(collection(db, "bookings"), where("senderId", "==", userId)),
+      (snapshot) => {
+        senderBookings = snapshot.docs.map(mapBooking);
+        emit();
+      },
+      onError,
+    );
+    const unsubscribeTraveler = onSnapshot(
+      query(collection(db, "bookings"), where("travelerId", "==", userId)),
+      (snapshot) => {
+        travelerBookings = snapshot.docs.map(mapBooking);
+        emit();
+      },
+      onError,
+    );
+
+    return () => {
+      unsubscribeSender();
+      unsubscribeTraveler();
+    };
+  }
+
   async saveTransition(
     booking: Booking,
     request: BookingRequest | null,
+    lifecycleCustodyEvent: NewCustodyEvent | null,
   ): Promise<{ readonly booking: Booking; readonly request: BookingRequest | null }> {
     const { db } = getFirebaseServices();
     const bookingReference = doc(db, "bookings", booking.id);
@@ -84,6 +149,19 @@ export class FirebaseBookingRepository implements BookingRepository {
         updatedAt: serverTimestamp(),
       });
     }
+    if (lifecycleCustodyEvent) {
+      batch.set(
+        doc(
+          db,
+          "custodyEvents",
+          `${booking.id}__${lifecycleCustodyEvent.eventType}`,
+        ),
+        {
+          ...toFirestoreCustodyEvent(lifecycleCustodyEvent),
+          timestamp: serverTimestamp(),
+        },
+      );
+    }
     await batch.commit();
 
     const [bookingSnapshot, requestSnapshot] = await Promise.all([
@@ -94,5 +172,13 @@ export class FirebaseBookingRepository implements BookingRepository {
       booking: mapBooking(bookingSnapshot),
       request: requestSnapshot ? mapBookingRequest(requestSnapshot) : null,
     };
+  }
+
+  private mergeBookings(
+    senderBookings: ReadonlyArray<Booking>,
+    travelerBookings: ReadonlyArray<Booking>,
+  ): ReadonlyArray<Booking> {
+    return [...new Map([...senderBookings, ...travelerBookings].map((booking) => [booking.id, booking])).values()]
+      .sort((left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? ""));
   }
 }

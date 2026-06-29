@@ -12,11 +12,9 @@ import { StatusChip } from "../../src/components/StatusChip";
 import { TextField } from "../../src/components/TextField";
 import { TrustBadge } from "../../src/components/TrustBadge";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
-import {
-  createTrip,
-  getFriendlyFirestoreError,
-  subscribeToUserTrips,
-} from "../../src/infrastructure/firebase/firestore";
+import { getFriendlyError } from "../../src/presentation/errors/getFriendlyError";
+import { mobileServices } from "../../src/presentation/services/mobileServices";
+import { TrustSummaryCard } from "../../src/presentation/components/TrustSummaryCard";
 import { colors, spacing, typography } from "../../src/theme/tokens";
 import type { Trip } from "../../src/types/models";
 
@@ -43,7 +41,7 @@ function isValidDateInput(value: string): boolean {
 export default function TravelScreen() {
   const auth = useAuthSession();
   const [form, setForm] = useState(emptyForm);
-  const [trips, setTrips] = useState<Trip[]>([]);
+  const [trips, setTrips] = useState<ReadonlyArray<Trip>>([]);
   const [listLoading, setListLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -65,7 +63,7 @@ export default function TravelScreen() {
     setDataError(null);
 
     try {
-      return subscribeToUserTrips(
+      return mobileServices.trip.watchOwned(
         auth.user.uid,
         (nextTrips) => {
           setTrips(nextTrips);
@@ -73,12 +71,12 @@ export default function TravelScreen() {
           setDataError(null);
         },
         (error) => {
-          setDataError(getFriendlyFirestoreError(error));
+          setDataError(getFriendlyError(error));
           setListLoading(false);
         },
       );
     } catch (error) {
-      setDataError(getFriendlyFirestoreError(error));
+      setDataError(getFriendlyError(error));
       setListLoading(false);
     }
   }, [auth.loading, auth.user]);
@@ -135,7 +133,8 @@ export default function TravelScreen() {
     setSuccessMessage(null);
 
     try {
-      await createTrip(auth.user.uid, {
+      await mobileServices.trip.create({
+        ownerId: auth.user.uid,
         originCountry: form.originCountry,
         originCity: form.originCity,
         destinationCountry: form.destinationCountry,
@@ -148,7 +147,7 @@ export default function TravelScreen() {
       setForm(emptyForm);
       setSuccessMessage("Trip saved. It is now available for corridor matching.");
     } catch (error) {
-      setFormError(getFriendlyFirestoreError(error));
+      setFormError(getFriendlyError(error));
     } finally {
       setSaving(false);
     }
@@ -344,6 +343,12 @@ export default function TravelScreen() {
                     </View>
                     <Text style={styles.mutedText}>Arrives {trip.arrivalDate}</Text>
                     {trip.notes ? <Text style={styles.descriptionText}>{trip.notes}</Text> : null}
+                    <TrustSummaryCard
+                      accountCreatedAt={auth.user?.createdAt}
+                      compact
+                      title="Traveler trust"
+                      userId={trip.ownerId}
+                    />
                   </Card>
                 ))
               : null}

@@ -12,7 +12,7 @@ Shipment and trip owners can safely maintain their own listing fields under Fire
 
 Use Firebase Cloud Functions for trust-sensitive commands and server-triggered reactions. Callable functions will validate identity, participants, current state, requested transition, and idempotency before using transactions to update state and record domain events.
 
-The current listing slice does not deploy functions. Direct client writes remain limited to owner-controlled shipment and trip records.
+No function is deployed yet. Milestone 5 introduces an explicit MVP exception: Firebase Auth plus strict Firestore rules permit participant-scoped booking, custody, review, and notification operations so the first end-to-end flow can be tested. The production decision in this ADR is unchanged; these client-orchestrated effects must migrate to transactional functions with emulator coverage and idempotency before launch.
 
 ## Consequences
 

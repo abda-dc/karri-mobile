@@ -1,6 +1,7 @@
 import type { BookingStatus } from "../../domain/booking/Booking";
 import type { ReviewDirection } from "../../domain/review/Review";
 import type { TrustInputs } from "../../domain/trust/TrustScore";
+import type { CustodyEventType } from "../../domain/custody/CustodyEvent";
 
 export interface CreateShipmentDto {
   readonly ownerId: string;
@@ -40,6 +41,16 @@ export interface TransitionBookingDto {
   readonly bookingId: string;
   readonly actorId: string;
   readonly nextStatus: BookingStatus;
+  readonly location?: string;
+  readonly note?: string;
+}
+
+export interface RecordCustodyEventDto {
+  readonly bookingId: string;
+  readonly actorId: string;
+  readonly eventType: CustodyEventType;
+  readonly location?: string;
+  readonly note?: string;
 }
 
 export interface SubmitReviewDto {

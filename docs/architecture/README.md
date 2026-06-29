@@ -10,7 +10,7 @@ This overview describes dependency direction, implementation status, and where d
 
 ## Current implementation
 
-The authoritative backend is Firebase/Firestore. The implemented mobile listing slice still calls focused Firebase helpers from presentation code. Milestone 4 introduces the layered foundation that later flows will adopt:
+The authoritative backend is Firebase/Firestore. Milestone 5 composes the Milestone 4 layers into the current mobile flow:
 
 ```text
 Presentation
@@ -20,7 +20,7 @@ Presentation
         -> Firestore
 ```
 
-The new domain and application code is portable TypeScript. Firebase-specific classes are isolated under `apps/mobile/src/infrastructure/firebase`. Trust-sensitive collections remain denied to the mobile client, so compile-safe adapters do not make unfinished flows operational.
+Domain and application code remains portable TypeScript. Firebase-specific classes are isolated under `apps/mobile/src/infrastructure/firebase`. Home, Send, Travel, Tracking, and Profile call application services or presentation components/hooks. Firestore rules permit only participant-scoped, state-guarded booking/custody/review/notification operations; authoritative trust-score persistence remains denied.
 
 ## Design principles
 
@@ -34,14 +34,14 @@ The new domain and application code is portable TypeScript. Firebase-specific cl
 
 ## Future direction
 
-Migrate current shipment and trip flows behind services, add pure-domain tests, implement trusted Cloud Function commands, and connect the local contracts to server-validated persistence. Add Remote Config, durable events, notifications, and offline hardening only after their platform-specific behavior is verified.
+Add pure-domain and Emulator Suite tests, then move sensitive commands and durable event effects into Cloud Functions with transactions and idempotency. Add Remote Config, push channels, and offline hardening only after platform behavior is verified.
 
 ## Out of scope
 
 - The old Karri monorepo and its deployment assumptions.
 - A second backend platform.
 - Features listed as Milestone 4 non-goals.
-- Claims that unconnected skeletons are production features.
+- Claims that the current client/rules boundary is production-hardened.
 
 ## Related documents
 

@@ -11,15 +11,7 @@ interface NotificationTemplate {
   readonly body: string;
 }
 
-const templates: Record<PlatformEventType, NotificationTemplate> = {
-  "shipment.created": {
-    title: "Shipment saved",
-    body: "Your shipment is ready for corridor matching.",
-  },
-  "trip.created": {
-    title: "Trip saved",
-    body: "Your trip is ready for corridor matching.",
-  },
+const templates: Partial<Record<PlatformEventType, NotificationTemplate>> = {
   "booking.requested": {
     title: "Booking requested",
     body: "A booking request needs your attention.",
@@ -85,6 +77,10 @@ export class NotificationService {
 
   private async createNotifications(event: PlatformDomainEvent): Promise<void> {
     const template = templates[event.type];
+
+    if (!template) {
+      return;
+    }
     const recipients = [...new Set(event.payload.recipientIds)];
 
     await Promise.all(
@@ -94,11 +90,23 @@ export class NotificationService {
           title: template.title,
           body: template.body,
           type: event.type,
-          relatedEntityType: event.type.split(".")[0],
+          relatedEntityType: event.type.startsWith("review.") ? "review" : "booking",
           relatedEntityId: event.aggregateId,
           status: NotificationStatus.Unread,
         }),
       ),
     );
+  }
+
+  watchForRecipient(
+    recipientId: string,
+    onData: Parameters<NotificationRepository["watchByRecipient"]>[1],
+    onError: Parameters<NotificationRepository["watchByRecipient"]>[2],
+  ): () => void {
+    return this.notifications.watchByRecipient(recipientId, onData, onError);
+  }
+
+  markRead(notificationId: string): Promise<void> {
+    return this.notifications.markRead(notificationId, new Date().toISOString());
   }
 }

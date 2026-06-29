@@ -11,11 +11,11 @@ Milestone 4 adds internal application contracts:
 - Firebase/Firestore implementation skeletons and mappers under infrastructure.
 - A local event publisher/subscriber contract.
 
-These interfaces are not an authorization boundary. Existing rules still deny booking, custody, review, notification writes, and trust-score records.
+These interfaces are not an authorization boundary. Milestone 5 Firestore rules now allow only participant-scoped, state-guarded booking/custody/review/notification operations and still deny trust-score records.
 
 ## Future command API
 
-Trust-sensitive actions use versioned callable Cloud Functions. Commands accept the minimum identifiers and decisions needed; they do not trust client-supplied owner, status, score, actor, or server timestamps.
+The current mobile client calls services whose Firebase repositories are constrained by Firestore rules. The production direction remains versioned callable Cloud Functions. Commands accept the minimum identifiers and decisions needed; they do not trust client-supplied owner, status, score, actor, or server timestamps.
 
 ```json
 {

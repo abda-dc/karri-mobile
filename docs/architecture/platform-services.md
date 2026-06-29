@@ -21,7 +21,7 @@ This document covers the Expo mobile runtime, Firebase platform services, source
 | GitHub Actions | MkDocs validation and publication | Active for documentation only |
 | MkDocs Material | Platform handbook | Active |
 
-Firebase is the authoritative backend direction. Firebase initialization, Auth operations, Firestore access, mappers, and repository adapters all live under `apps/mobile/src/infrastructure/firebase`. Existing listing screens still call the narrow infrastructure helper directly until migration behind application services is intentional and tested.
+Firebase is the authoritative backend direction. Firebase initialization, Auth operations, Firestore access, mappers, and repository adapters all live under `apps/mobile/src/infrastructure/firebase`. Home, Send, Travel, Tracking, and Profile now use application services or presentation hooks/components rather than a direct Firestore helper.
 
 ## Design principles
 

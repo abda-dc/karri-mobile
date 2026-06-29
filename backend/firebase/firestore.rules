@@ -76,6 +76,191 @@ service cloud.firestore {
         && validListingStatus(data.status);
     }
 
+    function isBookingParticipant(data) {
+      return signedIn()
+        && (data.senderId == request.auth.uid || data.travelerId == request.auth.uid);
+    }
+
+    function validBookingStatus(status) {
+      return status in [
+        'pending',
+        'accepted',
+        'in_transit',
+        'delivered',
+        'completed',
+        'cancelled',
+        'declined',
+        'expired'
+      ];
+    }
+
+    function validBookingRequest(data) {
+      return data.keys().hasOnly([
+          'bookingId',
+          'shipmentId',
+          'tripId',
+          'senderId',
+          'travelerId',
+          'message',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.bookingId is string
+        && data.shipmentId is string
+        && data.tripId is string
+        && data.senderId is string
+        && data.travelerId is string
+        && data.senderId != data.travelerId
+        && data.message is string && data.message.size() <= 500
+        && data.status in ['pending', 'accepted', 'declined', 'cancelled', 'expired']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function validBooking(data) {
+      return data.keys().hasOnly([
+          'bookingRequestId',
+          'shipmentId',
+          'tripId',
+          'senderId',
+          'travelerId',
+          'status',
+          'statusHistory',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.bookingRequestId is string
+        && data.shipmentId is string
+        && data.tripId is string
+        && data.senderId is string
+        && data.travelerId is string
+        && data.senderId != data.travelerId
+        && validBookingStatus(data.status)
+        && data.statusHistory is list
+        && data.statusHistory.size() > 0
+        && data.statusHistory.size() <= 8
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function validBookingListings(data) {
+      let shipmentPath = /databases/$(database)/documents/shipments/$(data.shipmentId);
+      let tripPath = /databases/$(database)/documents/trips/$(data.tripId);
+      let shipment = get(shipmentPath).data;
+      let trip = get(tripPath).data;
+      return exists(shipmentPath)
+        && exists(tripPath)
+        && shipment.ownerId == data.senderId
+        && trip.ownerId == data.travelerId
+        && shipment.status == 'active'
+        && trip.status == 'active'
+        && shipment.originCountry == trip.originCountry
+        && shipment.originCity == trip.originCity
+        && shipment.destinationCountry == trip.destinationCountry
+        && shipment.destinationCity == trip.destinationCity
+        && shipment.weightKg <= trip.availableCapacityKg;
+    }
+
+    function bookingCoreUnchanged() {
+      return request.resource.data.bookingRequestId == resource.data.bookingRequestId
+        && request.resource.data.shipmentId == resource.data.shipmentId
+        && request.resource.data.tripId == resource.data.tripId
+        && request.resource.data.senderId == resource.data.senderId
+        && request.resource.data.travelerId == resource.data.travelerId
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function validBookingTransition() {
+      return (
+          resource.data.status == 'pending'
+          && request.resource.data.status in ['accepted', 'declined']
+          && request.auth.uid == resource.data.travelerId
+        ) || (
+          resource.data.status == 'pending'
+          && request.resource.data.status == 'cancelled'
+          && request.auth.uid == resource.data.senderId
+        ) || (
+          resource.data.status == 'accepted'
+          && request.resource.data.status == 'in_transit'
+          && request.auth.uid == resource.data.travelerId
+        ) || (
+          resource.data.status == 'in_transit'
+          && request.resource.data.status == 'delivered'
+          && request.auth.uid == resource.data.travelerId
+        ) || (
+          resource.data.status == 'delivered'
+          && request.resource.data.status == 'completed'
+          && request.auth.uid == resource.data.senderId
+        );
+    }
+
+    function validAppendedBookingHistory() {
+      let history = request.resource.data.statusHistory;
+      let last = history[history.size() - 1];
+      return history.size() == resource.data.statusHistory.size() + 1
+        && history[0] == resource.data.statusHistory[0]
+        && (resource.data.statusHistory.size() < 2
+          || history[1] == resource.data.statusHistory[1])
+        && (resource.data.statusHistory.size() < 3
+          || history[2] == resource.data.statusHistory[2])
+        && (resource.data.statusHistory.size() < 4
+          || history[3] == resource.data.statusHistory[3])
+        && (resource.data.statusHistory.size() < 5
+          || history[4] == resource.data.statusHistory[4])
+        && (resource.data.statusHistory.size() < 6
+          || history[5] == resource.data.statusHistory[5])
+        && (resource.data.statusHistory.size() < 7
+          || history[6] == resource.data.statusHistory[6])
+        && last.status == request.resource.data.status
+        && last.changedBy == request.auth.uid
+        && last.changedAt is timestamp;
+    }
+
+    function bookingRequestCoreUnchanged() {
+      return request.resource.data.bookingId == resource.data.bookingId
+        && request.resource.data.shipmentId == resource.data.shipmentId
+        && request.resource.data.tripId == resource.data.tripId
+        && request.resource.data.senderId == resource.data.senderId
+        && request.resource.data.travelerId == resource.data.travelerId
+        && request.resource.data.message == resource.data.message
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function validBookingRequestTransition() {
+      return resource.data.status == 'pending'
+        && (
+          (request.resource.data.status in ['accepted', 'declined']
+            && request.auth.uid == resource.data.travelerId)
+          || (request.resource.data.status == 'cancelled'
+            && request.auth.uid == resource.data.senderId)
+        );
+    }
+
+    function linkedBookingMatchesRequest(requestId, data) {
+      let booking = getAfter(
+        /databases/$(database)/documents/bookings/$(data.bookingId)
+      ).data;
+      return booking.bookingRequestId == requestId
+        && booking.shipmentId == data.shipmentId
+        && booking.tripId == data.tripId
+        && booking.senderId == data.senderId
+        && booking.travelerId == data.travelerId
+        && booking.status == data.status;
+    }
+
+    function linkedRequestMatchesBooking(bookingId, data) {
+      let bookingRequest = getAfter(
+        /databases/$(database)/documents/bookingRequests/$(data.bookingRequestId)
+      ).data;
+      return bookingRequest.bookingId == bookingId
+        && bookingRequest.shipmentId == data.shipmentId
+        && bookingRequest.tripId == data.tripId
+        && bookingRequest.senderId == data.senderId
+        && bookingRequest.travelerId == data.travelerId
+        && bookingRequest.status == data.status;
+    }
+
     match /users/{userId} {
       allow read: if signedIn() && request.auth.uid == userId;
       allow create: if signedIn()
@@ -132,27 +317,287 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // These lifecycle collections remain deny-by-default until callable Cloud
-    // Functions, participant rules, and emulator tests are implemented.
     match /bookingRequests/{requestId} {
-      allow read, write: if false;
+      allow read: if isBookingParticipant(resource.data);
+      allow create: if signedIn()
+        && request.auth.uid == request.resource.data.senderId
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validBookingRequest(request.resource.data)
+        && validBookingListings(request.resource.data)
+        && linkedBookingMatchesRequest(requestId, request.resource.data);
+      allow update: if isBookingParticipant(resource.data)
+        && bookingRequestCoreUnchanged()
+        && validBookingRequest(request.resource.data)
+        && validBookingRequestTransition()
+        && request.resource.data.updatedAt == request.time
+        && getAfter(
+          /databases/$(database)/documents/bookings/$(resource.data.bookingId)
+        ).data.status == request.resource.data.status;
+      allow delete: if false;
     }
 
     match /bookings/{bookingId} {
-      allow read, write: if false;
+      allow read: if isBookingParticipant(resource.data);
+      allow create: if signedIn()
+        && request.auth.uid == request.resource.data.senderId
+        && request.resource.data.status == 'pending'
+        && request.resource.data.statusHistory.size() == 1
+        && request.resource.data.statusHistory[0].status == 'pending'
+        && request.resource.data.statusHistory[0].changedBy == request.auth.uid
+        && request.resource.data.statusHistory[0].changedAt is timestamp
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validBooking(request.resource.data)
+        && validBookingListings(request.resource.data)
+        && linkedRequestMatchesBooking(bookingId, request.resource.data);
+      allow update: if isBookingParticipant(resource.data)
+        && bookingCoreUnchanged()
+        && validBooking(request.resource.data)
+        && validBookingTransition()
+        && validAppendedBookingHistory()
+        && (resource.data.status != 'pending'
+          || getAfter(
+            /databases/$(database)/documents/bookingRequests/$(resource.data.bookingRequestId)
+          ).data.status == request.resource.data.status)
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
     }
 
     match /custodyEvents/{eventId} {
-      allow read, write: if false;
+      allow read: if isBookingParticipant(
+        get(/databases/$(database)/documents/bookings/$(resource.data.bookingId)).data
+      );
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'bookingId',
+          'eventType',
+          'performedBy',
+          'location',
+          'note',
+          'metadata',
+          'timestamp'
+        ])
+        && request.resource.data.bookingId is string
+        && request.resource.data.eventType in [
+          'shipment_created',
+          'traveler_accepted',
+          'pickup_confirmed',
+          'airport_departure',
+          'airport_arrival',
+          'delivery_confirmed',
+          'completed'
+        ]
+        && request.resource.data.performedBy == request.auth.uid
+        && (request.resource.data.location == null
+          || (request.resource.data.location is string
+            && request.resource.data.location.size() <= 160))
+        && (request.resource.data.note == null
+          || (request.resource.data.note is string
+            && request.resource.data.note.size() <= 500))
+        && request.resource.data.metadata is map
+        && request.resource.data.timestamp == request.time
+        && isBookingParticipant(
+          getAfter(
+            /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+          ).data
+        )
+        && (
+          (request.resource.data.eventType == 'shipment_created'
+            && request.auth.uid == getAfter(
+              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+            ).data.senderId
+            && getAfter(
+              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+            ).data.status == 'pending')
+          || (request.resource.data.eventType == 'traveler_accepted'
+            && request.auth.uid == getAfter(
+              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+            ).data.travelerId
+            && getAfter(
+              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+            ).data.status == 'accepted')
+          || (request.resource.data.eventType in ['pickup_confirmed', 'airport_departure', 'airport_arrival']
+            && request.auth.uid == getAfter(
+              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+            ).data.travelerId
+            && getAfter(
+              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+            ).data.status == 'in_transit')
+          || (request.resource.data.eventType == 'delivery_confirmed'
+            && request.auth.uid == getAfter(
+              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+            ).data.travelerId
+            && getAfter(
+              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+            ).data.status == 'delivered')
+          || (request.resource.data.eventType == 'completed'
+            && request.auth.uid == getAfter(
+              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+            ).data.senderId
+            && getAfter(
+              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+            ).data.status == 'completed')
+        );
+      allow update, delete: if false;
     }
 
     match /reviews/{reviewId} {
-      allow read, write: if false;
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'bookingId',
+          'reviewerId',
+          'subjectId',
+          'direction',
+          'rating',
+          'comment',
+          'createdAt',
+          'updatedAt'
+        ])
+        && reviewId == request.resource.data.bookingId
+          + '__' + request.resource.data.reviewerId
+          + '__' + request.resource.data.subjectId
+        && request.resource.data.reviewerId == request.auth.uid
+        && request.resource.data.reviewerId != request.resource.data.subjectId
+        && request.resource.data.direction in [
+          'sender_reviews_traveler',
+          'traveler_reviews_sender'
+        ]
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() <= 1000
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && get(
+          /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+        ).data.status == 'completed'
+        && (
+          (request.resource.data.reviewerId == get(
+            /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+          ).data.senderId
+            && request.resource.data.subjectId == get(
+              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+            ).data.travelerId
+            && request.resource.data.direction == 'sender_reviews_traveler')
+          || (request.resource.data.reviewerId == get(
+            /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+          ).data.travelerId
+            && request.resource.data.subjectId == get(
+              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+            ).data.senderId
+            && request.resource.data.direction == 'traveler_reviews_sender')
+        );
+      allow update, delete: if false;
     }
 
     match /notifications/{notificationId} {
       allow read: if signedIn() && resource.data.userId == request.auth.uid;
-      allow write: if false;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'userId',
+          'title',
+          'body',
+          'type',
+          'relatedEntityType',
+          'relatedId',
+          'status',
+          'readAt',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.userId is string
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 500
+        && request.resource.data.status == 'unread'
+        && request.resource.data.readAt == null
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && (
+          (request.resource.data.relatedEntityType == 'booking'
+            && request.resource.data.relatedId is string
+            && (
+              (request.resource.data.type == 'booking.requested'
+                && request.auth.uid == get(
+                  /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                ).data.senderId
+                && request.resource.data.userId == get(
+                  /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                ).data.travelerId
+                && get(
+                  /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                ).data.status == 'pending')
+              || (((request.resource.data.type == 'booking.accepted'
+                    && get(
+                      /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                    ).data.status == 'accepted')
+                  || (request.resource.data.type == 'booking.declined'
+                    && get(
+                      /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                    ).data.status == 'declined'))
+                && request.auth.uid == get(
+                  /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                ).data.travelerId
+                && request.resource.data.userId == get(
+                  /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                ).data.senderId
+                )
+              || (request.resource.data.type == 'booking.cancelled'
+                && request.auth.uid == get(
+                  /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                ).data.senderId
+                && request.resource.data.userId == get(
+                  /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                ).data.travelerId
+                && get(
+                  /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                ).data.status == 'cancelled')
+              || (((request.resource.data.type == 'package.picked_up'
+                    && get(
+                      /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                    ).data.status == 'in_transit')
+                  || (request.resource.data.type == 'package.delivered'
+                    && get(
+                      /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                    ).data.status == 'delivered'))
+                && request.auth.uid == get(
+                  /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                ).data.travelerId
+                && request.resource.data.userId == get(
+                  /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                ).data.senderId
+                )
+            ))
+          || (request.resource.data.relatedEntityType == 'review'
+            && request.resource.data.type == 'review.submitted'
+            && request.auth.uid == get(
+              /databases/$(database)/documents/reviews/$(request.resource.data.relatedId)
+            ).data.reviewerId
+            && request.resource.data.userId == get(
+              /databases/$(database)/documents/reviews/$(request.resource.data.relatedId)
+            ).data.subjectId)
+        );
+      allow update: if signedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'readAt',
+          'updatedAt'
+        ])
+        && resource.data.status == 'unread'
+        && request.resource.data.status == 'read'
+        && request.resource.data.readAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    match /trustScores/{userId} {
+      allow read, write: if false;
     }
 
     match /{document=**} {

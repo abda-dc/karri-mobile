@@ -14,16 +14,15 @@ Karri Mobile is a fresh Expo React Native application backed by Firebase. It doe
 
 ```mermaid
 flowchart TB
-    UI[Expo Router presentation] --> Direct[Current narrow infrastructure helper]
-    Direct --> Firebase[Firebase SDK]
+    UI[Expo Router presentation] --> Services[Application services]
+    UI --> Hooks[Presentation hooks and composed views]
     Firebase --> Auth[Firebase Authentication]
     Firebase --> FS[Cloud Firestore]
     Firebase --> Storage[Cloud Storage initialized, unused]
 
-    UI -. migration path .-> Services[Application services]
     Services --> Domain[Portable domain rules and events]
     Services --> Ports[Repository interfaces]
-    Ports --> Adapters[Firebase repository skeletons and mappers]
+    Ports --> Adapters[Firebase repositories and mappers]
     Adapters --> Firebase
 
     FS -. future trusted commands .-> Functions[Cloud Functions]
@@ -31,14 +30,15 @@ flowchart TB
     Functions -. future .-> DurableEvents[(Durable event records)]
 ```
 
-The current shipped listing path remains direct and narrow:
+The current mobile path is layered:
 
-- Authenticated users create `shipments` and `trips` with their Firebase UID as owner.
-- Screens subscribe to owner-scoped lists and active inventory.
-- Home computes exact corridor matches locally.
-- Firestore server timestamps are authoritative for current records.
+- Authenticated users create owner-scoped shipments/trips through services.
+- Home watches active inventory, computes exact matches, and requests bookings.
+- Tracking watches participant bookings/custody and invokes guarded service actions.
+- Profile watches notifications and displays visible-evidence trust summaries.
+- Firestore rules and server timestamps enforce the current MVP persistence boundary.
 
-Milestone 4 adds plain domain models, repository contracts, application services, a synchronous in-memory event bus, Firestore mappers, and Firebase repository skeletons. These are compile-safe foundations, not a claim that booking, custody, reviews, notifications, trust display, or Remote Config are live.
+Milestone 5 connects booking, custody, in-app notification, review, and trust-display foundations to mobile screens. Remote Config, push channels, and authoritative trust persistence remain unconnected.
 
 ## Design principles
 
@@ -51,15 +51,15 @@ Milestone 4 adds plain domain models, repository contracts, application services
 
 ## Future direction
 
-Existing listing screens will migrate behind application services without changing user-visible behavior. Cloud Functions will then implement transactional booking, custody, review, notification, and trust commands. Durable server events will support at-least-once consumers, while the local event bus remains useful for in-process reactions and tests.
+Cloud Functions will replace client-orchestrated sensitive persistence with transactional booking, custody, review, notification, and trust commands. Durable server events will support at-least-once consumers, while the local event bus remains useful for in-process reactions and tests.
 
 Firebase Remote Config, FCM, App Check, and offline persistence require their own validated adapters and rollout gates before activation. Expo/EAS will eventually package releases, and Firebase CLI automation will deploy reviewed rules, indexes, and functions.
 
 ## Out of scope
 
-- Rewriting existing screens in this milestone.
+- Major UI redesign beyond the booking/trust flow.
 - Deploying Cloud Functions or changing Firestore security rules.
-- Treating repository skeletons as an authorization boundary.
+- Treating mobile validation alone as an authorization boundary.
 - Payments, disputes, chat, SMS, AI matching, admin tooling, or a web app.
 
 ## Related documents

@@ -14,7 +14,8 @@ Firebase web configuration is public project metadata and is supplied through `E
 - Owner IDs come from Firebase Auth.
 - Profile rules prevent a client from assigning or changing the reserved trust-score field.
 - Firestore rules constrain listing ownership, mutable fields, types, and active marketplace reads.
-- Unimplemented trust-sensitive collections default to deny.
+- Lifecycle rules use participant membership, immutable identifiers, finite transitions, deterministic IDs, and server timestamps; unspecified access defaults to deny.
+- Custody/review updates and deletes and all `trustScores` access remain denied.
 - Storage defaults to deny because no upload flow is implemented.
 - Listener and write errors are shown without exposing configuration values.
 - Server timestamps prevent clients from choosing audit timestamps.

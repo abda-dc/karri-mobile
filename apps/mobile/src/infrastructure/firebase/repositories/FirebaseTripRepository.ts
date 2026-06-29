@@ -4,6 +4,8 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
+  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
@@ -41,5 +43,39 @@ export class FirebaseTripRepository implements TripRepository {
       ),
     );
     return snapshot.docs.map(mapTrip);
+  }
+
+  watchByOwner(
+    ownerId: string,
+    onData: (trips: ReadonlyArray<Trip>) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    const { db } = getFirebaseServices();
+    return onSnapshot(
+      query(
+        collection(db, "trips"),
+        where("ownerId", "==", ownerId),
+        orderBy("createdAt", "desc"),
+      ),
+      (snapshot) => onData(snapshot.docs.map(mapTrip)),
+      onError,
+    );
+  }
+
+  watchActive(
+    onData: (trips: ReadonlyArray<Trip>) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    const { db } = getFirebaseServices();
+    return onSnapshot(
+      query(
+        collection(db, "trips"),
+        where("status", "==", "active"),
+        orderBy("createdAt", "desc"),
+        limit(100),
+      ),
+      (snapshot) => onData(snapshot.docs.map(mapTrip)),
+      onError,
+    );
   }
 }

@@ -11,11 +11,9 @@ import { SectionHeader } from "../../src/components/SectionHeader";
 import { StatusChip } from "../../src/components/StatusChip";
 import { TrustBadge } from "../../src/components/TrustBadge";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
-import {
-  getFriendlyFirestoreError,
-  subscribeToActiveShipments,
-  subscribeToActiveTrips,
-} from "../../src/infrastructure/firebase/firestore";
+import { getFriendlyError } from "../../src/presentation/errors/getFriendlyError";
+import { mobileServices } from "../../src/presentation/services/mobileServices";
+import { TrustSummaryCard } from "../../src/presentation/components/TrustSummaryCard";
 import { colors, spacing, typography } from "../../src/theme/tokens";
 import type { Shipment, Trip } from "../../src/types/models";
 
@@ -25,7 +23,7 @@ type CorridorMatch = {
 };
 
 function normalizeRoutePart(value: string): string {
-  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+  return value.trim().replace(/\s+/g, " ");
 }
 
 function corridorsMatch(shipment: Shipment, trip: Trip): boolean {
@@ -40,11 +38,14 @@ function corridorsMatch(shipment: Shipment, trip: Trip): boolean {
 
 export default function AppHomeScreen() {
   const auth = useAuthSession();
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [trips, setTrips] = useState<Trip[]>([]);
+  const [shipments, setShipments] = useState<ReadonlyArray<Shipment>>([]);
+  const [trips, setTrips] = useState<ReadonlyArray<Trip>>([]);
   const [shipmentsLoading, setShipmentsLoading] = useState(true);
   const [tripsLoading, setTripsLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
+  const [requestingMatch, setRequestingMatch] = useState<string | null>(null);
+  const [requestMessage, setRequestMessage] = useState<string | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
 
   useEffect(() => {
     if (auth.loading) {
@@ -67,31 +68,31 @@ export default function AppHomeScreen() {
 
     try {
       unsubscribers.push(
-        subscribeToActiveShipments(
+        mobileServices.shipment.watchActive(
           (nextShipments) => {
             setShipments(nextShipments);
             setShipmentsLoading(false);
           },
           (error) => {
-            setDataError(getFriendlyFirestoreError(error));
+            setDataError(getFriendlyError(error));
             setShipmentsLoading(false);
           },
         ),
       );
       unsubscribers.push(
-        subscribeToActiveTrips(
+        mobileServices.trip.watchActive(
           (nextTrips) => {
             setTrips(nextTrips);
             setTripsLoading(false);
           },
           (error) => {
-            setDataError(getFriendlyFirestoreError(error));
+            setDataError(getFriendlyError(error));
             setTripsLoading(false);
           },
         ),
       );
     } catch (error) {
-      setDataError(getFriendlyFirestoreError(error));
+      setDataError(getFriendlyError(error));
       setShipmentsLoading(false);
       setTripsLoading(false);
     }
@@ -110,6 +111,31 @@ export default function AppHomeScreen() {
   );
 
   const isLoading = auth.loading || shipmentsLoading || tripsLoading;
+
+  async function handleRequestBooking(shipment: Shipment, trip: Trip) {
+    if (!auth.user) {
+      return;
+    }
+
+    const matchId = `${shipment.id}:${trip.id}`;
+    setRequestingMatch(matchId);
+    setRequestMessage(null);
+    setRequestError(null);
+
+    try {
+      await mobileServices.booking.request({
+        shipmentId: shipment.id,
+        tripId: trip.id,
+        senderId: auth.user.uid,
+        travelerId: trip.ownerId,
+      });
+      setRequestMessage("Booking requested. The traveler has an in-app notification.");
+    } catch (error) {
+      setRequestError(getFriendlyError(error));
+    } finally {
+      setRequestingMatch(null);
+    }
+  }
 
   return (
     <Screen contentStyle={styles.page} withTabBar>
@@ -171,6 +197,13 @@ export default function AppHomeScreen() {
             <Banner message={dataError} title="Matches could not load" variant="error" />
           ) : null}
 
+          {requestError ? (
+            <Banner message={requestError} title="Booking request failed" variant="error" />
+          ) : null}
+          {requestMessage ? (
+            <Banner message={requestMessage} title="Request sent" variant="success" />
+          ) : null}
+
           {!isLoading && !dataError && matches.length === 0 ? (
             <EmptyState
               action={
@@ -229,6 +262,17 @@ export default function AppHomeScreen() {
                     title="Match scope"
                     variant="info"
                   />
+
+                  <TrustSummaryCard compact title="Traveler trust" userId={trip.ownerId} />
+
+                  {shipment.ownerId === auth.user?.uid && trip.ownerId !== auth.user?.uid ? (
+                    <PrimaryButton
+                      loading={requestingMatch === `${shipment.id}:${trip.id}`}
+                      onPress={() => handleRequestBooking(shipment, trip)}
+                    >
+                      Request booking
+                    </PrimaryButton>
+                  ) : null}
                 </Card>
               ))
             : null}

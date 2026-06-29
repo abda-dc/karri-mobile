@@ -27,7 +27,7 @@
 3. An exact origin country/city and destination country/city match becomes a possible match card.
 4. The card provides context only. It does not rank, request a booking, charge money, or promise compatibility by date/weight.
 
-## Future booking and custody journey
+## Current booking and custody journey
 
 ```mermaid
 sequenceDiagram

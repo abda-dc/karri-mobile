@@ -2,63 +2,50 @@
 
 ## Stack
 
-- Expo React Native and TypeScript.
-- Expo Router for file-based navigation.
-- Firebase modular JavaScript SDK.
-- React state and Firebase listeners in the current UI; Zustand is not installed.
-- Plain TypeScript domain and application foundations.
-- Shared visual tokens and small presentational components.
+- Expo React Native, Expo Router, React, and strict TypeScript.
+- Firebase modular SDK isolated under `src/infrastructure/firebase`.
+- Portable domain models/rules and application services.
+- React screen state and realtime repository watches; Zustand remains uninstalled.
 
 ## Source layout
 
 ```text
 apps/mobile/
-  app/                         Expo Router screens and layouts
+  app/                              Expo Router screens
   src/
-    application/
-      dto/                     Presentation-to-service command shapes
-      services/                Validation and orchestration
-    components/                Reusable mobile UI primitives
-    domain/
-      booking/                 Booking model, repository port, state machine
-      configuration/           Typed operational configuration
-      custody/                 Immutable custody model and append/read port
-      events/                  Domain events and synchronous event bus
-      notification/            In-app notification model and port
-      profile/ user/           Account models and ports
-      review/ trust/           Review and explainable trust foundations
-      shipment/ trip/          Listing models and ports
+    application/dto/                Service command shapes
+    application/services/           Validation and orchestration
+    domain/                          Models, state guards, events, repository ports
     infrastructure/firebase/
-      mappers/                 Firestore-to-domain conversion
-      repositories/            Firebase repository skeletons
-    presentation/hooks/        React-facing Auth session bridge
-    presentation/stores/       Future thin feature stores if coordination warrants them
-    theme/                     Design tokens
-    types/                     Provider-independent compatibility aliases and inputs
+      mappers/                       Firestore/domain conversion
+      repositories/                  Realtime Firebase adapters
+    presentation/
+      components/                    Booking and trust composed views
+      errors/                        Provider-neutral user messages
+      hooks/                         Auth session bridge
+      services/                      Singleton mobile service composition
 ```
 
-## Dependency direction
+## Current screen-to-service flow
 
-Presentation should call application services. Services depend on domain models and repository interfaces. Firebase implementations point inward to those interfaces. Domain and application code do not import Firestore.
+- Home watches active listings through `ShipmentService`/`TripService` and calls `BookingService.request`.
+- Send and Travel create and watch owner listings through services.
+- Tracking watches participant bookings, composes shipment/trip/custody/review detail, and calls booking/custody/review services.
+- Profile watches bookings and in-app notifications and requests trust summaries.
+- No prioritized Milestone 5 screen imports the legacy Firestore helper; that helper was removed.
 
-The existing shipment/trip screens still call the narrow infrastructure Firestore helper. This preserves the working slice while the service seam is tested; it is an explicit migration state, not the final architecture.
+Screens decide presentation and available controls, while services and domain guards repeat every business rule. Firebase repositories and security rules remain the persistence/access boundary.
 
 ## State approach
 
-- Auth state is observed with the existing Firebase hook.
-- Firestore records arrive through `onSnapshot` subscriptions.
-- Screens own loading, error, records, and short-lived form state.
-- Matching remains derived locally.
-- Business rules introduced in Milestone 4 live in services/domain, not stores.
+Realtime Firestore snapshots feed small screen-local arrays. Form, loading, error, and pending-action state stays local. The singleton event bus and services live in the presentation composition module. No global store is justified yet.
 
-Zustand was evaluated and deferred. Add small feature stores only when multiple routes coordinate client-owned service state beyond Firebase listeners. Avoid one global store and keep Auth, Booking, Shipment, Trip, Notification, and Settings state separate if adopted.
+## Quality and limitations
 
-## Quality rules
-
-- Keep Firebase imports out of domain/application code.
-- Detach subscriptions and event handlers.
-- Distinguish pending local state from server confirmation.
-- Expose disabled/loading/error states in plain language.
-- Test on devices; TypeScript and Expo Doctor cannot prove runtime behavior.
+- Domain/application code remains Firebase-free.
+- Service and repository watches return explicit unsubscribe callbacks.
+- Booking status and custody timelines distinguish stored facts from planned actions.
+- Mobile business operations and asynchronous notification effects are not one atomic server transaction.
+- Device testing and Firebase Emulator Suite authorization tests remain necessary.
 
 See [Application Services](../architecture/application-services.md), [Offline Strategy](../architecture/offline-strategy.md), and [Technical Architecture](../architecture/technical-architecture.md).

@@ -14,7 +14,7 @@ Repository interfaces live beside their domain models for users, profiles, shipm
 
 Firebase implementations live under `apps/mobile/src/infrastructure/firebase/repositories`, and Firestore conversion lives under `infrastructure/firebase/mappers`. The required implementations are present for User, Profile, Shipment, Trip, Booking, Notification, Review, and Trust; an additional Custody implementation preserves the append/read-only contract.
 
-The adapters are compile-safe skeletons. Shipment and trip methods align with currently permitted Firestore operations. Booking, custody, review, notification mutation, and trust-score methods are not wired to the UI and will be rejected by current rules. Production sensitive commands remain a Cloud Functions responsibility.
+Firebase adapters now power realtime shipment/trip, participant booking, custody, review, and notification flows. Firestore rules permit only documented actor/state operations and keep custody/review destructive writes and trust-score persistence denied. Production sensitive commands remain a Cloud Functions responsibility.
 
 ## Design principles
 
@@ -27,14 +27,14 @@ The adapters are compile-safe skeletons. Shipment and trip methods align with cu
 
 ## Future direction
 
-Inject Firebase repositories into migrated shipment and trip services first. For sensitive flows, implement repository ports on the trusted backend or through validated callable-command adapters rather than enabling unrestricted client writes. Add emulator integration tests for every allowed and denied path.
+Implement repository ports on the trusted backend through validated callable-command adapters, preserving the current service contracts. Add emulator integration tests for every allowed and denied rule path before deployment.
 
 ## Out of scope
 
 - A generic base repository or ORM-style abstraction.
-- Enabling currently denied collections.
+- Broadening participant-scoped collections beyond the documented rules.
 - Hiding network failures or treating adapters as authorization.
-- Migrating existing screens in this milestone.
+- Treating the current rules as a substitute for production command transactions.
 
 ## Related documents
 

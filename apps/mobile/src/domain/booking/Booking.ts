@@ -24,7 +24,14 @@ export const BookingRequestStatus = {
 export type BookingRequestStatus =
   (typeof BookingRequestStatus)[keyof typeof BookingRequestStatus];
 
+export interface BookingStatusHistoryEntry {
+  readonly status: BookingStatus;
+  readonly changedAt: string;
+  readonly changedBy: string;
+}
+
 export interface BookingRequest extends DomainEntity {
+  readonly bookingId: string;
   readonly shipmentId: string;
   readonly tripId: string;
   readonly senderId: string;
@@ -40,11 +47,12 @@ export interface Booking extends DomainEntity {
   readonly senderId: string;
   readonly travelerId: string;
   readonly status: BookingStatus;
+  readonly statusHistory: ReadonlyArray<BookingStatusHistoryEntry>;
 }
 
 export type NewBookingRequest = Omit<
   BookingRequest,
-  "id" | "createdAt" | "updatedAt"
+  "id" | "bookingId" | "createdAt" | "updatedAt"
 >;
 
 export type NewBooking = Omit<Booking, "id" | "createdAt" | "updatedAt">;

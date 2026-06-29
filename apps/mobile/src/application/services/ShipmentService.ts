@@ -56,6 +56,25 @@ export class ShipmentService {
     return created;
   }
 
+  findById(shipmentId: string): Promise<Shipment | null> {
+    return this.shipments.findById(shipmentId);
+  }
+
+  watchOwned(
+    ownerId: string,
+    onData: (shipments: ReadonlyArray<Shipment>) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    return this.shipments.watchByOwner(ownerId, onData, onError);
+  }
+
+  watchActive(
+    onData: (shipments: ReadonlyArray<Shipment>) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    return this.shipments.watchActive(onData, onError);
+  }
+
   private validateCurrency(value: string): string {
     const currency = requireText(value, "rewardCurrency", 3).toUpperCase();
 

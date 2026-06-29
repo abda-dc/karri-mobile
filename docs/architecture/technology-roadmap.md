@@ -24,7 +24,7 @@ The roadmap covers mobile, domain, application, persistence, trusted execution, 
 | Documentation | MkDocs Material | Active |
 | Documentation CI | GitHub Actions and GitHub Pages | Active |
 
-The implemented runtime path remains the existing Expo screens to the narrow infrastructure Firebase helper. Milestone 4 isolates all provider code under infrastructure and adds the intended application/repository path without pretending the UI migration or trusted backend exists.
+The implemented runtime path now uses presentation screens/components, application services, domain rules, repository interfaces, and Firebase adapters. Firestore rules are the current MVP policy boundary; trusted Cloud Function commands remain the production migration path.
 
 ## Design principles
 

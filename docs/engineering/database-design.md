@@ -2,56 +2,47 @@
 
 ## Principles
 
-Firestore collections use flat top-level records for the MVP. Documents carry explicit participant or owner identifiers, status, and server timestamps. Domain models do not import Firestore types; infrastructure mappers translate provider timestamps and legacy field names.
+Firestore uses top-level collections with explicit owner/participant IDs, finite statuses, immutable core identifiers, and server timestamps. Infrastructure mappers translate Firestore values to portable domain models.
 
 ## Collections
 
-| Collection | Ownership / access | Current status |
-| --- | --- | --- |
-| `users` | User reads/writes own account document | Domain model, mapper, repository skeleton, and rules draft |
-| `profiles` | User reads/writes own profile; trust field protected | Domain model, mapper, repository skeleton, and rules draft |
-| `shipments` | Owner writes; signed-in users read active records | Implemented helpers/rules plus repository adapter |
-| `trips` | Owner writes; signed-in users read active records | Implemented helpers/rules plus repository adapter |
-| `bookingRequests` | Future participants through trusted command | Domain/application foundation; client access denied |
-| `bookings` | Future participants read; trusted code writes lifecycle | Domain/application foundation; client access denied |
-| `custodyEvents` | Future append-only trusted writes | Append/read repository foundation; client access denied |
-| `reviews` | Future eligible booking participants | Domain/application foundation; client access denied |
-| `notifications` | Recipient reads; trusted handler writes | Domain/application foundation; client writes denied |
-| `trustScores` | Trusted calculation reads/writes | Repository foundation; default rules deny access |
+| Collection | Current access and behavior |
+| --- | --- |
+| `users` | Own account document; foundation only |
+| `profiles` | Own profile; clients cannot change reserved trust score |
+| `shipments` | Owner writes; signed-in users read active listings |
+| `trips` | Owner writes; signed-in users read active listings |
+| `bookingRequests` | Sender creates; participants read; allowlisted pending outcome update |
+| `bookings` | Sender creates pending record; participants read; role/state-guarded updates |
+| `custodyEvents` | Participants read; expected actor appends; update/delete denied |
+| `reviews` | Signed-in reads; completed-booking participant creates deterministic record; update/delete denied |
+| `notifications` | Recipient reads/marks read; validated event actor creates deterministic record |
+| `trustScores` | Denied; authoritative persistence remains future work |
 
-No security-rule or index expansion is included in Milestone 4. A compile-safe repository does not grant runtime access.
+## Booking records
 
-## Domain and Firestore mapping
+A deterministic shipment/trip key creates one request and one pending booking in a Firestore batch. Booking documents include `statusHistory`, whose prior entries remain unchanged and whose final entry must match the new status and authenticated actor. Request and booking outcomes update together for accepted, declined, or cancelled states.
 
-Portable domain timestamps are ISO strings or `null`. Firestore mappers convert them to/from `Timestamp` and use server timestamps for new or updated records. Field-name differences are explicit: notification `recipientId` maps to Firestore `userId`, review `revieweeId` maps to `subjectId`, and user/profile document IDs remain Firebase UIDs.
+Rules re-read linked shipment/trip records to validate owners, active state, exact corridor fields, and capacity. Sensitive core identifiers and creation time are immutable.
 
-Existing UI imports from `src/types/models.ts` resolve to provider-independent domain aliases during the listing-flow migration. New service code depends directly on models under `src/domain`.
+## Custody and review records
 
-## Shipment
+Custody events store `bookingId`, type, performer, server timestamp, optional location/note, and metadata. There is no destructive write path.
 
-Core fields are `id`, `ownerId`, origin/destination country and city, package category, description, weight in kilograms, delivery window, reward amount/currency, status, and audit timestamps.
+Reviews use `bookingId__reviewerId__revieweeId` as the document ID to enforce one review per direction. Comments may be empty and are limited to 1,000 characters.
 
-## Trip
+## Notifications
 
-Core fields are `id`, `ownerId`, origin/destination country and city, departure and arrival `YYYY-MM-DD` values, available capacity in kilograms, notes, status, and audit timestamps.
+Notification IDs derive from event type, related entity, and recipient. Records store recipient `userId`, template text, event type, related entity type/ID, unread/read status, and timestamps. The composite `userId ASC, createdAt DESC` index supports the Profile watcher.
 
-## Booking and custody
+## Time and query shapes
 
-A booking request and pending booking are created as one repository operation. Production creation and transitions will run transactionally in a Cloud Function. Custody exposes append/read only; no update or delete contract exists.
+Firestore server timestamps remain authoritative for document audit fields and custody events. Domain status-history timestamps are converted to Firestore timestamps and constrained to typed append entries.
 
-## Time and money
+Participant booking screens run separate `senderId == uid` and `travelerId == uid` queries and merge by ID. Custody queries constrain `bookingId`; reviews constrain `bookingId` or `subjectId`; notifications constrain recipient and order newest-first.
 
-Firestore server timestamps are authoritative for persisted audit fields. Calendar dates remain strings until airport timezone requirements exist. Reward input remains a numeric MVP amount with currency; production money should use integer minor units after pricing requirements are settled.
+## Production hardening
 
-## Query shapes
+The current rules are an MVP policy boundary. Emulator allow/deny tests, Cloud Function transactions, command idempotency, capacity reservation, durable events, and privacy review remain required before production deployment.
 
-- Owned shipments or trips: `ownerId == auth.uid`, ordered newest-first.
-- Matching inventory: `status == active`, ordered newest-first and bounded.
-- Custody: `bookingId == target`, ordered chronologically in the adapter until an approved index exists.
-- Reviews and notifications: participant-scoped queries only after rules and indexes are reviewed.
-
-## IDs and deletion
-
-Firestore creates current listing IDs and repository-skeleton lifecycle IDs. The current UI exposes no deletion. Lifecycle records are retained or soft-closed according to future policy; custody history is never destructively edited.
-
-See [Domain Model](../architecture/domain-model.md), [Repository Pattern](../architecture/repository-pattern.md), and [Custody Model](../architecture/custody-model.md).
+See [Booking Lifecycle](../product/booking-lifecycle.md), [Custody Model](../architecture/custody-model.md), and [Repository Pattern](../architecture/repository-pattern.md).

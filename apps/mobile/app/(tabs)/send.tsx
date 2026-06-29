@@ -12,11 +12,8 @@ import { StatusChip } from "../../src/components/StatusChip";
 import { TextField } from "../../src/components/TextField";
 import { TrustBadge } from "../../src/components/TrustBadge";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
-import {
-  createShipment,
-  getFriendlyFirestoreError,
-  subscribeToUserShipments,
-} from "../../src/infrastructure/firebase/firestore";
+import { getFriendlyError } from "../../src/presentation/errors/getFriendlyError";
+import { mobileServices } from "../../src/presentation/services/mobileServices";
 import { colors, spacing, typography } from "../../src/theme/tokens";
 import type { Shipment } from "../../src/types/models";
 
@@ -35,7 +32,7 @@ const emptyForm = {
 export default function SendScreen() {
   const auth = useAuthSession();
   const [form, setForm] = useState(emptyForm);
-  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [shipments, setShipments] = useState<ReadonlyArray<Shipment>>([]);
   const [listLoading, setListLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -57,7 +54,7 @@ export default function SendScreen() {
     setDataError(null);
 
     try {
-      return subscribeToUserShipments(
+      return mobileServices.shipment.watchOwned(
         auth.user.uid,
         (nextShipments) => {
           setShipments(nextShipments);
@@ -65,12 +62,12 @@ export default function SendScreen() {
           setDataError(null);
         },
         (error) => {
-          setDataError(getFriendlyFirestoreError(error));
+          setDataError(getFriendlyError(error));
           setListLoading(false);
         },
       );
     } catch (error) {
-      setDataError(getFriendlyFirestoreError(error));
+      setDataError(getFriendlyError(error));
       setListLoading(false);
     }
   }, [auth.loading, auth.user]);
@@ -120,7 +117,8 @@ export default function SendScreen() {
     setSuccessMessage(null);
 
     try {
-      await createShipment(auth.user.uid, {
+      await mobileServices.shipment.create({
+        ownerId: auth.user.uid,
         originCountry: form.originCountry,
         originCity: form.originCity,
         destinationCountry: form.destinationCountry,
@@ -134,7 +132,7 @@ export default function SendScreen() {
       setForm(emptyForm);
       setSuccessMessage("Shipment saved. It is now available for corridor matching.");
     } catch (error) {
-      setFormError(getFriendlyFirestoreError(error));
+      setFormError(getFriendlyError(error));
     } finally {
       setSaving(false);
     }

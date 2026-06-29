@@ -2,46 +2,36 @@
 
 ## Purpose
 
-Define the immutable chain-of-custody domain record and persistence contract.
+Define the immutable custody record, lifecycle integration, and participant policy.
 
 ## Scope
 
-The model covers custody event identity, booking association, event type, timestamp, performer, optional location label, metadata, and append/read behavior.
+Custody records cover booking association, event type, server timestamp, performer, optional location/note, and schema-controlled metadata.
 
 ## Current implementation
 
-`CustodyEvent` is a readonly plain TypeScript model with:
+`CustodyEvent` remains plain readonly TypeScript. `CustodyRepository` exposes `append`, `listByBooking`, and `watchByBooking`; it exposes no update/delete operation. `FirebaseCustodyRepository` uses Firestore server timestamps and chronological client ordering.
 
-- `id`
-- `bookingId`
-- `eventType`
-- `timestamp`
-- `performedBy`
-- `location`
-- `metadata`
+Booking actions append Shipment Created, Traveler Accepted, Pickup Confirmed, Delivery Confirmed, and Completed. `CustodyService` lets only the traveler append Airport Departure and Airport Arrival while in transit, prevents duplicates, and requires departure before arrival.
 
-Supported foundation types are Shipment Created, Traveler Accepted, Pickup Confirmed, Airport Departure, Airport Arrival, Delivery Confirmed, and Completed. `CustodyRepository` exposes only `append` and `listByBooking`. `FirebaseCustodyRepository` maps to `custodyEvents` and contains no update or delete method.
-
-The repository is not wired to UI, and current Firestore rules deny all custody access. A repository shape demonstrates immutability but does not make a mobile append authoritative.
+Tracking renders timestamp, actor, label, location, and note. Firestore rules repeat participant, actor, booking-state, field-size, and append-only checks.
 
 ## Design principles
 
-- History is append-only; corrections append a linked fact instead of mutating history.
-- Server time is authoritative for persisted events.
-- The performer must be an eligible participant for the expected transition.
-- Location is an optional human-readable label; exact coordinates are not collected by default.
-- Metadata remains minimal, non-secret, and schema-controlled.
-- Reads are ordered chronologically for a booking.
+- Corrections are future appended facts, never mutation.
+- Server time is authoritative.
+- Event order follows booking lifecycle.
+- Exact coordinates are not collected by default.
+- Notes remain optional, bounded, and free of private contact data.
+- A recorded event is evidence of a platform action, not proof of physical reality.
 
 ## Future direction
 
-Implement a trusted append command that validates booking state, actor, event order, idempotency, and evidence references in one transaction. Add participant-only reads, Emulator Suite tests, correction linkage, evidence retention rules, and UI language that distinguishes submitted from server-confirmed events.
+Move the current atomic Firestore batches behind Cloud Function commands. Add allow/deny emulator tests, evidence references, correction linkage, retention policy, and explicit server-confirmed/pending UI states.
 
 ## Out of scope
 
-- Deleting or updating custody history.
-- Evidence uploads, QR handoff, geolocation tracking, or dispute resolution.
-- Enabling client writes in this milestone.
+- Custody edits/deletes, QR handoff, uploads, continuous location, disputes, and exception workflows.
 
 ## Related documents
 

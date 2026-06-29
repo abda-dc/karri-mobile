@@ -1,10 +1,11 @@
 import {
-  addDoc,
   collection,
+  doc,
   getDoc,
   getDocs,
   query,
   serverTimestamp,
+  setDoc,
   where,
 } from "firebase/firestore";
 import type { NewReview, Review } from "../../../domain/review/Review";
@@ -15,7 +16,12 @@ import { mapReview, toFirestoreReview } from "../mappers/reviewMapper";
 export class FirebaseReviewRepository implements ReviewRepository {
   async create(review: NewReview): Promise<Review> {
     const { db } = getFirebaseServices();
-    const reference = await addDoc(collection(db, "reviews"), {
+    const reference = doc(
+      db,
+      "reviews",
+      `${review.bookingId}__${review.reviewerId}__${review.revieweeId}`,
+    );
+    await setDoc(reference, {
       ...toFirestoreReview(review),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

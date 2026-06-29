@@ -17,9 +17,9 @@ Karri is guided by four operating values:
 
 ## Current product slice
 
-The repository currently contains an Expo Router mobile app, a Firebase client foundation, and portable domain/application architecture. The implemented user-facing MVP slice supports authenticated users creating and listing their own shipment and trip records, plus exact origin/destination corridor matching on the Home tab.
+The repository contains an Expo Router mobile app, Firebase/Firestore infrastructure, and portable domain/application architecture. The implemented user-facing slice supports shipment/trip creation, exact-corridor matching, booking requests and decisions, status/custody tracking, in-app notifications, explainable trust summaries, and completed-booking reviews.
 
-Booking, custody, notification, review, trust, and configuration code now provide compile-safe models, rules, service contracts, and Firebase adapters. Those foundations are not wired to screens or trusted backend commands and are not presented as live features. Payments and messaging remain out of scope.
+Firebase Auth and participant-scoped Firestore rules are the current MVP policy boundary. Production Cloud Function commands, durable events, emulator coverage, payments, disputes, chat, push, email, SMS, and AI matching remain out of scope.
 
 ## Platform direction
 

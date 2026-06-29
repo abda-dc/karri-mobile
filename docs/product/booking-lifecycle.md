@@ -1,10 +1,10 @@
 # Booking Lifecycle
 
-## Current status
+## Current implementation
 
-Milestone 4 implements the portable booking/request models, forward-only state guards, application orchestration, domain events, and a Firebase repository skeleton. No booking UI or callable function exists, and current Firestore rules still deny booking records. A possible match does not create a booking.
+Milestone 5 connects exact-corridor matches to persisted Firestore booking requests. A sender who owns the matched shipment can request the matched traveler. The repository creates deterministic `bookingRequests` and `bookings` documents in one Firestore batch, then `BookingService` publishes `booking.requested` and appends the first custody event.
 
-## Lifecycle
+Travelers see participant-scoped pending bookings in Tracking and can accept or decline. Senders may cancel a pending request. Accepted bookings continue through pickup, delivery, and sender completion.
 
 ```mermaid
 stateDiagram-v2
@@ -16,42 +16,34 @@ stateDiagram-v2
     Accepted --> InTransit
     InTransit --> Delivered
     Delivered --> Completed
-    Completed --> [*]
-    Declined --> [*]
-    Cancelled --> [*]
-    Expired --> [*]
 ```
 
-No backward or additional transitions are permitted. The code stores lowercase values: `pending`, `accepted`, `in_transit`, `delivered`, `completed`, `cancelled`, `declined`, and `expired`.
+Expired remains a trusted-system state with no current client action.
 
-## Actor rules
+## Actor and transition rules
 
-- The sender creates and may cancel a pending request.
-- The traveler accepts or declines, starts transit, and marks delivery.
-- The sender completes a delivered booking.
-- Only a trusted system actor expires a request.
-- Production commands derive actor identity from Firebase Auth; they never trust an actor ID sent by the client.
+- Sender: request, cancel while pending, complete after delivery.
+- Traveler: accept, decline, confirm pickup, and confirm delivery.
+- No terminal state has an outgoing transition.
+- Service guards and Firestore rules both reject backward or unauthorized transitions.
+- Request and booking outcomes change together in a Firestore batch.
+- Deterministic shipment/trip booking IDs prevent duplicate requests for the same pair.
 
-## Invariants
+## Tracking experience
 
-- A booking links one shipment, one trip, one sender UID, and one traveler UID.
-- Sender and traveler are different accounts.
-- Listing ownership, active state, corridor, dates, category, and capacity must be revalidated by trusted code.
-- Request and booking state change transactionally.
-- Accepted terms are snapshotted so listing edits cannot rewrite the agreement.
-- Custody changes append events rather than overwrite history.
-- Reviews require `completed` state.
+The Tracking tab displays current status, sender/traveler IDs, shipment and trip summaries, next expected action, append-only status history, custody timeline, trust context, and eligible actions. Completed bookings expose one review form per participant.
 
-## Command boundary
+## Current trust boundary
 
-The current mobile `BookingService` demonstrates validation and event behavior, but production request/transition execution belongs in callable Cloud Functions with transactions, version checks, idempotency, and durable events.
+Milestone 5 uses Firebase Auth plus participant-scoped Firestore rules as the executable policy boundary because Cloud Functions remain outside scope. Rules revalidate active listing ownership, exact corridor fields, capacity, participants, current state, immutable core fields, and appended status history.
+
+This is an MVP boundary, not the final production command architecture. Cloud Functions, emulator tests, idempotent command receipts, expiration automation, and atomic booking/custody/event effects remain required before production.
 
 ## Open decisions
 
 - Expiration duration and capacity reservation.
-- Recipient confirmation and completion policy.
-- Cancellation reasons and exception handling.
-- Terms snapshot shape and supported package categories.
-- Payment policy, which remains outside this milestone.
+- Recipient confirmation and exception handling.
+- Terms snapshots beyond the linked listing records.
+- Payment and dispute policy, which remain out of scope.
 
-See [Booking State Machine](../architecture/booking-state-machine.md), [Custody Model](../architecture/custody-model.md), and [API Design](../engineering/api-design.md).
+See [Booking State Machine](../architecture/booking-state-machine.md), [Chain of Custody](chain-of-custody.md), and [API Design](../engineering/api-design.md).

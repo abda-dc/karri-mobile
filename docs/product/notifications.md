@@ -1,41 +1,35 @@
 # Notifications
 
-## Current status
+## Current implementation
 
-Milestone 4 implements a centralized in-app notification foundation: business services publish typed domain events, `NotificationService` subscribes through the synchronous event bus, and `NotificationRepository` stores recipient records. Templates cover shipment/trip creation, booking outcomes, pickup, delivery, and reviews.
+The singleton mobile service composition starts `NotificationService`. Business services publish completed domain events to the synchronous event bus; the notification handler creates deterministic in-app Firestore records. The Profile tab watches the current recipient's records and supports marking unread records as read.
 
-The framework is not started by current UI. Current Firestore rules allow recipients to read notification records but deny every client write, so `FirebaseNotificationRepository` remains a compile-safe adapter for future trusted execution. Firebase Cloud Messaging is still uninitialized.
+Implemented mappings:
 
-## Flow
+| Event | Recipient |
+| --- | --- |
+| `booking.requested` | Traveler |
+| `booking.accepted` | Sender |
+| `booking.declined` | Sender |
+| `booking.cancelled` | Other participant (currently traveler) |
+| `package.picked_up` | Sender |
+| `package.delivered` | Sender |
+| `review.submitted` | Reviewee |
 
-```text
-Application service
-  -> completed domain event
-    -> NotificationService handler
-      -> in-app NotificationRepository record
-        -> future optional push hint
-```
+Booking expiration has a template but no current client command. Shipment/trip creation events do not generate notifications.
 
-Business services do not directly send notifications.
+## Integrity and privacy
 
-## Goals
+- Business services never call notification repositories directly.
+- Deterministic effect IDs avoid duplicate records for the same event/entity/recipient.
+- Firestore rules validate actor, recipient, event type, related booking/review, and current authoritative state.
+- Only the recipient may read or mark a notification read.
+- Notification text carries no package description, contact information, or evidence URL.
 
-- Tell the right participant that an action completed or needs attention.
-- Explain the next action in plain language.
-- Avoid leaking package, route, identity, or contact details on a lock screen.
-- Remain useful when push is delayed or disabled.
+## Current limitations
 
-## Current triggers
+The local bus is synchronous and non-durable, while Firestore creation is asynchronous. A failed notification does not roll back the business transition. Durable server events, idempotent Cloud Function consumers, retries, failed-effect monitoring, localization, quiet hours, and preferences remain future work.
 
-- Shipment or trip created.
-- Booking requested, accepted, declined, cancelled, or expired.
-- Package picked up or delivered.
-- Review submitted.
+Push, email, and SMS are not implemented.
 
-## Production direction
-
-Durable Cloud Function handlers consume validated server events, use deterministic effect IDs, apply preferences/templates, create in-app records, and optionally send minimal FCM hints. Push is not the system of record; opening the app reloads authoritative state.
-
-Quiet hours, localization, preference policy, invalid-token cleanup, retry monitoring, and delivery metrics are required before launch. Push, email, and SMS remain outside Milestone 4.
-
-See [Event Bus](../architecture/event-bus.md), [Event Architecture](../engineering/event-architecture.md), and [Application Services](../architecture/application-services.md).
+See [Event Bus](../architecture/event-bus.md) and [Event Architecture](../engineering/event-architecture.md).

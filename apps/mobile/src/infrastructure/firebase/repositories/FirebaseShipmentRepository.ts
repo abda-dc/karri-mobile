@@ -4,6 +4,8 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
+  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
@@ -42,5 +44,39 @@ export class FirebaseShipmentRepository implements ShipmentRepository {
       ),
     );
     return snapshot.docs.map(mapShipment);
+  }
+
+  watchByOwner(
+    ownerId: string,
+    onData: (shipments: ReadonlyArray<Shipment>) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    const { db } = getFirebaseServices();
+    return onSnapshot(
+      query(
+        collection(db, "shipments"),
+        where("ownerId", "==", ownerId),
+        orderBy("createdAt", "desc"),
+      ),
+      (snapshot) => onData(snapshot.docs.map(mapShipment)),
+      onError,
+    );
+  }
+
+  watchActive(
+    onData: (shipments: ReadonlyArray<Shipment>) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    const { db } = getFirebaseServices();
+    return onSnapshot(
+      query(
+        collection(db, "shipments"),
+        where("status", "==", "active"),
+        orderBy("createdAt", "desc"),
+        limit(100),
+      ),
+      (snapshot) => onData(snapshot.docs.map(mapShipment)),
+      onError,
+    );
   }
 }

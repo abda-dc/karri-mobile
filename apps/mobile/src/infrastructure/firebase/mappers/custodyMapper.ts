@@ -22,6 +22,7 @@ export function mapCustodyEvent(
     timestamp: toDomainTimestamp(data.timestamp),
     performedBy: stringValue(data.performedBy),
     location: typeof data.location === "string" ? data.location : null,
+    note: typeof data.note === "string" ? data.note : null,
     metadata: recordValue(data.metadata),
   };
 }
@@ -32,6 +33,7 @@ export function toFirestoreCustodyEvent(event: NewCustodyEvent): DocumentData {
     eventType: event.eventType,
     performedBy: event.performedBy,
     location: event.location,
+    note: event.note,
     metadata: event.metadata,
   };
 }

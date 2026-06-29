@@ -8,11 +8,14 @@ This directory is the version-controlled Firebase backend foundation for Karri P
 - Shipment/trip owners can create and update their records.
 - Any signed-in user can read active shipments/trips for MVP matching.
 - Inactive records remain readable to their owner.
-- Booking, custody, and review records default to no client access.
-- A notification recipient may read their records; only future trusted backend code writes them.
+- Booking requests/bookings are participant-readable and accept only allowlisted actor/state transitions.
+- Custody is participant-readable and append-only for an expected actor and booking state.
+- Signed-in users may read reviews; completed-booking participants create one deterministic review per direction.
+- Notification recipients read/mark their records; validated event actors create deterministic in-app records.
+- Trust-score persistence remains denied.
 - Storage denies all access until an evidence workflow and tests exist.
 
-Firestore rules do not filter query results. Mobile owner queries constrain `ownerId`, and match queries constrain `status == active`.
+Firestore rules do not filter query results. Mobile queries constrain owner, listing status, participant ID, booking ID, review subject, or notification recipient as required by their rule.
 
 ## Project setup
 
@@ -25,11 +28,11 @@ Firestore rules do not filter query results. Mobile owner queries constrain `own
 
 ## Validation and deployment direction
 
-Before deployment, add Firebase Emulator Suite tests covering allowed and denied cases. A future `firebase.json` should reference these files. Typical reviewed deployment commands will be:
+`firebase.json` references the versioned rules/index files and local Firestore emulator. Add Emulator Suite tests covering every allowed and denied lifecycle case. Typical reviewed deployment commands will be:
 
 ```powershell
 firebase deploy --only firestore:rules,firestore:indexes
 firebase deploy --only storage
 ```
 
-Do not deploy these first-pass rules to a production project without emulator tests, a data/privacy review, and configured monitoring.
+The Milestone 5 rules are an MVP policy boundary while Cloud Functions remain out of scope. Do not deploy them to production without emulator tests, command/idempotency hardening, a data/privacy review, and configured monitoring.

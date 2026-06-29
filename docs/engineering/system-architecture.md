@@ -2,23 +2,20 @@
 
 ## Scope
 
-Karri Mobile consists of one Expo application, Firebase client integration, versioned Firebase rules/index configuration, portable domain/application foundations, Firebase repository skeletons, and a MkDocs handbook. There is no separate application server, ORM, or deployed Cloud Function in this repository.
+Karri Mobile consists of one Expo application, portable domain/application layers, Firebase repositories/mappers, participant-scoped Firestore rules/indexes, and a MkDocs handbook. There is no separate application server, ORM, or deployed Cloud Function in this repository.
 
 ## Runtime components
 
 ```mermaid
 flowchart LR
     User[Sender or traveler] --> Mobile[Expo app]
-    Mobile --> Current[Current infrastructure Firebase helper]
-    Current --> Auth[Firebase Auth]
-    Current --> Data[Cloud Firestore]
-    Current -. initialized, unused .-> Files[Cloud Storage]
-
-    Mobile -. future wiring .-> Services[Application services]
+    Mobile --> Services[Application services]
     Services --> Domain[Domain rules and events]
     Services --> Ports[Repository ports]
     Adapters[Firebase adapters] --> Ports
     Adapters --> Data
+    Adapters --> Auth[Firebase Auth]
+    Adapters -. initialized, unused .-> Files[Cloud Storage]
 
     Data -. planned trusted commands .-> Functions[Cloud Functions]
     Functions -. planned .-> Push[FCM]
@@ -33,14 +30,14 @@ flowchart LR
 5. Realtime listeners return owner-scoped or active-market records.
 6. Home computes exact corridor matches locally.
 
-Milestone 4 code provides a target service/repository/event path, but no composition root has replaced the current listing helpers.
+Milestone 5 uses a singleton mobile composition to connect screens, services, the event bus, and Firebase adapters.
 
 ## Failure and trust boundaries
 
 - Missing configuration prevents Firebase initialization with a readable setup message.
 - Missing Auth prevents ownerless data writes.
 - Firestore rules remain the final direct-client access boundary.
-- Repository skeletons for denied collections are not operational features.
+- Firestore rules constrain every client lifecycle operation; application types alone do not authorize it.
 - Domain validation improves consistency but cannot authorize an untrusted device.
 - Cloud Functions will validate and transact multi-party commands.
 
