@@ -1,0 +1,13 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Storage is initialized in the app for future package/custody evidence,
+    // but no upload flow has been designed or implemented. Keep all access
+    // denied until paths, participants, content limits, retention, and scanning
+    // have emulator-tested rules.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

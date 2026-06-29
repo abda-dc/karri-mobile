@@ -1,18 +1,16 @@
 # Architecture Decision Records
 
-Architecture Decision Records explain important technical and product architecture choices.
+ADRs capture decisions that shape Karri Platform v2. “Accepted” records describe the chosen direction; a consequence may still be future implementation work.
 
-Each ADR should answer:
+| ADR | Decision | Status |
+| --- | --- | --- |
+| [0001](adr-0001-why-expo.md) | Use Expo for the mobile application | Accepted |
+| [0002](adr-0002-why-firebase.md) | Use Firebase as the managed backend platform | Accepted |
+| [0003](adr-0003-why-cloud-functions.md) | Put trusted business transitions in Cloud Functions | Accepted |
+| [0004](adr-0004-why-event-architecture.md) | Emit durable domain events after important transitions | Accepted |
+| [0005](adr-0005-why-trust-score.md) | Build an explainable evidence-based trust score | Accepted |
+| [0006](adr-0006-why-chain-of-custody.md) | Preserve an append-only custody history | Accepted |
+| [0007](adr-0007-why-feature-flags.md) | Use feature flags for staged exposure | Accepted |
+| [0008](adr-0008-why-remote-configuration.md) | Use Remote Config for non-secret operational values | Accepted |
 
-- What decision was made?
-- Why was it made?
-- What alternatives were considered?
-- What are the consequences?
-
-## ADR list
-
-- ADR-0001: Why Expo
-- ADR-0002: Why Firebase
-- ADR-0003: Why Event Architecture
-- ADR-0004: Why Chain of Custody
-- ADR-0005: Why Documentation First
+Superseded decisions should remain in the repository with a new status and a link to the replacing ADR.

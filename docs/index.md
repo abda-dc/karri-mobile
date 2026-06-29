@@ -1,30 +1,37 @@
-# Karri Mobile Handbook
+# Karri Platform v2
 
-Karri Mobile is a mobile-first platform for trusted peer-to-peer cross-border shipping.
+Karri is a mobile-first peer-to-peer cross-border shipping platform. It helps diaspora senders find travelers already moving along the same corridor, then makes responsibility and package custody visible from request through delivery.
 
-This handbook is the source of truth for product strategy, architecture, engineering standards, design, operations, AI-assisted development, and architecture decisions.
+The first market is the East African diaspora. The product is designed to expand corridor by corridor without weakening the local trust, clarity, and reliability that make the first corridors work.
 
-## The Karri principle
+## Product promise
 
-Trust is the product.
+> I know who I am coordinating with, what we agreed to, who has the package, and what happens next.
 
-Every decision should improve trust, simplicity, transparency, reliability, or delight.
+Karri is guided by four operating values:
 
-## Platform flow
+- **Trust:** identity, reputation, and custody signals must be understandable.
+- **Transparency:** status, expectations, and limitations must be visible.
+- **Reliability:** important transitions must be recorded and recoverable.
+- **Simplicity:** a first-time sender or traveler should know what to do next.
 
-Sender creates shipment
--> Traveler creates trip
--> Match found
--> Booking requested
--> Booking accepted
--> Package picked up
--> Package in transit
--> Package delivered
--> Review submitted
+## Current product slice
 
-## Current phase
+The repository currently contains an Expo Router mobile app and a Firebase client foundation. The implemented MVP slice supports authenticated users creating and listing their own shipment and trip records, plus exact origin/destination corridor matching on the Home tab.
 
-Foundation and documentation platform.
+Booking requests, payments, messaging, custody transitions, notifications, reviews, and calculated trust scores are documented future work. They are not presented as implemented.
 
+## Platform direction
 
-_Last updated: 2026-06-28 09:32:54_
+```mermaid
+flowchart LR
+    S[Sender creates shipment] --> M[Corridor match]
+    T[Traveler creates trip] --> M
+    M --> R[Booking request]
+    R --> A[Accepted booking]
+    A --> C[Custody events]
+    C --> D[Delivery]
+    D --> V[Review and trust update]
+```
+
+Start with the [Executive Summary](strategy/executive-summary.md), then use the Product, Architecture, and Engineering sections as the source of truth for implementation decisions.

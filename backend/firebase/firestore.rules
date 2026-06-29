@@ -1,0 +1,162 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owns(resourceData) {
+      return signedIn() && resourceData.ownerId == request.auth.uid;
+    }
+
+    function isNumber(value) {
+      return value is int || value is float;
+    }
+
+    function validListingStatus(status) {
+      return status in ['draft', 'active', 'closed', 'cancelled'];
+    }
+
+    function validShipment(data) {
+      return data.keys().hasOnly([
+          'ownerId',
+          'originCountry',
+          'originCity',
+          'destinationCountry',
+          'destinationCity',
+          'packageCategory',
+          'packageDescription',
+          'weightKg',
+          'deliveryWindow',
+          'rewardAmount',
+          'rewardCurrency',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.ownerId is string
+        && data.originCountry is string && data.originCountry.size() > 0 && data.originCountry.size() <= 80
+        && data.originCity is string && data.originCity.size() > 0 && data.originCity.size() <= 120
+        && data.destinationCountry is string && data.destinationCountry.size() > 0 && data.destinationCountry.size() <= 80
+        && data.destinationCity is string && data.destinationCity.size() > 0 && data.destinationCity.size() <= 120
+        && data.packageCategory is string && data.packageCategory.size() > 0 && data.packageCategory.size() <= 80
+        && data.packageDescription is string && data.packageDescription.size() > 0 && data.packageDescription.size() <= 500
+        && isNumber(data.weightKg) && data.weightKg > 0 && data.weightKg <= 100
+        && data.deliveryWindow is string && data.deliveryWindow.size() > 0 && data.deliveryWindow.size() <= 120
+        && isNumber(data.rewardAmount) && data.rewardAmount > 0 && data.rewardAmount <= 100000
+        && data.rewardCurrency is string && data.rewardCurrency.size() == 3
+        && validListingStatus(data.status);
+    }
+
+    function validTrip(data) {
+      return data.keys().hasOnly([
+          'ownerId',
+          'originCountry',
+          'originCity',
+          'destinationCountry',
+          'destinationCity',
+          'departureDate',
+          'arrivalDate',
+          'availableCapacityKg',
+          'notes',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.ownerId is string
+        && data.originCountry is string && data.originCountry.size() > 0 && data.originCountry.size() <= 80
+        && data.originCity is string && data.originCity.size() > 0 && data.originCity.size() <= 120
+        && data.destinationCountry is string && data.destinationCountry.size() > 0 && data.destinationCountry.size() <= 80
+        && data.destinationCity is string && data.destinationCity.size() > 0 && data.destinationCity.size() <= 120
+        && data.departureDate is string && data.departureDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && data.arrivalDate is string && data.arrivalDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && isNumber(data.availableCapacityKg) && data.availableCapacityKg > 0 && data.availableCapacityKg <= 100
+        && data.notes is string && data.notes.size() <= 500
+        && validListingStatus(data.status);
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId;
+      allow delete: if false;
+    }
+
+    match /profiles/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.trustScore == null;
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.trustScore == resource.data.trustScore;
+      allow delete: if false;
+    }
+
+    match /shipments/{shipmentId} {
+      allow read: if signedIn() && (owns(resource.data) || resource.data.status == 'active');
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validShipment(request.resource.data);
+      allow update: if owns(resource.data)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time
+        && validShipment(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /trips/{tripId} {
+      allow read: if signedIn() && (owns(resource.data) || resource.data.status == 'active');
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validTrip(request.resource.data);
+      allow update: if owns(resource.data)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time
+        && validTrip(request.resource.data);
+      allow delete: if false;
+    }
+
+    // These lifecycle collections remain deny-by-default until callable Cloud
+    // Functions, participant rules, and emulator tests are implemented.
+    match /bookingRequests/{requestId} {
+      allow read, write: if false;
+    }
+
+    match /bookings/{bookingId} {
+      allow read, write: if false;
+    }
+
+    match /custodyEvents/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /reviews/{reviewId} {
+      allow read, write: if false;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

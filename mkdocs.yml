@@ -1,8 +1,10 @@
-site_name: Karri Mobile Handbook
-site_description: Documentation for Karri Mobile, a trusted peer-to-peer cross-border shipping platform.
+site_name: Karri Platform Handbook
+site_description: Product and engineering handbook for the Karri mobile-first cross-border shipping platform.
 site_author: Karri
-repo_name: karri-mobile
+site_url: https://abda-dc.github.io/karri-mobile/
+repo_name: abda-dc/karri-mobile
 repo_url: https://github.com/abda-dc/karri-mobile
+edit_uri: edit/main/docs/
 
 theme:
   name: material
@@ -11,17 +13,20 @@ theme:
     - navigation.sections
     - navigation.expand
     - navigation.indexes
+    - navigation.top
     - search.suggest
     - search.highlight
     - content.code.copy
   palette:
-    - scheme: default
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
       primary: teal
       accent: amber
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
-    - scheme: slate
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
       primary: teal
       accent: amber
       toggle:
@@ -48,10 +53,44 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Vision & Mission: vision-mission.md
-  - Product Constitution: product/product-constitution.md
+  - Strategy:
+      - Executive Summary: strategy/executive-summary.md
+      - Vision and Mission: strategy/vision-and-mission.md
+      - Product Constitution: strategy/product-constitution.md
+      - Product Strategy: strategy/product-strategy.md
+      - Business Model: strategy/business-model.md
+  - Product:
+      - Roadmap: product/product-roadmap.md
+      - Product Requirements: product/product-requirements-document.md
+      - Personas: product/personas.md
+      - User Journeys: product/user-journeys.md
+      - Booking Lifecycle: product/booking-lifecycle.md
+      - Chain of Custody: product/chain-of-custody.md
+      - Matching Engine: product/matching-engine.md
+      - Notifications: product/notifications.md
+      - Reviews: product/reviews.md
+      - Trust Score: product/trust-score.md
   - Architecture:
-      - Overview: architecture/technical-architecture.md
-      - ADR Index: adr/index.md
+      - Technical Architecture: architecture/technical-architecture.md
+      - ADRs:
+          - Index: adr/index.md
+          - ADR-0001 - Expo: adr/adr-0001-why-expo.md
+          - ADR-0002 - Firebase: adr/adr-0002-why-firebase.md
+          - ADR-0003 - Cloud Functions: adr/adr-0003-why-cloud-functions.md
+          - ADR-0004 - Event Architecture: adr/adr-0004-why-event-architecture.md
+          - ADR-0005 - Trust Score: adr/adr-0005-why-trust-score.md
+          - ADR-0006 - Chain of Custody: adr/adr-0006-why-chain-of-custody.md
+          - ADR-0007 - Feature Flags: adr/adr-0007-why-feature-flags.md
+          - ADR-0008 - Remote Configuration: adr/adr-0008-why-remote-configuration.md
   - Engineering:
       - Standards: engineering/engineering-standards.md
+      - System Architecture: engineering/system-architecture.md
+      - Mobile Architecture: engineering/mobile-architecture.md
+      - Backend Architecture: engineering/backend-architecture.md
+      - Database Design: engineering/database-design.md
+      - Authentication: engineering/authentication.md
+      - Authorization: engineering/authorization.md
+      - Security: engineering/security.md
+      - API Design: engineering/api-design.md
+      - Event Architecture: engineering/event-architecture.md
+      - CI/CD: engineering/ci-cd.md

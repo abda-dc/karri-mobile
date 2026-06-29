@@ -1,55 +1,62 @@
 # Technical Architecture
 
-Karri Mobile uses a mobile-first, managed-service architecture.
+## Current system
 
-## Current target stack
+Karri Platform v2 is a fresh Expo React Native application backed by Firebase. It does not use the previous Karri Turborepo, pnpm workspace, Azure services, Prisma, or deployment topology.
 
-- Expo React Native
-- TypeScript
-- Expo Router
-- Firebase Authentication
-- Cloud Firestore
-- Cloud Functions
-- Cloud Storage
-- Firebase Cloud Messaging
-- Firebase App Check
-- EAS Build
-- EAS Update
+```mermaid
+flowchart TB
+    App[Expo React Native app] --> Auth[Firebase Authentication]
+    App --> FS[Cloud Firestore]
+    App -. future uploads .-> Storage[Cloud Storage]
+    App -. future tokens .-> FCM[Firebase Cloud Messaging]
+    App -. future attestation .-> Check[Firebase App Check]
+    FS -. future triggers .-> Fn[Cloud Functions]
+    Fn -. future events .-> Events[(Business event records)]
+    Fn -. future notifications .-> FCM
+```
 
-## Architecture principles
+## Implemented boundary
 
-- Mobile-first
-- Offline-friendly
-- API-first
-- Event-driven
-- Secure by default
-- Documentation-first
-- AI-friendly
+The mobile app uses Expo Router screens and a small shared component/theme layer. A safe Firebase module reads public Expo environment variables, exposes readiness state, and initializes Auth, Firestore, and Storage only when configuration is complete.
 
-## Service boundaries
+The implemented data path is deliberately direct and narrow:
 
-The mobile app handles presentation and user input.
+- Authenticated users create `shipments` and `trips` with their Firebase UID as owner.
+- Screens subscribe to owner-scoped lists for the user's records.
+- The Home tab subscribes to active shipment and trip inventory and computes exact corridor matches locally.
+- Server timestamps populate authoritative creation and update times.
 
-Cloud Functions handle business operations such as:
+No server functions are currently deployed by this repository. No code claims that future placeholders such as FCM or App Check are active.
 
-- Booking creation
-- Booking acceptance
-- Custody transitions
-- Notification dispatch
-- Trust score updates
-- Review submission
-- Dispute creation
+## Trusted backend boundary
 
-Firestore stores platform state.
+Direct client writes are acceptable for owner-controlled listing data under Firestore rules. Multi-party or trust-sensitive operations will use callable Cloud Functions:
 
-Cloud Storage stores package images, identity documents, and other user-uploaded files.
+- Booking request creation and response.
+- Booking state transitions.
+- Custody event append and evidence validation.
+- Review eligibility and submission.
+- Notification fan-out.
+- Trust score recalculation.
 
-Firebase Cloud Messaging delivers push notifications.
+This prevents one participant's device from declaring a sensitive outcome unilaterally.
 
-## Important rule
+## Event direction
 
-The mobile client must not directly perform final business operations.
+The target architecture records durable domain events after a validated state change. Events support notifications, audit, analytics, and future integrations. The current listing slice stores state only; event production begins when Cloud Functions own multi-step lifecycle operations.
 
-It requests actions.
+## Data stores
 
-The backend validates, records, emits events, and updates state.
+- **Cloud Firestore:** user/profile, listing, booking, custody, review, and notification documents.
+- **Cloud Storage:** future package/custody evidence objects; initialized in the client but unused by current flows.
+- **Authentication:** account identity and session state.
+- **Remote Config:** future non-secret rollout and corridor configuration.
+
+## Security posture
+
+Firebase web configuration identifies the project but is not treated as a secret. Access control depends on Authentication, Firestore/Storage rules, server validation, App Check when enabled, and monitoring. Service-account keys and private credentials never belong in the mobile app.
+
+## Deployment direction
+
+Expo/EAS will package the mobile app. Firebase CLI will eventually deploy rules, indexes, Storage rules, and Cloud Functions. GitHub Actions currently validates and publishes MkDocs; mobile and Firebase deployment workflows are future work.
