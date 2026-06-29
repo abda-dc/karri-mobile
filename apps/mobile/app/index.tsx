@@ -1,92 +1,128 @@
 import { router } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { Image, StyleSheet, Text, View } from "react-native";
-import { AppScreen } from "../src/components/AppScreen";
-import { InfoCard } from "../src/components/InfoCard";
+import { Badge } from "../src/components/Badge";
+import { Banner } from "../src/components/Banner";
+import { Card } from "../src/components/Card";
 import { PrimaryButton } from "../src/components/PrimaryButton";
-import { StatusPill } from "../src/components/StatusPill";
-import { colors, spacing, typography } from "../src/theme/tokens";
+import { Screen } from "../src/components/Screen";
+import { TrustBadge } from "../src/components/TrustBadge";
+import { isFirebaseConfigured } from "../src/lib/firebase";
+import { colors, radii, spacing, typography } from "../src/theme/tokens";
 
-export default function HomeScreen() {
+export default function WelcomeScreen() {
   return (
-    <AppScreen>
-      <StatusBar style="dark" />
+    <Screen centered contentStyle={styles.screenContent}>
+      {!isFirebaseConfigured ? (
+        <Banner
+          compact
+          message="Add the local Firebase values before starting an authenticated development session."
+          title="Development setup"
+          variant="development"
+        />
+      ) : null}
 
-      <View style={styles.header}>
+      <View style={styles.hero}>
         <Image
+          accessibilityLabel="Karri"
+          resizeMode="contain"
           source={require("../assets/karri-logo.jpeg")}
           style={styles.logo}
-          resizeMode="contain"
         />
-
-        <StatusPill label="Mobile MVP" />
-
-        <Text style={styles.title}>Karri Mobile</Text>
-        <Text style={styles.subtitle}>
-          A safer way for diaspora senders and trusted travelers to coordinate packages,
-          custody, and delivery updates.
-        </Text>
+        <TrustBadge compact label="Community shipping, made clearer" />
+        <View style={styles.heroCopy}>
+          <Text style={styles.title}>Welcome to Karri</Text>
+          <Text style={styles.subtitle}>
+            Trusted community shipping between travelers and senders.
+          </Text>
+          <Text style={styles.body}>
+            Create shipments, share trips, and find reliable route matches across borders.
+          </Text>
+        </View>
       </View>
 
-      <View style={styles.actions}>
-        <PrimaryButton onPress={() => router.push("/login")}>Sign in with email</PrimaryButton>
-        <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/send")}>Send a package</PrimaryButton>
-        <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/travel")}>
-          I&apos;m traveling
-        </PrimaryButton>
-      </View>
+      <PrimaryButton onPress={() => router.push("/login")}>Get started</PrimaryButton>
 
-      <View style={styles.cards}>
-        <InfoCard
-          title="Trust starts with identity"
-          body="Profiles, verified contact details, and clear roles will help users know who they are working with."
-        />
-        <InfoCard
-          title="Custody stays visible"
-          body="Every booking should make pickup, handoff, transit, and delivery status easy to understand."
-        />
-        <InfoCard
-          title="Status before confusion"
-          body="Tracking and alerts will keep senders and travelers aligned before problems grow."
-        />
-      </View>
-
-      <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/tracking")}>
-        View tracking placeholder
-      </PrimaryButton>
-    </AppScreen>
+      <Card style={styles.roleCard} variant="soft">
+        <View style={styles.roleHeader}>
+          <Text style={styles.roleTitle}>One community, two ways to help</Text>
+          <Badge label="Mobile-first" tone="primary" />
+        </View>
+        <View style={styles.roleRow}>
+          <View style={styles.roleItem}>
+            <Text style={styles.roleLabel}>For senders</Text>
+            <Text style={styles.roleBody}>Describe the route and package with clarity.</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.roleItem}>
+            <Text style={styles.roleLabel}>For travelers</Text>
+            <Text style={styles.roleBody}>Share your route and available capacity.</Text>
+          </View>
+        </View>
+      </Card>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    gap: spacing.md,
-    marginBottom: spacing.xl,
+  screenContent: {
+    gap: spacing.xl,
+  },
+  hero: {
+    gap: spacing.lg,
   },
   logo: {
-    width: 96,
-    height: 96,
-    borderRadius: 24,
+    borderRadius: radii.xl,
+    height: 84,
+    width: 84,
+  },
+  heroCopy: {
+    gap: spacing.sm,
   },
   title: {
     color: colors.text,
-    fontSize: typography.title,
-    fontWeight: "900",
-    lineHeight: 40,
+    ...typography.display,
   },
   subtitle: {
-    color: colors.muted,
-    fontSize: typography.body,
-    lineHeight: 24,
+    color: colors.primaryDark,
+    ...typography.headline,
   },
-  actions: {
-    gap: spacing.md,
-    marginBottom: spacing.xl,
+  body: {
+    color: colors.textSecondary,
+    ...typography.body,
   },
-  cards: {
+  roleCard: {
+    gap: spacing.lg,
+  },
+  roleHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    justifyContent: "space-between",
+  },
+  roleTitle: {
+    color: colors.text,
+    flexShrink: 1,
+    ...typography.subheading,
+  },
+  roleRow: {
+    flexDirection: "row",
     gap: spacing.md,
-    marginBottom: spacing.lg,
+  },
+  roleItem: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  roleLabel: {
+    color: colors.primary,
+    ...typography.label,
+  },
+  roleBody: {
+    color: colors.textSecondary,
+    ...typography.caption,
+  },
+  divider: {
+    backgroundColor: colors.border,
+    width: 1,
   },
 });
-
-

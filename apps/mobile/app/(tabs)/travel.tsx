@@ -1,14 +1,16 @@
 import { router } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { AppScreen } from "../../src/components/AppScreen";
-import { FormCard } from "../../src/components/FormCard";
-import { InfoCard } from "../../src/components/InfoCard";
+import { Badge } from "../../src/components/Badge";
+import { Banner } from "../../src/components/Banner";
+import { Card } from "../../src/components/Card";
+import { EmptyState } from "../../src/components/EmptyState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
-import { ScreenHeader } from "../../src/components/ScreenHeader";
-import { StatusPill } from "../../src/components/StatusPill";
-import { TextInputField } from "../../src/components/TextInputField";
+import { Screen } from "../../src/components/Screen";
+import { SectionHeader } from "../../src/components/SectionHeader";
+import { StatusChip } from "../../src/components/StatusChip";
+import { TextField } from "../../src/components/TextField";
+import { TrustBadge } from "../../src/components/TrustBadge";
 import { useAuthSession } from "../../src/lib/auth";
 import {
   createTrip,
@@ -153,181 +155,214 @@ export default function TravelScreen() {
   }
 
   return (
-    <AppScreen>
-      <StatusBar style="dark" />
-      <ScreenHeader
-        eyebrow="Traveler flow"
-        title="Share a trip"
-        subtitle="Publish your route, dates, and spare capacity so senders can see a possible corridor match."
+    <Screen contentStyle={styles.page} withTabBar>
+      <SectionHeader
+        eyebrow="Travel with Karri"
+        subtitle="Share your route, dates, and spare capacity so senders can understand the opportunity."
+        title="Create a trip"
+      />
+
+      <TrustBadge
+        detail="Clear availability and handoff expectations support better coordination."
+        label="Reliability starts early"
       />
 
       {auth.loading ? (
-        <View style={styles.stateBlock}>
+        <Card style={styles.loadingCard} variant="outlined">
           <ActivityIndicator color={colors.primary} />
           <Text style={styles.mutedText}>Checking your Karri session...</Text>
-        </View>
+        </Card>
       ) : null}
 
       {!auth.loading && !auth.user ? (
         <View style={styles.section}>
-          <InfoCard
-            title={auth.error ? "Firebase setup or sign-in needed" : "Sign in to share a trip"}
-            body={
-              auth.error ??
-              "Trips are scoped to your Firebase account, so Karri needs an authenticated session first."
-            }
+          {auth.error ? (
+            <Banner compact message={auth.error} title="Development setup" variant="development" />
+          ) : null}
+          <EmptyState
+            action={<PrimaryButton onPress={() => router.push("/login")}>Get started</PrimaryButton>}
+            description="Start a Karri session before creating an owner-scoped trip."
+            marker="T"
+            title="Sign in to share a trip"
           />
-          <PrimaryButton onPress={() => router.push("/login")}>Open sign in</PrimaryButton>
         </View>
       ) : null}
 
       {auth.user ? (
         <View style={styles.pageStack}>
-          <FormCard>
-            <Text style={styles.sectionTitle}>New trip</Text>
-            <View style={styles.fieldRow}>
-              <View style={styles.fieldColumn}>
-                <TextInputField
-                  label="Origin country"
-                  placeholder="United States"
-                  maxLength={80}
-                  value={form.originCountry}
-                  onChangeText={(value) => updateField("originCountry", value)}
-                />
-              </View>
-              <View style={styles.fieldColumn}>
-                <TextInputField
-                  label="Origin city"
-                  placeholder="Washington, DC"
-                  maxLength={120}
-                  value={form.originCity}
-                  onChangeText={(value) => updateField("originCity", value)}
-                />
-              </View>
-            </View>
-            <View style={styles.fieldRow}>
-              <View style={styles.fieldColumn}>
-                <TextInputField
-                  label="Destination country"
-                  placeholder="Kenya"
-                  maxLength={80}
-                  value={form.destinationCountry}
-                  onChangeText={(value) => updateField("destinationCountry", value)}
-                />
-              </View>
-              <View style={styles.fieldColumn}>
-                <TextInputField
-                  label="Destination city"
-                  placeholder="Nairobi"
-                  maxLength={120}
-                  value={form.destinationCity}
-                  onChangeText={(value) => updateField("destinationCity", value)}
-                />
-              </View>
-            </View>
-            <View style={styles.fieldRow}>
-              <View style={styles.fieldColumn}>
-                <TextInputField
-                  label="Departure date"
-                  placeholder="2026-07-10"
-                  helperText="Use YYYY-MM-DD."
-                  maxLength={10}
-                  value={form.departureDate}
-                  onChangeText={(value) => updateField("departureDate", value)}
-                />
-              </View>
-              <View style={styles.fieldColumn}>
-                <TextInputField
-                  label="Arrival date"
-                  placeholder="2026-07-11"
-                  helperText="Use YYYY-MM-DD."
-                  maxLength={10}
-                  value={form.arrivalDate}
-                  onChangeText={(value) => updateField("arrivalDate", value)}
-                />
-              </View>
-            </View>
-            <TextInputField
-              label="Available luggage capacity (kg)"
-              placeholder="8"
-              keyboardType="decimal-pad"
-              value={form.availableCapacityKg}
-              onChangeText={(value) => updateField("availableCapacityKg", value)}
+          <Card variant="elevated">
+            <SectionHeader
+              subtitle="Matches use the country and city values exactly."
+              title="Route"
             />
-            <TextInputField
-              label="Notes (optional)"
-              placeholder="Handoff availability or package preferences"
+            <View style={styles.fieldRow}>
+              <TextField
+                containerStyle={styles.fieldColumn}
+                label="Origin country"
+                maxLength={80}
+                onChangeText={(value) => updateField("originCountry", value)}
+                placeholder="United States"
+                required
+                value={form.originCountry}
+              />
+              <TextField
+                containerStyle={styles.fieldColumn}
+                label="Origin city"
+                maxLength={120}
+                onChangeText={(value) => updateField("originCity", value)}
+                placeholder="Washington, DC"
+                required
+                value={form.originCity}
+              />
+            </View>
+            <View style={styles.fieldRow}>
+              <TextField
+                containerStyle={styles.fieldColumn}
+                label="Destination country"
+                maxLength={80}
+                onChangeText={(value) => updateField("destinationCountry", value)}
+                placeholder="Kenya"
+                required
+                value={form.destinationCountry}
+              />
+              <TextField
+                containerStyle={styles.fieldColumn}
+                label="Destination city"
+                maxLength={120}
+                onChangeText={(value) => updateField("destinationCity", value)}
+                placeholder="Nairobi"
+                required
+                value={form.destinationCity}
+              />
+            </View>
+          </Card>
+
+          <Card variant="outlined">
+            <SectionHeader
+              subtitle="Use calendar dates and share only the capacity you are comfortable offering."
+              title="Schedule and capacity"
+            />
+            <View style={styles.fieldRow}>
+              <TextField
+                containerStyle={styles.fieldColumn}
+                helperText="Use YYYY-MM-DD."
+                label="Departure date"
+                maxLength={10}
+                onChangeText={(value) => updateField("departureDate", value)}
+                placeholder="2026-07-10"
+                required
+                value={form.departureDate}
+              />
+              <TextField
+                containerStyle={styles.fieldColumn}
+                helperText="Use YYYY-MM-DD."
+                label="Arrival date"
+                maxLength={10}
+                onChangeText={(value) => updateField("arrivalDate", value)}
+                placeholder="2026-07-11"
+                required
+                value={form.arrivalDate}
+              />
+            </View>
+            <TextField
+              keyboardType="decimal-pad"
+              label="Available luggage capacity (kg)"
+              onChangeText={(value) => updateField("availableCapacityKg", value)}
+              placeholder="8"
+              required
+              value={form.availableCapacityKg}
+            />
+            <TextField
               helperText="Do not add private contact or travel-document details."
+              label="Notes (optional)"
               maxLength={500}
               multiline
-              value={form.notes}
               onChangeText={(value) => updateField("notes", value)}
+              placeholder="Handoff availability or package preferences"
+              value={form.notes}
             />
 
-            {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
-            {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
-
-            <PrimaryButton disabled={saving} onPress={handleCreateTrip}>
-              {saving ? "Saving trip..." : "Save trip"}
-            </PrimaryButton>
-          </FormCard>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Your trips</Text>
-
-            {listLoading ? (
-              <View style={styles.stateBlock}>
-                <ActivityIndicator color={colors.primary} />
-                <Text style={styles.mutedText}>Loading your trips...</Text>
-              </View>
+            {formError ? (
+              <Banner message={formError} title="Review trip details" variant="error" />
+            ) : null}
+            {successMessage ? (
+              <Banner message={successMessage} title="Trip ready" variant="success" />
             ) : null}
 
-            {!listLoading && dataError ? <InfoCard title="Could not load trips" body={dataError} /> : null}
+            <PrimaryButton loading={saving} onPress={handleCreateTrip}>
+              {saving ? "Saving trip..." : "Save trip"}
+            </PrimaryButton>
+          </Card>
+
+          <View style={styles.section}>
+            <SectionHeader
+              action={<StatusChip label={`${trips.length} total`} tone="neutral" />}
+              eyebrow="Your activity"
+              subtitle="Your newest travel routes appear first."
+              title="Current trips"
+            />
+
+            {listLoading ? (
+              <Card style={styles.loadingCard} variant="outlined">
+                <ActivityIndicator color={colors.primary} />
+                <Text style={styles.mutedText}>Loading your trips...</Text>
+              </Card>
+            ) : null}
+
+            {!listLoading && dataError ? (
+              <Banner message={dataError} title="Trips could not load" variant="error" />
+            ) : null}
 
             {!listLoading && !dataError && trips.length === 0 ? (
-              <InfoCard
+              <EmptyState
+                description="Complete the form above and your saved trip will appear here."
+                marker="T"
                 title="No trips yet"
-                body="Your saved travel routes will appear here. Create the first one above."
               />
             ) : null}
 
             {!listLoading && !dataError
               ? trips.map((trip) => (
-                  <View key={trip.id} style={styles.listingCard}>
+                  <Card key={trip.id} variant="elevated">
                     <View style={styles.cardHeader}>
-                      <Text style={styles.cardTitle}>
-                        {trip.originCity} → {trip.destinationCity}
-                      </Text>
-                      <StatusPill label={trip.status} />
+                      <View style={styles.cardTitleBlock}>
+                        <Text style={styles.cardTitle}>
+                          {trip.originCity} → {trip.destinationCity}
+                        </Text>
+                        <Text style={styles.routeText}>
+                          {trip.originCountry} → {trip.destinationCountry}
+                        </Text>
+                      </View>
+                      <StatusChip
+                        label={trip.status}
+                        tone={trip.status === "active" ? "active" : "neutral"}
+                      />
                     </View>
-                    <Text style={styles.routeText}>
-                      {trip.originCountry} → {trip.destinationCountry}
-                    </Text>
-                    <Text style={styles.mutedText}>
-                      {trip.departureDate} → {trip.arrivalDate} · {trip.availableCapacityKg} kg available
-                    </Text>
+                    <View style={styles.metaRow}>
+                      <Badge label={trip.departureDate} tone="info" />
+                      <Badge label={`${trip.availableCapacityKg} kg available`} tone="primary" />
+                    </View>
+                    <Text style={styles.mutedText}>Arrives {trip.arrivalDate}</Text>
                     {trip.notes ? <Text style={styles.descriptionText}>{trip.notes}</Text> : null}
-                  </View>
+                  </Card>
                 ))
               : null}
           </View>
         </View>
       ) : null}
-    </AppScreen>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  page: {
+    gap: spacing.xl,
+  },
   pageStack: {
     gap: spacing.xl,
   },
   section: {
     gap: spacing.md,
-  },
-  sectionTitle: {
-    color: colors.text,
-    fontSize: typography.headline,
-    fontWeight: "900",
   },
   fieldRow: {
     flexDirection: "row",
@@ -335,21 +370,13 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   fieldColumn: {
-    flexBasis: 180,
+    flexBasis: 200,
     flexGrow: 1,
   },
-  stateBlock: {
+  loadingCard: {
     alignItems: "center",
-    gap: spacing.sm,
-    paddingVertical: spacing.lg,
-  },
-  listingCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 20,
-    gap: spacing.xs,
-    padding: spacing.md,
+    flexDirection: "row",
+    justifyContent: "center",
   },
   cardHeader: {
     alignItems: "flex-start",
@@ -358,37 +385,30 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     justifyContent: "space-between",
   },
+  cardTitleBlock: {
+    flex: 1,
+    gap: spacing.xxs,
+    minWidth: 210,
+  },
   cardTitle: {
     color: colors.text,
-    flexShrink: 1,
-    fontSize: 17,
-    fontWeight: "900",
+    ...typography.subheading,
   },
   routeText: {
     color: colors.primary,
-    fontSize: 14,
-    fontWeight: "800",
+    ...typography.label,
+  },
+  metaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
   },
   descriptionText: {
     color: colors.text,
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: spacing.xs,
+    ...typography.body,
   },
   mutedText: {
-    color: colors.muted,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  errorText: {
-    color: colors.warning,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  successText: {
-    color: colors.success,
-    fontSize: 14,
-    fontWeight: "700",
-    lineHeight: 20,
+    color: colors.textSecondary,
+    ...typography.caption,
   },
 });

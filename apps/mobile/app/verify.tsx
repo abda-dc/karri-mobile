@@ -1,13 +1,15 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
-import { AppScreen } from "../src/components/AppScreen";
-import { FormCard } from "../src/components/FormCard";
-import { InfoCard } from "../src/components/InfoCard";
+import { StyleSheet, View } from "react-native";
+import { Banner } from "../src/components/Banner";
+import { Card } from "../src/components/Card";
 import { PrimaryButton } from "../src/components/PrimaryButton";
-import { ScreenHeader } from "../src/components/ScreenHeader";
+import { Screen } from "../src/components/Screen";
+import { SectionHeader } from "../src/components/SectionHeader";
+import { TrustBadge } from "../src/components/TrustBadge";
 import { getFriendlyAuthError, startMvpAuthSession } from "../src/lib/auth";
-import { colors, spacing } from "../src/theme/tokens";
+import { isFirebaseConfigured } from "../src/lib/firebase";
+import { spacing } from "../src/theme/tokens";
 
 export default function VerifyScreen() {
   const [isStarting, setIsStarting] = useState(false);
@@ -28,24 +30,34 @@ export default function VerifyScreen() {
   }
 
   return (
-    <AppScreen>
-      <ScreenHeader
-        eyebrow="MVP authentication"
-        title="Start your Karri session"
-        subtitle="Email code delivery is not enabled yet. Continue creates a temporary Firebase Auth account so your listings have a real owner."
+    <Screen centered contentStyle={styles.content}>
+      <SectionHeader
+        eyebrow="One more step"
+        subtitle="Create a Karri development session, then choose how you want to participate."
+        title="You&apos;re almost ready"
       />
 
-      <FormCard>
-        <InfoCard
-          title="Temporary account"
-          body="This anonymous Firebase account is not an identity verification or trust signal. It will be replaced or linked when production authentication is implemented."
+      <Card variant="elevated">
+        <TrustBadge
+          detail="Your shipment and trip records stay scoped to your Firebase user."
+          label="Account-scoped activity"
+        />
+        <Banner
+          compact
+          message={
+            isFirebaseConfigured
+              ? "Karri will use an anonymous Firebase session for this MVP. It is not identity verification or a trust score."
+              : "Firebase is not configured locally, so a development session cannot start yet."
+          }
+          title="Development Mode"
+          variant="development"
         />
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Banner message={error} title="Session could not start" variant="error" /> : null}
 
         <View style={styles.actions}>
-          <PrimaryButton disabled={isStarting} onPress={handleContinue}>
-            {isStarting ? "Starting session..." : "Continue to profile setup"}
+          <PrimaryButton loading={isStarting} onPress={handleContinue}>
+            {isStarting ? "Starting session..." : "Continue"}
           </PrimaryButton>
           <PrimaryButton
             disabled={isStarting}
@@ -55,19 +67,16 @@ export default function VerifyScreen() {
             Back to email
           </PrimaryButton>
         </View>
-      </FormCard>
-    </AppScreen>
+      </Card>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  actions: {
-    gap: spacing.md,
-    marginTop: spacing.sm,
+  content: {
+    gap: spacing.xl,
   },
-  error: {
-    color: colors.warning,
-    fontSize: 14,
-    lineHeight: 20,
+  actions: {
+    gap: spacing.sm,
   },
 });

@@ -1,14 +1,16 @@
 import { router } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { AppScreen } from "../../src/components/AppScreen";
-import { FormCard } from "../../src/components/FormCard";
-import { InfoCard } from "../../src/components/InfoCard";
+import { Badge } from "../../src/components/Badge";
+import { Banner } from "../../src/components/Banner";
+import { Card } from "../../src/components/Card";
+import { EmptyState } from "../../src/components/EmptyState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
-import { ScreenHeader } from "../../src/components/ScreenHeader";
-import { StatusPill } from "../../src/components/StatusPill";
-import { TextInputField } from "../../src/components/TextInputField";
+import { Screen } from "../../src/components/Screen";
+import { SectionHeader } from "../../src/components/SectionHeader";
+import { StatusChip } from "../../src/components/StatusChip";
+import { TextField } from "../../src/components/TextField";
+import { TrustBadge } from "../../src/components/TrustBadge";
 import { useAuthSession } from "../../src/lib/auth";
 import {
   createShipment,
@@ -139,184 +141,230 @@ export default function SendScreen() {
   }
 
   return (
-    <AppScreen>
-      <StatusBar style="dark" />
-      <ScreenHeader
-        eyebrow="Sender flow"
-        title="Send a package"
-        subtitle="Describe the route, package, timing, and reward clearly so compatible travelers can evaluate the request."
+    <Screen contentStyle={styles.page} withTabBar>
+      <SectionHeader
+        eyebrow="Send with Karri"
+        subtitle="Share the route, package, timing, and reward a traveler needs to evaluate your request."
+        title="Create a shipment"
+      />
+
+      <TrustBadge
+        detail="Clear package details help travelers make informed choices."
+        label="Clarity builds trust"
       />
 
       {auth.loading ? (
-        <View style={styles.stateBlock}>
+        <Card style={styles.loadingCard} variant="outlined">
           <ActivityIndicator color={colors.primary} />
           <Text style={styles.mutedText}>Checking your Karri session...</Text>
-        </View>
+        </Card>
       ) : null}
 
       {!auth.loading && !auth.user ? (
         <View style={styles.section}>
-          <InfoCard
-            title={auth.error ? "Firebase setup or sign-in needed" : "Sign in to send"}
-            body={
-              auth.error ??
-              "Shipments are scoped to your Firebase account, so Karri needs an authenticated session first."
-            }
+          {auth.error ? (
+            <Banner compact message={auth.error} title="Development setup" variant="development" />
+          ) : null}
+          <EmptyState
+            action={<PrimaryButton onPress={() => router.push("/login")}>Get started</PrimaryButton>}
+            description="Start a Karri session before creating an owner-scoped shipment."
+            marker="S"
+            title="Sign in to create a shipment"
           />
-          <PrimaryButton onPress={() => router.push("/login")}>Open sign in</PrimaryButton>
         </View>
       ) : null}
 
       {auth.user ? (
         <View style={styles.pageStack}>
-          <FormCard>
-            <Text style={styles.sectionTitle}>New shipment</Text>
-            <View style={styles.fieldRow}>
-              <View style={styles.fieldColumn}>
-                <TextInputField
-                  label="Origin country"
-                  placeholder="United States"
-                  maxLength={80}
-                  value={form.originCountry}
-                  onChangeText={(value) => updateField("originCountry", value)}
-                />
-              </View>
-              <View style={styles.fieldColumn}>
-                <TextInputField
-                  label="Origin city"
-                  placeholder="Washington, DC"
-                  maxLength={120}
-                  value={form.originCity}
-                  onChangeText={(value) => updateField("originCity", value)}
-                />
-              </View>
-            </View>
-            <View style={styles.fieldRow}>
-              <View style={styles.fieldColumn}>
-                <TextInputField
-                  label="Destination country"
-                  placeholder="Kenya"
-                  maxLength={80}
-                  value={form.destinationCountry}
-                  onChangeText={(value) => updateField("destinationCountry", value)}
-                />
-              </View>
-              <View style={styles.fieldColumn}>
-                <TextInputField
-                  label="Destination city"
-                  placeholder="Nairobi"
-                  maxLength={120}
-                  value={form.destinationCity}
-                  onChangeText={(value) => updateField("destinationCity", value)}
-                />
-              </View>
-            </View>
-            <TextInputField
-              label="Package category"
-              placeholder="Clothing, documents, personal care..."
-              maxLength={80}
-              value={form.packageCategory}
-              onChangeText={(value) => updateField("packageCategory", value)}
+          <Card variant="elevated">
+            <SectionHeader
+              subtitle="Matches use the country and city values exactly."
+              title="Route"
             />
-            <TextInputField
-              label="Package description"
-              placeholder="Describe what the traveler should expect"
+            <View style={styles.fieldRow}>
+              <TextField
+                containerStyle={styles.fieldColumn}
+                label="Origin country"
+                maxLength={80}
+                onChangeText={(value) => updateField("originCountry", value)}
+                placeholder="United States"
+                required
+                value={form.originCountry}
+              />
+              <TextField
+                containerStyle={styles.fieldColumn}
+                label="Origin city"
+                maxLength={120}
+                onChangeText={(value) => updateField("originCity", value)}
+                placeholder="Washington, DC"
+                required
+                value={form.originCity}
+              />
+            </View>
+            <View style={styles.fieldRow}>
+              <TextField
+                containerStyle={styles.fieldColumn}
+                label="Destination country"
+                maxLength={80}
+                onChangeText={(value) => updateField("destinationCountry", value)}
+                placeholder="Kenya"
+                required
+                value={form.destinationCountry}
+              />
+              <TextField
+                containerStyle={styles.fieldColumn}
+                label="Destination city"
+                maxLength={120}
+                onChangeText={(value) => updateField("destinationCity", value)}
+                placeholder="Nairobi"
+                required
+                value={form.destinationCity}
+              />
+            </View>
+          </Card>
+
+          <Card variant="outlined">
+            <SectionHeader
+              subtitle="Describe only what a traveler needs to assess the package."
+              title="Package details"
+            />
+            <TextField
+              label="Package category"
+              maxLength={80}
+              onChangeText={(value) => updateField("packageCategory", value)}
+              placeholder="Clothing, documents, personal care..."
+              required
+              value={form.packageCategory}
+            />
+            <TextField
               helperText="Do not include private recipient contact details."
+              label="Package description"
               maxLength={500}
               multiline
-              value={form.packageDescription}
               onChangeText={(value) => updateField("packageDescription", value)}
+              placeholder="Describe what the traveler should expect"
+              required
+              value={form.packageDescription}
             />
-            <TextInputField
+            <TextField
+              keyboardType="decimal-pad"
               label="Weight estimate (kg)"
-              placeholder="2.5"
-              keyboardType="decimal-pad"
-              value={form.weightKg}
               onChangeText={(value) => updateField("weightKg", value)}
+              placeholder="2.5"
+              required
+              value={form.weightKg}
             />
-            <TextInputField
+          </Card>
+
+          <Card variant="outlined">
+            <SectionHeader
+              subtitle="Set a practical window and a clear reward offer."
+              title="Timing and reward"
+            />
+            <TextField
               label="Desired delivery window"
-              placeholder="July 10–20, 2026"
               maxLength={120}
-              value={form.deliveryWindow}
               onChangeText={(value) => updateField("deliveryWindow", value)}
+              placeholder="July 10–20, 2026"
+              required
+              value={form.deliveryWindow}
             />
-            <TextInputField
-              label="Reward offer (USD)"
-              placeholder="40"
+            <TextField
               keyboardType="decimal-pad"
-              value={form.rewardAmount}
+              label="Reward offer (USD)"
               onChangeText={(value) => updateField("rewardAmount", value)}
+              placeholder="40"
+              required
+              value={form.rewardAmount}
             />
 
-            {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
-            {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
+            {formError ? (
+              <Banner message={formError} title="Review shipment details" variant="error" />
+            ) : null}
+            {successMessage ? (
+              <Banner message={successMessage} title="Shipment ready" variant="success" />
+            ) : null}
 
-            <PrimaryButton disabled={saving} onPress={handleCreateShipment}>
+            <PrimaryButton loading={saving} onPress={handleCreateShipment}>
               {saving ? "Saving shipment..." : "Save shipment"}
             </PrimaryButton>
-          </FormCard>
+          </Card>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Your shipments</Text>
+            <SectionHeader
+              action={<StatusChip label={`${shipments.length} total`} tone="neutral" />}
+              eyebrow="Your activity"
+              subtitle="Your newest shipment requests appear first."
+              title="Current shipments"
+            />
 
             {listLoading ? (
-              <View style={styles.stateBlock}>
+              <Card style={styles.loadingCard} variant="outlined">
                 <ActivityIndicator color={colors.primary} />
                 <Text style={styles.mutedText}>Loading your shipments...</Text>
-              </View>
+              </Card>
             ) : null}
 
             {!listLoading && dataError ? (
-              <InfoCard title="Could not load shipments" body={dataError} />
+              <Banner message={dataError} title="Shipments could not load" variant="error" />
             ) : null}
 
             {!listLoading && !dataError && shipments.length === 0 ? (
-              <InfoCard
+              <EmptyState
+                description="Complete the form above and your saved shipment will appear here."
+                marker="S"
                 title="No shipments yet"
-                body="Your saved shipment requests will appear here. Create the first one above."
               />
             ) : null}
 
             {!listLoading && !dataError
               ? shipments.map((shipment) => (
-                  <View key={shipment.id} style={styles.listingCard}>
+                  <Card key={shipment.id} variant="elevated">
                     <View style={styles.cardHeader}>
-                      <Text style={styles.cardTitle}>
-                        {shipment.originCity} → {shipment.destinationCity}
-                      </Text>
-                      <StatusPill label={shipment.status} />
+                      <View style={styles.cardTitleBlock}>
+                        <Text style={styles.cardTitle}>
+                          {shipment.originCity} → {shipment.destinationCity}
+                        </Text>
+                        <Text style={styles.routeText}>
+                          {shipment.originCountry} → {shipment.destinationCountry}
+                        </Text>
+                      </View>
+                      <StatusChip
+                        label={shipment.status}
+                        tone={shipment.status === "active" ? "active" : "neutral"}
+                      />
                     </View>
-                    <Text style={styles.routeText}>
-                      {shipment.originCountry} → {shipment.destinationCountry}
-                    </Text>
+                    <View style={styles.metaRow}>
+                      <Badge label={shipment.packageCategory} tone="primary" />
+                      <Badge label={`${shipment.weightKg} kg`} />
+                      <Badge
+                        label={`${shipment.rewardAmount} ${shipment.rewardCurrency}`}
+                        tone="gold"
+                      />
+                    </View>
                     <Text style={styles.mutedText}>
-                      {shipment.packageCategory} · {shipment.weightKg} kg · {shipment.rewardAmount}{" "}
-                      {shipment.rewardCurrency}
+                      Delivery window: {shipment.deliveryWindow}
                     </Text>
-                    <Text style={styles.mutedText}>Delivery window: {shipment.deliveryWindow}</Text>
                     <Text style={styles.descriptionText}>{shipment.packageDescription}</Text>
-                  </View>
+                  </Card>
                 ))
               : null}
           </View>
         </View>
       ) : null}
-    </AppScreen>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  page: {
+    gap: spacing.xl,
+  },
   pageStack: {
     gap: spacing.xl,
   },
   section: {
     gap: spacing.md,
-  },
-  sectionTitle: {
-    color: colors.text,
-    fontSize: typography.headline,
-    fontWeight: "900",
   },
   fieldRow: {
     flexDirection: "row",
@@ -324,21 +372,13 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   fieldColumn: {
-    flexBasis: 180,
+    flexBasis: 200,
     flexGrow: 1,
   },
-  stateBlock: {
+  loadingCard: {
     alignItems: "center",
-    gap: spacing.sm,
-    paddingVertical: spacing.lg,
-  },
-  listingCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 20,
-    gap: spacing.xs,
-    padding: spacing.md,
+    flexDirection: "row",
+    justifyContent: "center",
   },
   cardHeader: {
     alignItems: "flex-start",
@@ -347,37 +387,30 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     justifyContent: "space-between",
   },
+  cardTitleBlock: {
+    flex: 1,
+    gap: spacing.xxs,
+    minWidth: 210,
+  },
   cardTitle: {
     color: colors.text,
-    flexShrink: 1,
-    fontSize: 17,
-    fontWeight: "900",
+    ...typography.subheading,
   },
   routeText: {
     color: colors.primary,
-    fontSize: 14,
-    fontWeight: "800",
+    ...typography.label,
+  },
+  metaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
   },
   descriptionText: {
     color: colors.text,
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: spacing.xs,
+    ...typography.body,
   },
   mutedText: {
-    color: colors.muted,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  errorText: {
-    color: colors.warning,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  successText: {
-    color: colors.success,
-    fontSize: 14,
-    fontWeight: "700",
-    lineHeight: 20,
+    color: colors.textSecondary,
+    ...typography.caption,
   },
 });

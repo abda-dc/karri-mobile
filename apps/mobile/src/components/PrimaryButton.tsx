@@ -1,49 +1,67 @@
 import { ReactNode } from "react";
-import { Pressable, StyleSheet, Text } from "react-native";
-import { colors, spacing } from "../theme/tokens";
+import {
+  ActivityIndicator,
+  Pressable,
+  PressableProps,
+  StyleProp,
+  StyleSheet,
+  Text,
+  ViewStyle,
+} from "react-native";
+import { colors, radii, spacing, touchTargets, typography } from "../theme/tokens";
 
 type PrimaryButtonProps = {
   children: ReactNode;
   disabled?: boolean;
-  onPress?: () => void;
-  variant?: "primary" | "secondary";
+  loading?: boolean;
+  onPress?: PressableProps["onPress"];
+  style?: StyleProp<ViewStyle>;
+  variant?: "ghost" | "primary" | "secondary";
 };
 
 export function PrimaryButton({
   children,
   disabled = false,
+  loading = false,
   onPress,
+  style,
   variant = "primary",
 }: PrimaryButtonProps) {
-  const isPrimary = variant === "primary";
+  const isDisabled = disabled || loading;
+  const activityColor = variant === "primary" ? colors.white : colors.primary;
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      disabled={disabled}
+      accessibilityState={{ busy: loading, disabled: isDisabled }}
+      disabled={isDisabled}
+      hitSlop={touchTargets.hitSlop}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        isPrimary ? styles.primary : styles.secondary,
-        pressed && !disabled && styles.pressed,
-        disabled && styles.disabled,
+        styles[variant],
+        pressed && !isDisabled && styles.pressed,
+        isDisabled && styles.disabled,
+        style,
       ]}
     >
-      <Text style={[styles.text, isPrimary ? styles.primaryText : styles.secondaryText]}>
-        {children}
-      </Text>
+      {loading ? <ActivityIndicator color={activityColor} size="small" /> : null}
+      <Text style={[styles.text, styles[`${variant}Text`]]}>{children}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: 18,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
     alignItems: "center",
+    borderRadius: radii.lg,
     borderWidth: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+    justifyContent: "center",
+    minHeight: touchTargets.comfortable,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
   primary: {
     backgroundColor: colors.primary,
@@ -51,22 +69,30 @@ const styles = StyleSheet.create({
   },
   secondary: {
     backgroundColor: colors.surface,
-    borderColor: colors.border,
+    borderColor: colors.borderStrong,
+  },
+  ghost: {
+    backgroundColor: "transparent",
+    borderColor: "transparent",
   },
   pressed: {
     opacity: 0.82,
+    transform: [{ scale: 0.99 }],
   },
   disabled: {
-    opacity: 0.55,
+    opacity: 0.5,
   },
   text: {
-    fontSize: 16,
-    fontWeight: "800",
+    ...typography.bodyStrong,
+    textAlign: "center",
   },
   primaryText: {
-    color: "#FFFFFF",
+    color: colors.white,
   },
   secondaryText: {
     color: colors.primaryDark,
+  },
+  ghostText: {
+    color: colors.primary,
   },
 });

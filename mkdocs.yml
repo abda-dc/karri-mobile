@@ -70,6 +70,12 @@ nav:
       - Notifications: product/notifications.md
       - Reviews: product/reviews.md
       - Trust Score: product/trust-score.md
+  - Design:
+      - Brand Guidelines: design/brand-guidelines.md
+      - Design System: design/design-system.md
+      - Components: design/components.md
+      - Accessibility: design/accessibility.md
+      - UX Patterns: design/ux-patterns.md
   - Architecture:
       - Technical Architecture: architecture/technical-architecture.md
       - ADRs:

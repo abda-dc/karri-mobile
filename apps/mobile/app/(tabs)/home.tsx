@@ -1,11 +1,15 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { AppScreen } from "../../src/components/AppScreen";
-import { InfoCard } from "../../src/components/InfoCard";
+import { Badge } from "../../src/components/Badge";
+import { Banner } from "../../src/components/Banner";
+import { Card } from "../../src/components/Card";
+import { EmptyState } from "../../src/components/EmptyState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
-import { ScreenHeader } from "../../src/components/ScreenHeader";
-import { StatusPill } from "../../src/components/StatusPill";
+import { Screen } from "../../src/components/Screen";
+import { SectionHeader } from "../../src/components/SectionHeader";
+import { StatusChip } from "../../src/components/StatusChip";
+import { TrustBadge } from "../../src/components/TrustBadge";
 import { useAuthSession } from "../../src/lib/auth";
 import {
   getFriendlyFirestoreError,
@@ -108,133 +112,168 @@ export default function AppHomeScreen() {
   const isLoading = auth.loading || shipmentsLoading || tripsLoading;
 
   return (
-    <AppScreen>
-      <ScreenHeader
-        eyebrow="Karri home"
-        title="Possible corridor matches"
-        subtitle="Karri compares active shipment and trip origins and destinations exactly. These are leads to evaluate, not bookings or safety guarantees."
-      />
-
-      <View style={styles.actions}>
-        <PrimaryButton onPress={() => router.push("/(tabs)/send")}>Send a package</PrimaryButton>
-        <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/travel")}>
-          I&apos;m traveling
-        </PrimaryButton>
-        <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/tracking")}>
-          Track a booking
-        </PrimaryButton>
-      </View>
+    <Screen contentStyle={styles.page} withTabBar>
+      <Card style={styles.hero} variant="soft">
+        <View style={styles.heroTop}>
+          <Badge label="Karri community" tone="primary" />
+          <TrustBadge compact label="Trust-first" />
+        </View>
+        <View style={styles.heroCopy}>
+          <Text style={styles.heroTitle}>Move across borders with more clarity.</Text>
+          <Text style={styles.heroBody}>
+            Share what needs to move, publish where you&apos;re going, and see compatible
+            community routes.
+          </Text>
+        </View>
+        <View style={styles.actions}>
+          <PrimaryButton onPress={() => router.push("/(tabs)/send")}>Create shipment</PrimaryButton>
+          <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/travel")}>
+            Share a trip
+          </PrimaryButton>
+        </View>
+      </Card>
 
       {!auth.loading && !auth.user ? (
         <View style={styles.section}>
-          <InfoCard
-            title={auth.error ? "Firebase setup or sign-in needed" : "Sign in to find matches"}
-            body={
-              auth.error ??
-              "Active route inventory is available only to authenticated Karri accounts."
-            }
+          {auth.error ? (
+            <Banner compact message={auth.error} title="Development setup" variant="development" />
+          ) : null}
+          <EmptyState
+            action={<PrimaryButton onPress={() => router.push("/login")}>Get started</PrimaryButton>}
+            description="Start a Karri session to view active community routes and possible matches."
+            marker="M"
+            title="Your matches will appear here"
           />
-          <PrimaryButton onPress={() => router.push("/login")}>Open sign in</PrimaryButton>
         </View>
       ) : null}
 
       {auth.user ? (
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Exact route matches</Text>
-            {!isLoading && !dataError ? <StatusPill label={`${matches.length} found`} /> : null}
-          </View>
+          <SectionHeader
+            action={
+              !isLoading && !dataError ? (
+                <StatusChip label={`${matches.length} found`} tone="active" />
+              ) : undefined
+            }
+            eyebrow="Suggested matches"
+            subtitle="Exact origin and destination corridors from current active listings."
+            title="Routes that line up"
+          />
 
           {isLoading ? (
-            <View style={styles.stateBlock}>
+            <Card style={styles.loadingCard} variant="outlined">
               <ActivityIndicator color={colors.primary} />
               <Text style={styles.mutedText}>Comparing active routes...</Text>
-            </View>
+            </Card>
           ) : null}
 
           {!isLoading && dataError ? (
-            <InfoCard title="Could not load matches" body={dataError} />
+            <Banner message={dataError} title="Matches could not load" variant="error" />
           ) : null}
 
           {!isLoading && !dataError && matches.length === 0 ? (
-            <InfoCard
-              title="No exact matches yet"
-              body="Create shipment and trip listings with the same origin country/city and destination country/city to see a possible match here."
+            <EmptyState
+              action={
+                <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/send")}>
+                  Create a shipment
+                </PrimaryButton>
+              }
+              description="An exact match appears when a shipment and trip share the same origin and destination cities and countries."
+              marker="R"
+              title="No route matches yet"
             />
           ) : null}
 
           {!isLoading && !dataError
             ? matches.map(({ shipment, trip }) => (
-                <View key={`${shipment.id}:${trip.id}`} style={styles.matchCard}>
+                <Card key={`${shipment.id}:${trip.id}`} variant="elevated">
                   <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>
-                      {shipment.originCity} → {shipment.destinationCity}
-                    </Text>
-                    <StatusPill label="Possible match" />
+                    <View style={styles.cardTitleBlock}>
+                      <Text style={styles.cardTitle}>
+                        {shipment.originCity} → {shipment.destinationCity}
+                      </Text>
+                      <Text style={styles.routeText}>
+                        {shipment.originCountry} → {shipment.destinationCountry}
+                      </Text>
+                    </View>
+                    <StatusChip label="Possible match" tone="info" />
                   </View>
-                  <Text style={styles.routeText}>
-                    {shipment.originCountry} → {shipment.destinationCountry}
-                  </Text>
-                  <View style={styles.detailGroup}>
-                    <Text style={styles.detailLabel}>Shipment</Text>
-                    <Text style={styles.mutedText}>
-                      {shipment.packageCategory} · {shipment.weightKg} kg · {shipment.rewardAmount}{" "}
-                      {shipment.rewardCurrency}
-                    </Text>
-                    <Text style={styles.mutedText}>
-                      Desired window: {shipment.deliveryWindow}
-                    </Text>
+
+                  <TrustBadge detail="Origin and destination align" label="Exact corridor" />
+
+                  <View style={styles.detailsRow}>
+                    <View style={styles.detailGroup}>
+                      <Text style={styles.detailLabel}>Shipment</Text>
+                      <Text style={styles.mutedText}>
+                        {shipment.packageCategory} · {shipment.weightKg} kg
+                      </Text>
+                      <Text style={styles.mutedText}>
+                        {shipment.rewardAmount} {shipment.rewardCurrency} reward
+                      </Text>
+                      <Text style={styles.mutedText}>Window: {shipment.deliveryWindow}</Text>
+                    </View>
+                    <View style={styles.detailGroup}>
+                      <Text style={styles.detailLabel}>Trip</Text>
+                      <Text style={styles.mutedText}>
+                        {trip.departureDate} → {trip.arrivalDate}
+                      </Text>
+                      <Text style={styles.mutedText}>
+                        {trip.availableCapacityKg} kg available
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.detailGroup}>
-                    <Text style={styles.detailLabel}>Trip</Text>
-                    <Text style={styles.mutedText}>
-                      {trip.departureDate} → {trip.arrivalDate} · {trip.availableCapacityKg} kg available
-                    </Text>
-                  </View>
-                  <Text style={styles.disclaimer}>
-                    Date, weight, category, and participant eligibility are not checked by this first match.
-                  </Text>
-                </View>
+
+                  <Banner
+                    compact
+                    message="Dates, weight, category, and participant eligibility still need human review."
+                    title="Match scope"
+                    variant="info"
+                  />
+                </Card>
               ))
             : null}
         </View>
       ) : null}
-    </AppScreen>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  actions: {
-    gap: spacing.md,
-    marginBottom: spacing.xl,
+  page: {
+    gap: spacing.xxl,
   },
-  section: {
-    gap: spacing.md,
+  hero: {
+    backgroundColor: colors.primarySoft,
+    gap: spacing.lg,
   },
-  sectionHeader: {
-    alignItems: "flex-start",
+  heroTop: {
+    alignItems: "center",
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
     justifyContent: "space-between",
   },
-  sectionTitle: {
+  heroCopy: {
+    gap: spacing.sm,
+  },
+  heroTitle: {
     color: colors.text,
-    fontSize: typography.headline,
-    fontWeight: "900",
+    ...typography.title,
   },
-  stateBlock: {
+  heroBody: {
+    color: colors.textSecondary,
+    ...typography.body,
+  },
+  actions: {
+    gap: spacing.sm,
+  },
+  section: {
+    gap: spacing.md,
+  },
+  loadingCard: {
     alignItems: "center",
-    gap: spacing.sm,
-    paddingVertical: spacing.lg,
-  },
-  matchCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 20,
-    gap: spacing.sm,
-    padding: spacing.md,
+    flexDirection: "row",
+    justifyContent: "center",
   },
   cardHeader: {
     alignItems: "flex-start",
@@ -243,33 +282,35 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     justifyContent: "space-between",
   },
+  cardTitleBlock: {
+    flex: 1,
+    gap: spacing.xxs,
+    minWidth: 210,
+  },
   cardTitle: {
     color: colors.text,
-    flexShrink: 1,
-    fontSize: 18,
-    fontWeight: "900",
+    ...typography.subheading,
   },
   routeText: {
     color: colors.primary,
-    fontSize: 14,
-    fontWeight: "800",
+    ...typography.label,
+  },
+  detailsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.lg,
   },
   detailGroup: {
-    gap: 2,
+    flex: 1,
+    gap: spacing.xxs,
+    minWidth: 180,
   },
   detailLabel: {
     color: colors.text,
-    fontSize: 14,
-    fontWeight: "900",
+    ...typography.label,
   },
   mutedText: {
-    color: colors.muted,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  disclaimer: {
-    color: colors.warning,
-    fontSize: 13,
-    lineHeight: 18,
+    color: colors.textSecondary,
+    ...typography.caption,
   },
 });
