@@ -9,9 +9,12 @@ export const NotificationDestination = {
   Tracking: "tracking",
 } as const;
 
+export type NotificationDestination =
+  (typeof NotificationDestination)[keyof typeof NotificationDestination];
+
 export type NotificationRoute =
   | {
-      readonly bookingId: string;
+      readonly bookingId?: string;
       readonly destination: typeof NotificationDestination.Tracking;
     }
   | {
@@ -34,7 +37,13 @@ export class NotificationRouter {
           bookingId: action.bookingId,
           destination: NotificationDestination.Tracking,
         };
+      case NotificationActionType.OpenTracking:
+        return {
+          bookingId: action.bookingId,
+          destination: NotificationDestination.Tracking,
+        };
       case NotificationActionType.OpenNotifications:
+      case NotificationActionType.OpenProfile:
         return { destination: NotificationDestination.Profile };
       case NotificationActionType.OpenHome:
         return { destination: NotificationDestination.Home };
