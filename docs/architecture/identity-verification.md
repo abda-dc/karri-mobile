@@ -58,7 +58,7 @@ Phase 7.5 adds reusable Presentation components for the verification badge, stat
 
 The UI is intentionally read-only. An unverified account sees that identity verification is being prepared, while existing records receive transparent status, level, document-count, date, outcome, and next-action explanations. No upload, metadata-edit, submission, renewal, or reviewer control is exposed.
 
-For the signed-in user's Profile only, the loaded identity level is explicitly mapped into the existing trust vocabulary: `none` remains `none`, `basic` remains `basic`, and `identity_verified` becomes the trust engine's `identity` input. Other users' trust cards retain the safe `none` default because identity-verification records are private and self-readable.
+For the signed-in user's Profile only, the loaded identity level is explicitly mapped into the existing trust vocabulary: `none` remains `none`, `basic` remains `basic`, and `identity_verified` becomes the trust engine's `identity` input. Other users' trust cards use reviews-only evidence because identity-verification records are private and self-readable; the UI does not present unavailable private identity state as a known fact.
 
 ## Privacy and retention
 
@@ -66,11 +66,13 @@ Identity evidence is high-sensitivity data. Before real collection begins, Karri
 
 The current twelve-event cap bounds the client aggregate and makes append-only rule validation explicit. A production review workflow may move immutable audit events to a server-owned subcollection if longer histories are required.
 
-## Future manual review and trust integration
+## Trust integration and future manual review
 
 A trusted server workflow must authenticate and authorize reviewers, perform idempotent transitions, record reviewer decisions, and prevent concurrent stale updates. Manual review UI, queues, escalation, dual control, and operational monitoring are deferred.
 
-Trust-score integration is also deferred. When activated, it must map only a currently valid `identity_verified` result into the trust engine, explain the factor to users, and promptly remove the benefit after expiry or revocation. A client-reported verification level must never be treated as authoritative.
+The current Profile projection uses verification as one explainable trust factor: active basic states contribute limited evidence, verified identity contributes the full factor, and unverified, rejected, expired, or revoked states contribute none. The factor never guarantees safety or authorizes an action.
+
+This remains a client-calculated MVP projection. Production trust must obtain verification evidence from a trusted server projection, remove benefits promptly after expiry or revocation, preserve evidence references, and never treat a client-reported level as authoritative.
 
 ## Explicitly deferred
 
@@ -79,7 +81,7 @@ Trust-score integration is also deferred. When activated, it must map only a cur
 - OCR, liveness, biometric comparison, and automated document checks
 - third-party KYC/identity providers and credentials
 - reviewer dashboards and Cloud Functions
-- trust-score mutation, booking privileges, payments, and disputes
+- authoritative trust-score projection, booking privileges, payments, and disputes
 - production retention jobs, deletion workflows, and compliance controls
 
 ## Related documents

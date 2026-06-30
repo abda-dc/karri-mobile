@@ -26,20 +26,30 @@ export class TrustService {
       readonly verificationLevel?: VerificationLevel;
     } = {},
   ): Promise<TrustSummary> {
+    const calculatedAt = this.clock.now();
     const reviews = await this.reviews.listByReviewee(userId);
     const averageReview =
       reviews.length === 0
         ? null
         : reviews.reduce((total, review) => total + review.rating, 0) / reviews.length;
     const visibleCompletedBookingIds = new Set(reviews.map((review) => review.bookingId));
+    const hasParticipantContext =
+      context.bookings !== undefined ||
+      context.accountCreatedAt !== undefined ||
+      context.verificationLevel !== undefined;
     const bookings = context.bookings?.filter(
       (booking) => booking.senderId === userId || booking.travelerId === userId,
     );
     const accountCreatedAt = context.accountCreatedAt
       ? new Date(context.accountCreatedAt).getTime()
       : Number.NaN;
-    const accountAgeDays = Number.isFinite(accountCreatedAt)
-      ? Math.max(0, Math.floor((Date.now() - accountCreatedAt) / 86_400_000))
+    const calculationTime = new Date(calculatedAt).getTime();
+    const accountAgeDays =
+      Number.isFinite(accountCreatedAt) && Number.isFinite(calculationTime)
+      ? Math.max(
+          0,
+          Math.floor((calculationTime - accountCreatedAt) / 86_400_000),
+        )
       : 0;
     const inputs = {
       completedDeliveries: bookings
@@ -55,9 +65,11 @@ export class TrustService {
     } as const;
 
     return {
-      score: this.calculator.calculate(userId, inputs, this.clock.now()),
+      score: this.calculator.calculate(userId, inputs, calculatedAt),
       inputs,
-      evidenceScope: bookings ? "participant_history" : "reviews_only",
+      evidenceScope: hasParticipantContext
+        ? "participant_history"
+        : "reviews_only",
     };
   }
 

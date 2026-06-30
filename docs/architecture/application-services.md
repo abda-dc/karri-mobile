@@ -22,12 +22,14 @@ This document covers the implemented service foundations for shipments, trips, b
 | `NotificationPreferenceService` | Load safe defaults, persist preference snapshots, enable/disable available channels, and validate quiet hours through domain helpers |
 | `ReviewService` | Enforce completed-booking participation, one review per reviewer, rating bounds, and aggregate averages |
 | `IdentityVerificationService` | Validate metadata-only drafts, enforce the finite verification workflow, append audit events, and expose transparent status summaries; review commands require a future trusted host |
-| `TrustService` | Validate evidence inputs, invoke the versioned calculator, persist the result |
+| `TrustService` | Build scope-aware visible evidence inputs, derive account age from the injected clock, invoke the bounded versioned calculator, and persist only through its repository port |
 | `OfflineService` | Expose provider-neutral connectivity/pending-write status and safely retry Firestore's existing queue |
 | `RemoteConfigService` | Serve safe typed defaults and optionally refresh from a provider |
 | `ApplicationErrorService` | Normalize domain/provider failures, attach recovery guidance, and report structured diagnostics through an injected logger |
 
 Services import repository interfaces and domain types; they do not import Firestore. A singleton presentation composition now injects Firebase adapters and the event bus. Home, Send, Travel, Tracking, and Profile use the service layer. Profile's read-only identity-verification hook calls `IdentityVerificationService` through that composition and never imports the Firebase repository directly.
+
+`TrustService.getVisibleSummary` currently returns a client-calculated display projection. Profile may supply the current user's participant history, account creation time, and self-readable identity level. Other-user summaries use visible review evidence only. Authoritative persistence remains denied and requires a future trusted server projection with durable evidence references.
 
 Push delivery remains inert: no domain-event handler calls `PushNotificationService`. Registration is separately user-initiated from Profile through `PushRegistrationService` and an Expo Infrastructure adapter. It can request permission/acquire a token in a configured native build, but trusted persistence returns deferred and no sender exists. The real delivery gateway must run in trusted server code.
 
