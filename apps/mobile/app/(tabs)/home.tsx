@@ -11,7 +11,7 @@ import { SectionHeader } from "../../src/components/SectionHeader";
 import { StatusChip } from "../../src/components/StatusChip";
 import { TrustBadge } from "../../src/components/TrustBadge";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
-import { getFriendlyError } from "../../src/presentation/errors/getFriendlyError";
+import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
 import { TrustSummaryCard } from "../../src/presentation/components/TrustSummaryCard";
 import { colors, spacing, typography } from "../../src/theme/tokens";
@@ -82,7 +82,7 @@ export default function AppHomeScreen() {
             setShipmentsLoading(false);
           },
           (error) => {
-            setDataError(getFriendlyError(error));
+            setDataError(reportFriendlyError(error, "home.watch-active-shipments"));
             setShipmentsLoading(false);
           },
         ),
@@ -94,13 +94,13 @@ export default function AppHomeScreen() {
             setTripsLoading(false);
           },
           (error) => {
-            setDataError(getFriendlyError(error));
+            setDataError(reportFriendlyError(error, "home.watch-active-trips"));
             setTripsLoading(false);
           },
         ),
       );
     } catch (error) {
-      setDataError(getFriendlyError(error));
+      setDataError(reportFriendlyError(error, "home.start-listing-watches"));
       setShipmentsLoading(false);
       setTripsLoading(false);
     }
@@ -149,7 +149,7 @@ export default function AppHomeScreen() {
         next.delete(matchId);
         return next;
       });
-      setRequestError(getFriendlyError(error));
+      setRequestError(reportFriendlyError(error, "home.request-booking"));
     }
   }
 

@@ -20,6 +20,7 @@ This document covers the implemented service foundations for shipments, trips, b
 | `TrustService` | Validate evidence inputs, invoke the versioned calculator, persist the result |
 | `OfflineService` | Expose provider-neutral connectivity/pending-write status and safely retry Firestore's existing queue |
 | `RemoteConfigService` | Serve safe typed defaults and optionally refresh from a provider |
+| `ApplicationErrorService` | Normalize domain/provider failures, attach recovery guidance, and report structured diagnostics through an injected logger |
 
 Services import repository interfaces and domain types; they do not import Firestore. A singleton presentation composition now injects Firebase adapters and the event bus. Home, Send, Travel, Tracking, and Profile use the service layer.
 
@@ -49,6 +50,7 @@ Zustand remains deferred. Screens use thin local state and service-backed realti
 
 - [Domain Model](domain-model.md)
 - [Repository Pattern](repository-pattern.md)
+- [Error Handling](error-handling.md)
 - [Event Bus](event-bus.md)
 - [Mobile Architecture](../engineering/mobile-architecture.md)
 - [API Design](../engineering/api-design.md)

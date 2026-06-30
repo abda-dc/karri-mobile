@@ -17,6 +17,7 @@ import {
   FirebaseTrustRepository,
 } from "../../infrastructure/firebase/repositories";
 import { firebaseOfflineStatusGateway } from "../../infrastructure/firebase/FirebaseOfflineStatusGateway";
+import { reportApplicationError } from "../errors/getFriendlyError";
 
 const eventBus = new EventBus();
 const bookingRepository = new FirebaseBookingRepository();
@@ -27,10 +28,14 @@ const shipmentRepository = new FirebaseShipmentRepository();
 const tripRepository = new FirebaseTripRepository();
 const trustRepository = new FirebaseTrustRepository();
 
+firebaseOfflineStatusGateway.setBackgroundErrorReporter((error, operation) => {
+  reportApplicationError(error, operation);
+});
+
 const notificationService = new NotificationService(
   eventBus,
   notificationRepository,
-  (error) => console.warn("In-app notification could not be persisted.", error),
+  (error) => reportApplicationError(error, "notifications.persist-event"),
 );
 notificationService.start();
 

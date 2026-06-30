@@ -42,7 +42,7 @@ export default function LoginScreen() {
           message={
             isFirebaseConfigured
               ? "Email delivery is not active yet. The next step uses Karri's anonymous Firebase session bridge."
-              : "Firebase is not configured locally. Add the values from apps/mobile/.env.example before continuing."
+              : "Karri is not configured locally. Add the documented mobile environment values before continuing."
           }
           title="Development Mode"
           variant="development"

@@ -12,7 +12,7 @@ import { StatusChip } from "../../src/components/StatusChip";
 import { TextField } from "../../src/components/TextField";
 import { TrustBadge } from "../../src/components/TrustBadge";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
-import { getFriendlyError } from "../../src/presentation/errors/getFriendlyError";
+import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
 import { colors, spacing, typography } from "../../src/theme/tokens";
 import type { Shipment } from "../../src/types/models";
@@ -62,12 +62,12 @@ export default function SendScreen() {
           setDataError(null);
         },
         (error) => {
-          setDataError(getFriendlyError(error));
+          setDataError(reportFriendlyError(error, "send.watch-shipments"));
           setListLoading(false);
         },
       );
     } catch (error) {
-      setDataError(getFriendlyError(error));
+      setDataError(reportFriendlyError(error, "send.start-shipment-watch"));
       setListLoading(false);
     }
   }, [auth.loading, auth.user]);
@@ -132,7 +132,7 @@ export default function SendScreen() {
       setForm(emptyForm);
       setSuccessMessage("Shipment saved. It is now available for corridor matching.");
     } catch (error) {
-      setFormError(getFriendlyError(error));
+      setFormError(reportFriendlyError(error, "send.create-shipment"));
     } finally {
       setSaving(false);
     }

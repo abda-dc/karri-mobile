@@ -7,11 +7,9 @@ import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
 import { SectionHeader } from "../src/components/SectionHeader";
 import { TrustBadge } from "../src/components/TrustBadge";
-import {
-  getFriendlyAuthError,
-  startMvpAuthSession,
-} from "../src/infrastructure/firebase/auth";
+import { startMvpAuthSession } from "../src/infrastructure/firebase/auth";
 import { isFirebaseConfigured } from "../src/infrastructure/firebase/client";
+import { reportFriendlyError } from "../src/presentation/errors/getFriendlyError";
 import { spacing } from "../src/theme/tokens";
 
 export default function VerifyScreen() {
@@ -26,7 +24,7 @@ export default function VerifyScreen() {
       await startMvpAuthSession();
       router.replace("/profile-setup");
     } catch (sessionError) {
-      setError(getFriendlyAuthError(sessionError));
+      setError(reportFriendlyError(sessionError, "verify.start-auth-session"));
     } finally {
       setIsStarting(false);
     }
@@ -50,7 +48,7 @@ export default function VerifyScreen() {
           message={
             isFirebaseConfigured
               ? "Karri will use an anonymous Firebase session for this MVP. It is not identity verification or a trust score."
-              : "Firebase is not configured locally, so a development session cannot start yet."
+              : "Karri is not configured locally, so a development session cannot start yet."
           }
           title="Development Mode"
           variant="development"

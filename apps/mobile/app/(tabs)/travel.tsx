@@ -12,7 +12,7 @@ import { StatusChip } from "../../src/components/StatusChip";
 import { TextField } from "../../src/components/TextField";
 import { TrustBadge } from "../../src/components/TrustBadge";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
-import { getFriendlyError } from "../../src/presentation/errors/getFriendlyError";
+import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
 import { TrustSummaryCard } from "../../src/presentation/components/TrustSummaryCard";
 import { colors, spacing, typography } from "../../src/theme/tokens";
@@ -71,12 +71,12 @@ export default function TravelScreen() {
           setDataError(null);
         },
         (error) => {
-          setDataError(getFriendlyError(error));
+          setDataError(reportFriendlyError(error, "travel.watch-trips"));
           setListLoading(false);
         },
       );
     } catch (error) {
-      setDataError(getFriendlyError(error));
+      setDataError(reportFriendlyError(error, "travel.start-trip-watch"));
       setListLoading(false);
     }
   }, [auth.loading, auth.user]);
@@ -147,7 +147,7 @@ export default function TravelScreen() {
       setForm(emptyForm);
       setSuccessMessage("Trip saved. It is now available for corridor matching.");
     } catch (error) {
-      setFormError(getFriendlyError(error));
+      setFormError(reportFriendlyError(error, "travel.create-trip"));
     } finally {
       setSaving(false);
     }

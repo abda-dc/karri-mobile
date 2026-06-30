@@ -8,7 +8,7 @@ import {
 import { Banner } from "../../components/Banner";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { spacing } from "../../theme/tokens";
-import { getFriendlyError } from "../errors/getFriendlyError";
+import { getFriendlyError, reportApplicationError } from "../errors/getFriendlyError";
 import { useOfflineStatus } from "../hooks/useOfflineStatus";
 import { mobileServices } from "../services/mobileServices";
 
@@ -22,7 +22,7 @@ export function OfflineStatusBanner() {
 
   const writeLabel = status.pendingWrites === 1 ? "change" : "changes";
   let title = "Syncing changes";
-  let message = `${status.pendingWrites} ${writeLabel} waiting for Firestore confirmation.`;
+  let message = `${status.pendingWrites} ${writeLabel} waiting for service confirmation.`;
   let variant: "error" | "info" | "warning" = "info";
 
   if (status.phase === SyncPhase.Offline) {
@@ -52,8 +52,9 @@ export function OfflineStatusBanner() {
     setRetrying(true);
     try {
       await mobileServices.offline.retryPendingWrites();
-    } catch {
+    } catch (error) {
       // The shared status will surface the retry failure.
+      reportApplicationError(error, "offline.retry-pending-writes");
     } finally {
       setRetrying(false);
     }

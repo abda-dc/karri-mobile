@@ -11,7 +11,7 @@ import { StatusChip } from "../../src/components/StatusChip";
 import { TrustBadge } from "../../src/components/TrustBadge";
 import type { Booking, BookingRequest } from "../../src/domain/booking/Booking";
 import { BookingDetailCard } from "../../src/presentation/components/BookingDetailCard";
-import { getFriendlyError } from "../../src/presentation/errors/getFriendlyError";
+import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
 import { colors, spacing, typography } from "../../src/theme/tokens";
@@ -47,12 +47,12 @@ export default function TrackingScreen() {
           setLoading(false);
         },
         (watchError) => {
-          setError(getFriendlyError(watchError));
+          setError(reportFriendlyError(watchError, "tracking.watch-booking-activity"));
           setLoading(false);
         },
       );
     } catch (watchError) {
-      setError(getFriendlyError(watchError));
+      setError(reportFriendlyError(watchError, "tracking.start-booking-watch"));
       setLoading(false);
       return;
     }

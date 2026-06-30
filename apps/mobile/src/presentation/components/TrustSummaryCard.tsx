@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import type { Booking } from "../../domain/booking/Booking";
 import type { TrustSummary } from "../../domain/trust/TrustScore";
+import { Banner } from "../../components/Banner";
 import { Card } from "../../components/Card";
 import { StatusChip } from "../../components/StatusChip";
 import { colors, spacing, typography } from "../../theme/tokens";
+import { reportFriendlyError } from "../errors/getFriendlyError";
 import { mobileServices } from "../services/mobileServices";
 
 interface TrustSummaryCardProps {
@@ -26,10 +28,12 @@ export function TrustSummaryCard({
 }: TrustSummaryCardProps) {
   const [summary, setSummary] = useState<TrustSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setError(null);
 
     void mobileServices.trust
       .getVisibleSummary(userId, { accountCreatedAt, bookings, verificationLevel: "none" })
@@ -39,9 +43,11 @@ export function TrustSummaryCard({
           setLoading(false);
         }
       })
-      .catch(() => {
+      .catch((summaryError) => {
+        const message = reportFriendlyError(summaryError, "trust.load-summary");
         if (active) {
           setSummary(null);
+          setError(message);
           setLoading(false);
         }
       });
@@ -58,6 +64,10 @@ export function TrustSummaryCard({
         <Text style={styles.muted}>Loading trust evidence...</Text>
       </Card>
     );
+  }
+
+  if (error) {
+    return <Banner compact message={error} title="Trust summary unavailable" variant="error" />;
   }
 
   if (!summary) {

@@ -14,6 +14,7 @@ apps/mobile/
   app/                              Expo Router screens
   src/
     application/dto/                Service command shapes
+    application/errors/             Provider-neutral error model and logging ports
     application/services/           Validation and orchestration
     domain/                          Models, state guards, events, repository ports
     infrastructure/firebase/
@@ -21,6 +22,7 @@ apps/mobile/
       firestoreCache(.native).ts       Platform-specific cache configuration
       mappers/                       Firestore/domain conversion
       repositories/                  Realtime Firebase adapters
+    infrastructure/logging/          Replaceable diagnostics adapter
     presentation/
       components/                    Booking and trust composed views
       errors/                        Provider-neutral user messages
@@ -35,6 +37,7 @@ apps/mobile/
 - Tracking uses one combined `BookingService` subscription for participant bookings and booking requests, composes shipment/trip/custody/review detail, and calls booking/custody/review services.
 - Profile watches bookings and in-app notifications and requests trust summaries.
 - The shared `Screen` shell consumes `useOfflineStatus` and displays offline, queued, syncing, or failed-write state without provider imports.
+- Presentation reports caught failures through `ApplicationErrorService`; screens receive safe category-specific messages while Firebase codes and original exceptions remain diagnostic-only.
 - No prioritized Milestone 5 screen imports the legacy Firestore helper; that helper was removed.
 
 Screens decide presentation and available controls, while services and domain guards repeat every business rule. Firebase repositories and security rules remain the persistence/access boundary.
@@ -52,4 +55,4 @@ Realtime Firestore snapshots feed small screen-local arrays. Tracking's combined
 - Mobile business operations and asynchronous notification effects are not one atomic server transaction.
 - Device testing and Firebase Emulator Suite authorization tests remain necessary.
 
-See [Application Services](../architecture/application-services.md), [Offline Strategy](../architecture/offline-strategy.md), and [Technical Architecture](../architecture/technical-architecture.md).
+See [Application Services](../architecture/application-services.md), [Error Handling](../architecture/error-handling.md), [Offline Strategy](../architecture/offline-strategy.md), and [Technical Architecture](../architecture/technical-architecture.md).

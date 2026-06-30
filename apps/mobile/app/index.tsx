@@ -15,7 +15,7 @@ export default function WelcomeScreen() {
       {!isFirebaseConfigured ? (
         <Banner
           compact
-          message="Add the local Firebase values before starting an authenticated development session."
+          message="Add the documented mobile environment values before starting a development session."
           title="Development setup"
           variant="development"
         />

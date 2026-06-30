@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import {
-  getFriendlyAuthError,
   subscribeToAuthSession,
   type AuthIdentity,
 } from "../../infrastructure/firebase/auth";
 import { isFirebaseConfigured } from "../../infrastructure/firebase/client";
+import { reportFriendlyError } from "../errors/getFriendlyError";
 
 export interface AuthSessionState {
   readonly user: AuthIdentity | null;
@@ -18,7 +18,7 @@ export function useAuthSession(): AuthSessionState {
     loading: isFirebaseConfigured,
     error: isFirebaseConfigured
       ? null
-      : "Firebase is not configured. Add the values from apps/mobile/.env.example.",
+      : "Karri is not configured for this environment. Add the documented mobile environment values.",
   });
 
   useEffect(() => {
@@ -30,10 +30,18 @@ export function useAuthSession(): AuthSessionState {
       return subscribeToAuthSession(
         (user) => setState({ user, loading: false, error: null }),
         (error) =>
-          setState({ user: null, loading: false, error: getFriendlyAuthError(error) }),
+          setState({
+            user: null,
+            loading: false,
+            error: reportFriendlyError(error, "auth.watch-session"),
+          }),
       );
     } catch (error) {
-      setState({ user: null, loading: false, error: getFriendlyAuthError(error) });
+      setState({
+        user: null,
+        loading: false,
+        error: reportFriendlyError(error, "auth.start-session-watch"),
+      });
       return;
     }
   }, []);

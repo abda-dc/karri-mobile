@@ -1,31 +1,20 @@
+import type { ApplicationError } from "../../application/errors/ApplicationError";
+import { applicationErrorService } from "./applicationErrorService";
+
+function formatFriendlyError(error: ApplicationError): string {
+  return error.retryGuidance
+    ? `${error.message} ${error.retryGuidance}`
+    : error.message;
+}
+
 export function getFriendlyError(error: unknown): string {
-  if (error instanceof Error && error.name === "DomainValidationError") {
-    return error.message;
-  }
+  return formatFriendlyError(applicationErrorService.normalize(error));
+}
 
-  if (typeof error === "object" && error && "code" in error) {
-    const code = String(error.code);
+export function reportApplicationError(error: unknown, operation: string): ApplicationError {
+  return applicationErrorService.report(error, { operation });
+}
 
-    if (code === "permission-denied") {
-      return "Karri does not have permission to perform that action.";
-    }
-
-    if (code === "unavailable") {
-      return "Karri could not reach Firestore. Check your connection and try again.";
-    }
-
-    if (code === "aborted") {
-      return "This record changed while Karri was saving. Review the latest state and try again.";
-    }
-
-    if (code === "deadline-exceeded") {
-      return "Karri could not confirm the change in time. Check sync status before trying again.";
-    }
-
-    if (code === "already-exists" || code === "failed-precondition") {
-      return "That action was already completed or is no longer available.";
-    }
-  }
-
-  return "Karri could not complete that action. Please try again.";
+export function reportFriendlyError(error: unknown, operation: string): string {
+  return formatFriendlyError(reportApplicationError(error, operation));
 }

@@ -15,7 +15,7 @@ import {
   type Notification,
 } from "../../src/domain/notification/Notification";
 import { TrustSummaryCard } from "../../src/presentation/components/TrustSummaryCard";
-import { getFriendlyError } from "../../src/presentation/errors/getFriendlyError";
+import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
 import { colors, spacing, typography } from "../../src/theme/tokens";
@@ -66,7 +66,7 @@ export default function ProfileScreen() {
           markReady();
         },
         (watchError) => {
-          setError(getFriendlyError(watchError));
+          setError(reportFriendlyError(watchError, "profile.watch-bookings"));
           setLoading(false);
         },
       );
@@ -78,7 +78,7 @@ export default function ProfileScreen() {
           markReady();
         },
         (watchError) => {
-          setError(getFriendlyError(watchError));
+          setError(reportFriendlyError(watchError, "profile.watch-notifications"));
           setLoading(false);
         },
       );
@@ -88,7 +88,7 @@ export default function ProfileScreen() {
         unsubscribeNotifications();
       };
     } catch (watchError) {
-      setError(getFriendlyError(watchError));
+      setError(reportFriendlyError(watchError, "profile.start-activity-watches"));
       setLoading(false);
       return;
     }
@@ -115,7 +115,7 @@ export default function ProfileScreen() {
         ),
       );
     } catch (markError) {
-      setError(getFriendlyError(markError));
+      setError(reportFriendlyError(markError, "profile.mark-notification-read"));
     } finally {
       setPendingReadIds((current) => {
         const next = new Set(current);

@@ -18,7 +18,7 @@ import type { Review } from "../../domain/review/Review";
 import type { Shipment } from "../../domain/shipment/Shipment";
 import type { Trip } from "../../domain/trip/Trip";
 import { colors, spacing, typography } from "../../theme/tokens";
-import { getFriendlyError } from "../errors/getFriendlyError";
+import { reportFriendlyError } from "../errors/getFriendlyError";
 import { mobileServices } from "../services/mobileServices";
 import { TrustSummaryCard } from "./TrustSummaryCard";
 
@@ -97,8 +97,9 @@ export function BookingDetailCard({
         }
       })
       .catch((error) => {
+        const message = reportFriendlyError(error, "booking-detail.load-related-records");
         if (active) {
-          setActionError(getFriendlyError(error));
+          setActionError(message);
           setLoadingDetails(false);
         }
       });
@@ -108,10 +109,11 @@ export function BookingDetailCard({
       unsubscribe = mobileServices.custody.watchByBooking(
         booking.id,
         setCustody,
-        (error) => setActionError(getFriendlyError(error)),
+        (error) =>
+          setActionError(reportFriendlyError(error, "booking-detail.watch-custody")),
       );
     } catch (error) {
-      setActionError(getFriendlyError(error));
+      setActionError(reportFriendlyError(error, "booking-detail.start-custody-watch"));
     }
 
     return () => {
@@ -147,7 +149,7 @@ export function BookingDetailCard({
       setActionMessage(success);
       return true;
     } catch (error) {
-      setActionError(getFriendlyError(error));
+      setActionError(reportFriendlyError(error, `booking-detail.${key}`));
       return false;
     } finally {
       setActionLoading(null);
@@ -218,7 +220,7 @@ export function BookingDetailCard({
       setRating("");
       setComment("");
     } catch (error) {
-      setActionError(getFriendlyError(error));
+      setActionError(reportFriendlyError(error, "booking-detail.submit-review"));
     } finally {
       setReviewPending(false);
       setActionLoading(null);

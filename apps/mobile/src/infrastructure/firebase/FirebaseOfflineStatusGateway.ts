@@ -11,6 +11,7 @@ import { getFirebaseServices, isFirebaseConfigured } from "./client";
 import { firestorePersistenceMode } from "./firestoreCache";
 
 const slowWriteThresholdMs = 1_500;
+type BackgroundErrorReporter = (error: unknown, operation: string) => void;
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error("An unknown synchronization error occurred.");
@@ -25,6 +26,11 @@ export class FirebaseOfflineStatusGateway implements OfflineStatusGateway {
   private networkSubscription: ReturnType<typeof Network.addNetworkStateListener> | null = null;
   private slowPending = false;
   private syncPromise: Promise<void> | null = null;
+  private backgroundErrorReporter: BackgroundErrorReporter | null = null;
+
+  setBackgroundErrorReporter(reporter: BackgroundErrorReporter): void {
+    this.backgroundErrorReporter = reporter;
+  }
 
   watchStatus(onData: (status: OfflineStatus) => void): () => void {
     this.start();
@@ -136,7 +142,9 @@ export class FirebaseOfflineStatusGateway implements OfflineStatusGateway {
     });
     void Network.getNetworkStateAsync()
       .then((networkState) => this.updateConnection(networkState))
-      .catch(() => undefined);
+      .catch((error) => {
+        this.backgroundErrorReporter?.(error, "offline.read-network-state");
+      });
   }
 
   private updateConnection(networkState: Network.NetworkState): void {
@@ -160,7 +168,9 @@ export class FirebaseOfflineStatusGateway implements OfflineStatusGateway {
       connection === ConnectionStatus.Online &&
       this.status.pendingWrites > 0
     ) {
-      void this.retryPendingWrites().catch(() => undefined);
+      void this.retryPendingWrites().catch((error) => {
+        this.backgroundErrorReporter?.(error, "offline.reconnect-sync");
+      });
     }
   }
 
