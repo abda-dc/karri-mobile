@@ -18,7 +18,7 @@ This document covers the implemented service foundations for shipments, trips, b
 | `NotificationService` | Subscribe to domain events and materialize in-app notification records |
 | `PushNotificationService` | Convert a canonical in-app notification and semantic action into a provider-neutral delivery request; current gateway returns deferred |
 | `PushRegistrationService` | Coordinate future per-user/device token registration and persistence; current adapters return deferred without prompting |
-| `NotificationRouter` | Parse injected provider payloads into semantic actions and resolve provider-neutral destinations without navigating |
+| `NotificationRouter` | Parse injected provider payloads into semantic actions and resolve provider-neutral destinations. Presentation adapts those destinations into Expo Router paths without embedding navigation inside the service layer |
 | `NotificationPreferenceService` | Load safe defaults, persist preference snapshots, enable/disable available channels, and validate quiet hours through domain helpers |
 | `ReviewService` | Enforce completed-booking participation, one review per reviewer, rating bounds, and aggregate averages |
 | `TrustService` | Validate evidence inputs, invoke the versioned calculator, persist the result |
