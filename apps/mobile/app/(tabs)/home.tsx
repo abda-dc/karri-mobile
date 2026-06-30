@@ -1,10 +1,11 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Badge } from "../../src/components/Badge";
 import { Banner } from "../../src/components/Banner";
 import { Card } from "../../src/components/Card";
 import { EmptyState } from "../../src/components/EmptyState";
+import { LoadingState } from "../../src/components/LoadingState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
@@ -243,10 +244,7 @@ export default function AppHomeScreen() {
           />
 
           {isLoading ? (
-            <Card style={styles.loadingCard} variant="outlined">
-              <ActivityIndicator color={colors.primary} />
-              <Text style={styles.mutedText}>Comparing active routes...</Text>
-            </Card>
+            <LoadingState message="Comparing active routes..." />
           ) : null}
 
           {!isLoading && dataError ? (
@@ -362,11 +360,6 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: spacing.md,
-  },
-  loadingCard: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
   },
   cardHeader: {
     alignItems: "flex-start",

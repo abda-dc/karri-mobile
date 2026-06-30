@@ -1,9 +1,10 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Banner } from "../../src/components/Banner";
 import { Card } from "../../src/components/Card";
 import { EmptyState } from "../../src/components/EmptyState";
+import { LoadingState } from "../../src/components/LoadingState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
@@ -146,10 +147,7 @@ export default function ProfileScreen() {
       />
 
       {auth.loading || loading ? (
-        <Card style={styles.loadingCard} variant="outlined">
-          <ActivityIndicator color={colors.primary} />
-          <Text style={styles.muted}>Loading profile activity...</Text>
-        </Card>
+        <LoadingState message="Loading profile activity..." />
       ) : null}
 
       {!auth.loading && !auth.user ? (
@@ -238,11 +236,6 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   page: {
     gap: spacing.xl,
-  },
-  loadingCard: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
   },
   muted: {
     color: colors.textSecondary,

@@ -1,10 +1,11 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Badge } from "../../src/components/Badge";
 import { Banner } from "../../src/components/Banner";
 import { Card } from "../../src/components/Card";
 import { EmptyState } from "../../src/components/EmptyState";
+import { LoadingState } from "../../src/components/LoadingState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
@@ -167,10 +168,7 @@ export default function TravelScreen() {
       />
 
       {auth.loading ? (
-        <Card style={styles.loadingCard} variant="outlined">
-          <ActivityIndicator color={colors.primary} />
-          <Text style={styles.mutedText}>Checking your Karri session...</Text>
-        </Card>
+        <LoadingState message="Checking your Karri session..." />
       ) : null}
 
       {!auth.loading && !auth.user ? (
@@ -302,10 +300,7 @@ export default function TravelScreen() {
             />
 
             {listLoading ? (
-              <Card style={styles.loadingCard} variant="outlined">
-                <ActivityIndicator color={colors.primary} />
-                <Text style={styles.mutedText}>Loading your trips...</Text>
-              </Card>
+              <LoadingState message="Loading your trips..." />
             ) : null}
 
             {!listLoading && dataError ? (
@@ -377,11 +372,6 @@ const styles = StyleSheet.create({
   fieldColumn: {
     flexBasis: 200,
     flexGrow: 1,
-  },
-  loadingCard: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
   },
   cardHeader: {
     alignItems: "flex-start",

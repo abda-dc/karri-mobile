@@ -26,13 +26,15 @@ Do not use it for ordinary product empty states.
 
 Every Firestore-backed surface supports:
 
-- **Loading:** spinner plus specific progress text.
+- **Loading:** the reusable `LoadingState` combines a spinner, specific progress text, and static skeleton bars that suggest incoming content without implying data.
 - **Error:** error banner with a safe message.
 - **Empty:** friendly explanation and one relevant next action.
 - **Success:** success banner after a confirmed write.
 - **Content:** cards with status and concise metadata.
 
 Keep existing content visible when a later design adds refresh behavior; do not blank the screen unnecessarily.
+
+Skeleton bars are decorative and hidden from assistive technology. The progress message uses a polite live region, and the shared pattern intentionally avoids animation so it remains stable across Expo targets.
 
 Error banners use the centralized application error message and its recovery guidance. They preserve specific validation and lifecycle-rule failures, but never display provider codes, raw exception messages, or stack details. Permission and conflict errors direct the user to refresh or sign in; network and timeout errors direct the user to check connectivity and sync state before repeating a mutation.
 
