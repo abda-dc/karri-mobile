@@ -1,4 +1,9 @@
-import type { PushToken } from "../notifications/PushToken";
+import {
+  assertPushToken,
+  type PushToken,
+} from "../notifications/PushToken";
+import type { NotificationPermissionStatus } from "../notifications/NotificationPermission";
+import { requireText } from "./validation";
 
 export const PushRegistrationAvailability = {
   Available: "available",
@@ -46,6 +51,7 @@ export type PushTokenPersistenceResult =
 
 export interface PushTokenRegistrationGateway {
   readonly availability: PushRegistrationAvailability;
+  getPermissionStatus(): Promise<NotificationPermissionStatus>;
   register(userId: string): Promise<PushRegistrationResult>;
   unregister(token: PushToken): Promise<PushRegistrationResult>;
 }
@@ -65,11 +71,17 @@ export class PushRegistrationService {
     return this.registrationGateway.availability;
   }
 
+  getPermissionStatus(): Promise<NotificationPermissionStatus> {
+    return this.registrationGateway.getPermissionStatus();
+  }
+
   async register(userId: string): Promise<PushRegistrationResult> {
-    const registration = await this.registrationGateway.register(userId);
+    const activeUserId = requireText(userId, "userId", 128);
+    const registration = await this.registrationGateway.register(activeUserId);
     if (registration.status !== PushRegistrationStatus.Registered) {
       return registration;
     }
+    assertPushToken(registration.token, activeUserId);
 
     const persistence = await this.tokens.save(registration.token);
     if (persistence.status !== PushTokenPersistenceStatus.Stored) {
@@ -86,6 +98,7 @@ export class PushRegistrationService {
   }
 
   async unregister(token: PushToken): Promise<PushRegistrationResult> {
+    assertPushToken(token, token.userId);
     const registration = await this.registrationGateway.unregister(token);
     if (registration.status !== PushRegistrationStatus.Unregistered) {
       return registration;

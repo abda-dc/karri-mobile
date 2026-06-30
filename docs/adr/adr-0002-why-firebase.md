@@ -10,7 +10,7 @@ Karri needs authentication, realtime listing data, file storage, push notificati
 
 ## Decision
 
-Use Firebase Authentication, Cloud Firestore, Cloud Storage, Cloud Functions, Firebase Cloud Messaging, App Check, and Remote Config as the managed backend platform. The current code initializes Auth, Firestore, and Storage. Phase 6 adds provider-neutral push contracts and explicit Firebase stubs, but Cloud Messaging, token registration, and push delivery remain uninitialized. Phase 7 stores self-scoped notification preference documents through a domain-owned repository port; this storage does not enable messaging or grant notification permission.
+Use Firebase Authentication, Cloud Firestore, Cloud Storage, Cloud Functions, Firebase Cloud Messaging, App Check, and Remote Config as the managed backend platform. The current code initializes Auth, Firestore, and Storage. Phase 6 adds provider-neutral push contracts and explicit Firebase delivery/persistence stubs. Phase 7 stores self-scoped notification preference documents through a domain-owned repository port; this storage does not enable messaging or grant notification permission. Phase 13 adds user-initiated Expo permission/token acquisition, but trusted token persistence, Cloud Messaging delivery, and server dispatch remain uninitialized.
 
 ## Consequences
 

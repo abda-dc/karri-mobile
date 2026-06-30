@@ -2,12 +2,12 @@
 
 ## Status and guardrails
 
-This document is a design gate, not an activation. The mobile app does not install or call `expo-notifications`, request notification permission, obtain or persist a device token, start a notification listener, or send to Expo, FCM, or APNs. No Cloud Function or delivery collection exists yet.
+This document covers the controlled client foundation and the still-future trusted delivery system. The mobile app now installs `expo-notifications` and may request permission/obtain an Expo token only after an authenticated user saves Push intent and presses the experimental Profile button. The app does not persist/display/log the token, start a notification listener, navigate from a notification, send a push, or contact FCM/APNs as a sender. No Cloud Function or delivery collection exists yet.
 
 The activation order is deliberate:
 
 1. Keep an in-app notification record as the canonical user-visible fact.
-2. Add native permission and token registration only after approved copy, credentials, and device tests exist.
+2. Keep native permission/token acquisition behind explicit user intent; do not enable trusted persistence until credentials, endpoints, and device tests exist.
 3. Add trusted server delivery only after preference enforcement, idempotency, token privacy, retries, and monitoring exist.
 4. Roll out push as an optional hint. Never make it the only record of a booking, custody, delivery, review, or trust event.
 
@@ -17,7 +17,7 @@ The activation order is deliberate:
 | --- | --- | --- |
 | Domain | Notification records, preference rules, categories, channels, and quiet-hours values | No Firebase, Expo, FCM, APNs, permission, token, or navigation APIs |
 | Application | In-app notification orchestration, deferred push/registration contracts, and semantic action routing | No provider imports and no assumption that a stored preference is platform permission |
-| Infrastructure | Firestore repositories plus deferred Firebase-named push, token, and payload adapters | Provider payload parsing stops at a validated semantic action; delivery and registration remain inert |
+| Infrastructure | Firestore repositories, deferred Firebase delivery/persistence, validated payload routing, and the explicit Expo native registration adapter | Provider payload parsing stops at a validated semantic action; permission/token acquisition is user-initiated and delivery remains inert |
 | Presentation | Profile notification/preference UI, availability hook, Expo Router target adapter, and the composition root that injects infrastructure adapters | Screens/components do not call Firebase; no permission prompt, token effect, listener, or automatic navigation |
 | Trusted server (future) | Durable events, canonical notification materialization, policy evaluation, token lookup, provider delivery, receipts, retries, and cleanup | Never expose service credentials or unrestricted token access to a client |
 
@@ -41,14 +41,14 @@ untrusted provider payload
 
 ### Package and provider strategy
 
-Use `expo-notifications` as the future native client adapter. For the first controlled rollout, obtain an `ExpoPushToken` and use the Expo Push Service from trusted server code. This is the smallest operational surface while preserving the existing provider-neutral application contracts and the option to move the server gateway to direct FCM/APNs later.
+Phase 13 uses `expo-notifications` as the native client adapter. It can obtain an `ExpoPushToken`, while the future trusted sender is planned to use Expo Push Service first. This is the smallest operational surface while preserving provider-neutral application contracts and the option to move the server gateway to direct FCM/APNs later.
 
-When activation is separately approved:
+Current controlled foundation:
 
-- Install the SDK-compatible package with `npx expo install expo-notifications`. `expo-constants` is already installed and can supply the EAS project ID.
-- Add the `expo-notifications` config plugin and reviewed native app identifiers/configuration in the same activation change.
+- The SDK-compatible `expo-notifications` package and config plugin are present; `expo-constants` supplies an EAS project ID when configured.
+- Background remote notifications are explicitly disabled in plugin configuration.
 - Use a development build or signed EAS build. Expo Go is not an acceptance-test environment for remote push.
-- Keep `FirebasePushNotificationGateway`, `FirebasePushTokenRegistrationGateway`, and `FirebasePushTokenRepository` deferred until their real counterparts and server endpoints pass the rollout gates below.
+- Keep `FirebasePushNotificationGateway` and `FirebasePushTokenRepository` deferred until trusted server endpoints pass the rollout gates below.
 - Do not add local notifications, background notification tasks, exact alarms, rich media, or interactive actions in the first activation.
 
 ### Android notification channels
@@ -97,11 +97,14 @@ The future client flow is explicit and authenticated:
 3. Android creates the reviewed channels before token acquisition.
 4. The native adapter obtains the Expo push token using the configured EAS project ID.
 5. The adapter associates it with a random app-installation ID, platform, provider, app version, environment, and current permission state. Do not use a hardware identifier.
-6. `PushRegistrationService` sends the registration through an authenticated gateway to trusted server code.
-7. The server derives `userId` from verified authentication, validates project/provider/platform, upserts the installation registration, and returns a non-secret registration ID.
-8. Only after server confirmation may the UI show the device as registered. Permission granted without confirmed registration is a recoverable incomplete state.
+6. `PushRegistrationService` validates ownership/token shape and passes it to the token repository port.
+7. The current repository returns `deferred`; a future authenticated gateway will send it to trusted server code.
+8. The future server derives `userId` from verified authentication, validates project/provider/platform, upserts the installation registration, and returns a non-secret registration ID.
+9. Only after server confirmation may the UI show the device as registered. Permission granted without confirmed registration is a recoverable incomplete state.
 
-Clients must not write token documents directly. App Check should be staged before broad rollout, but authentication, ownership validation, and server-only token access are required from the first implementation.
+Clients must not write token documents directly. The current client therefore reports registration as deferred after token acquisition. App Check should be staged before broad rollout, but authentication, ownership validation, and server-only token access are required from the first persistence implementation.
+
+`PushRegistrationService.unregister` and the Expo adapter provide the current cleanup seam: automatic Expo token updates can be disabled and the repository remove operation is invoked. The repository remains deferred, so this is not yet authenticated sign-out cleanup or proof of server deletion.
 
 ### Rotation, sign-out, and invalid-token cleanup
 
@@ -137,6 +140,8 @@ On tap, the app must:
 6. fall back to the Profile notification list if the record is missing, stale, malformed, or no longer authorized.
 
 ### Test checklist
+
+The executable payload contract, typed examples, expected routes/failures, and manual device procedure are maintained in [Controlled Push Notification Testing](../engineering/push-notification-testing.md).
 
 Automated checks before activation:
 
@@ -266,6 +271,8 @@ Production send remains blocked until:
 - real-device permission, background/terminated delivery, and authorization tests pass;
 - dashboards/alerts and an operator runbook exist;
 - privacy, retention, copy, and rollout owners approve activation.
+
+The evidence-bearing production decision is tracked in [Production Push Readiness](../operations/push-production-readiness.md). Its current status is No-Go.
 
 ## Official implementation references
 

@@ -19,7 +19,7 @@ Firebase web configuration is public project metadata and is supplied through `E
 - Storage defaults to deny because no upload flow is implemented.
 - Listener and write errors are shown without exposing configuration values.
 - Server timestamps prevent clients from choosing audit timestamps.
-- Deferred push adapters request and store no tokens. Future push registrations are secrets: direct client collection access, token logging, and client-side provider delivery remain prohibited.
+- The controlled Expo adapter may obtain a token only after explicit authenticated intent. It does not display/log the token or write it directly to Firestore; trusted persistence and delivery remain deferred. Push registrations are secrets, so direct client collection access and client-side provider delivery remain prohibited.
 
 ## Known MVP limitations
 

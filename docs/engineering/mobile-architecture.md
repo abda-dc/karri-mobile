@@ -6,7 +6,7 @@
 - Firebase modular SDK isolated under `src/infrastructure/firebase`.
 - Portable domain models/rules and application services.
 - React screen state and realtime repository watches; Zustand remains uninstalled.
-- Provider-neutral push contracts are present, but Expo Notifications and notification permission/runtime listeners are not installed or invoked.
+- Expo Notifications is installed behind an Infrastructure adapter. Permission/token acquisition is available only through an explicit Profile control; listeners, automatic navigation, token persistence, and delivery remain absent.
 
 ## Source layout
 
@@ -23,8 +23,9 @@ apps/mobile/
       FirebaseOfflineStatusGateway.ts  One network listener and pending-write tracking
       firestoreCache(.native).ts       Platform-specific cache configuration
       mappers/                       Firestore/domain conversion
-      push/                          Deferred token, delivery, and payload-routing adapters
+      push/                          Deferred delivery/persistence plus validated payload routing
       repositories/                  Realtime Firebase adapters
+    infrastructure/expo/notifications/  Explicit native permission/token adapter
     infrastructure/logging/          Replaceable diagnostics adapter
     presentation/
       components/                    Booking and trust composed views
@@ -41,7 +42,7 @@ apps/mobile/
 - Profile watches bookings and in-app notifications and requests trust summaries.
 - The shared `Screen` shell consumes `useOfflineStatus` and displays offline, queued, syncing, or failed-write state without provider imports.
 - Presentation reports caught failures through `ApplicationErrorService`; screens receive safe category-specific messages while Firebase codes and original exceptions remain diagnostic-only.
-- `PushNotificationService`, `PushRegistrationService`, and `NotificationRouter` are composed with deferred Firebase adapters. No screen invokes delivery or registration, no permission is requested, and no runtime listener or delivery starts. The presentation route adapter is present but has no tap/listener runtime.
+- `PushNotificationService` remains composed with a deferred Firebase delivery gateway. `PushRegistrationService` uses `ExpoPushTokenRegistrationGateway` plus a deferred trusted-persistence port. Profile invokes it only from the experimental button after checking saved preferences. No runtime listener, automatic navigation, or delivery starts.
 - `NotificationPreferenceService` uses a self-scoped repository to load defaults or store immutable preference snapshots. The Profile screen consumes `useNotificationPreferences`; saving preferences still does not activate push or request platform permission.
 - No prioritized Milestone 5 screen imports the legacy Firestore helper; that helper was removed.
 
@@ -58,7 +59,7 @@ Realtime Firestore snapshots feed small screen-local arrays. Tracking's combined
 - Expo web uses IndexedDB-backed Firestore persistence; native Expo uses an honest memory-only queue that does not survive process termination.
 - Booking status and custody timelines distinguish stored facts from planned actions.
 - Mobile business operations and asynchronous notification effects are not one atomic server transaction.
-- Push availability reports `deferred`; token values are neither requested nor persisted, and semantic routes are not executed.
+- Registration availability is `available` only in Android/iOS builds with an EAS project ID. An explicit action may request/acquire a token, but trusted persistence remains deferred; tokens are not displayed/logged and semantic routes are resolved without execution.
 - Preference persistence does not activate a channel. Push defaults off, Email/SMS are enforced placeholders, and quiet hours are stored but not evaluated by any delivery runtime.
 - Device testing and Firebase Emulator Suite authorization tests remain necessary.
 

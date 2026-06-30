@@ -6,7 +6,7 @@ import {
 import type { PushToken } from "../../../application/notifications/PushToken";
 
 const deferredReason =
-  "Push token persistence is intentionally deferred; no token was written to Firestore.";
+  "Trusted server token persistence is not implemented; no token was stored or enabled for delivery.";
 
 export class FirebasePushTokenRepository implements PushTokenRepository {
   async remove(_token: PushToken): Promise<PushTokenPersistenceResult> {

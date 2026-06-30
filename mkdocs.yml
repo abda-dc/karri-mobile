@@ -113,4 +113,7 @@ nav:
       - Security: engineering/security.md
       - API Design: engineering/api-design.md
       - Event Architecture: engineering/event-architecture.md
+      - Push Notification Testing: engineering/push-notification-testing.md
       - CI/CD: engineering/ci-cd.md
+  - Operations:
+      - Push Production Readiness: operations/push-production-readiness.md

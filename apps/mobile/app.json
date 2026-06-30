@@ -22,7 +22,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "karri_activity_v1",
+          "enableBackgroundRemoteNotifications": false
+        }
+      ]
     ]
   }
 }

@@ -25,9 +25,9 @@ import { firebaseOfflineStatusGateway } from "../../infrastructure/firebase/Fire
 import {
   FirebaseNotificationRoutingSource,
   FirebasePushNotificationGateway,
-  FirebasePushTokenRegistrationGateway,
   FirebasePushTokenRepository,
 } from "../../infrastructure/firebase/push";
+import { ExpoPushTokenRegistrationGateway } from "../../infrastructure/expo/notifications";
 import { reportApplicationError } from "../errors/getFriendlyError";
 
 const eventBus = new EventBus();
@@ -44,7 +44,7 @@ const pushNotificationService = new PushNotificationService(
   new FirebasePushNotificationGateway(),
 );
 const pushRegistrationService = new PushRegistrationService(
-  new FirebasePushTokenRegistrationGateway(),
+  new ExpoPushTokenRegistrationGateway(),
   new FirebasePushTokenRepository(),
 );
 const notificationRouter = new NotificationRouter(

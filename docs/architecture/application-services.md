@@ -17,7 +17,7 @@ This document covers the implemented service foundations for shipments, trips, b
 | `BookingService` | Create requests, enforce actor roles and forward transitions, coordinate request/booking persistence, publish lifecycle events |
 | `NotificationService` | Subscribe to domain events and materialize in-app notification records |
 | `PushNotificationService` | Convert a canonical in-app notification identity and semantic action into a content-free provider-neutral delivery request; current gateway returns deferred |
-| `PushRegistrationService` | Coordinate future per-user/device token registration and persistence; current adapters return deferred without prompting |
+| `PushRegistrationService` | Expose provider-neutral permission status, validate explicit per-user/install token registration, and coordinate trusted persistence; Expo acquisition is active only from the user control while persistence remains deferred |
 | `NotificationRouter` | Parse injected provider payloads into semantic actions and resolve provider-neutral destinations. Presentation adapts those destinations into Expo Router paths without embedding navigation inside the service layer |
 | `NotificationPreferenceService` | Load safe defaults, persist preference snapshots, enable/disable available channels, and validate quiet hours through domain helpers |
 | `ReviewService` | Enforce completed-booking participation, one review per reviewer, rating bounds, and aggregate averages |
@@ -28,7 +28,7 @@ This document covers the implemented service foundations for shipments, trips, b
 
 Services import repository interfaces and domain types; they do not import Firestore. A singleton presentation composition now injects Firebase adapters and the event bus. Home, Send, Travel, Tracking, and Profile use the service layer.
 
-Push services are composed but inert. No current domain-event handler calls `PushNotificationService`, and no presentation route calls registration. The real delivery gateway must run in trusted server code; the mobile composition remains deferred. This keeps in-app notification behavior unchanged while preserving future provider seams.
+Push delivery remains inert: no domain-event handler calls `PushNotificationService`. Registration is separately user-initiated from Profile through `PushRegistrationService` and an Expo Infrastructure adapter. It can request permission/acquire a token in a configured native build, but trusted persistence returns deferred and no sender exists. The real delivery gateway must run in trusted server code.
 
 Preference reads and writes use the domain-owned `NotificationPreferenceRepository` port. The Firebase adapter may store a self-scoped preference document, but neither the service nor repository starts delivery. Email and SMS remain disabled placeholders, and stored push preference is not platform permission.
 
@@ -53,7 +53,7 @@ Zustand remains deferred. Screens use thin local state and service-backed realti
 - Direct Firestore access from services.
 - A giant global store or speculative store scaffolding.
 - Cloud Function deployment in this milestone.
-- Notification permission prompts, Expo Notifications runtime behavior, token storage, or FCM/APNs delivery.
+- Automatic permission prompts, notification listeners/navigation, trusted token storage, or FCM/APNs delivery.
 - A separate Settings route or delivery-time preference enforcement runtime.
 
 ## Related documents

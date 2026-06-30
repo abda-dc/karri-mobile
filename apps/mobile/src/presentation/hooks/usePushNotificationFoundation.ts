@@ -9,6 +9,7 @@ export interface PushNotificationFoundation {
   readonly deliveryAvailability: PushDeliveryAvailability;
   readonly registrationAvailability: PushRegistrationAvailability;
   resolveAction(action: NotificationAction): NotificationRoute;
+  resolvePayload(payload: unknown): NotificationRoute | null;
 }
 
 export function usePushNotificationFoundation(): PushNotificationFoundation {
@@ -18,6 +19,8 @@ export function usePushNotificationFoundation(): PushNotificationFoundation {
       registrationAvailability: mobileServices.pushRegistration.availability,
       resolveAction: (action: NotificationAction) =>
         mobileServices.notificationRouter.resolve(action),
+      resolvePayload: (payload: unknown) =>
+        mobileServices.notificationRouter.resolvePayload(payload),
     }),
     [],
   );

@@ -15,17 +15,18 @@ This document covers the Expo mobile runtime, Firebase platform services, source
 | Expo and React Native | Mobile runtime and development | Active |
 | Expo Router | File-based application navigation | Active |
 | Expo Network | One app-level connectivity signal for offline UI and reconnect handling | Active |
+| Expo Notifications | Explicit native permission status and Expo token acquisition | Controlled development foundation; no listener, persistence, or sender |
 | Firebase Authentication | Identity and persisted mobile session | Active; anonymous MVP bridge only |
 | Cloud Firestore | Domain persistence, realtime reads, queued writes, preference storage, and web IndexedDB cache | Active; native cache is memory-only |
 | Cloud Storage | Future evidence storage | Initialized but unused; rules deny access |
-| Firebase Cloud Messaging | Future minimal push hints | Contracts and deferred stubs only; SDK/runtime delivery is not initialized |
+| Firebase Cloud Messaging | Future minimal push hints | No delivery SDK/runtime or credentials are initialized |
 | GitHub | Source control and collaboration | Active |
 | GitHub Actions | MkDocs validation and publication | Active for documentation only |
 | MkDocs Material | Platform handbook | Active |
 
 Firebase is the authoritative backend direction. Firebase initialization, Auth operations, Firestore cache/status behavior, mappers, and repository adapters all live under `apps/mobile/src/infrastructure/firebase`. Home, Send, Travel, Tracking, and Profile use application services or presentation hooks/components rather than direct Firestore or network APIs.
 
-The `infrastructure/firebase/push` folder contains explicit deferred adapters for delivery, token registration, token persistence, and Firebase-shaped action parsing. These adapters preserve the future provider boundary without importing messaging SDKs, requesting permission, writing token documents, or starting listeners.
+The `infrastructure/expo/notifications` folder contains the explicit native permission/token adapter. It can run only from the Profile registration action, requires saved Push intent and EAS/native configuration, and disables Expo automatic token-update mode. The `infrastructure/firebase/push` folder retains deferred delivery/token persistence plus payload routing through the strict provider-neutral schema. Neither path starts a listener, navigates, writes a token document, or sends a push.
 
 `FirebaseNotificationPreferenceRepository` is separate from those deferred push adapters. It performs only authenticated reads and writes for `notificationPreferences/{userId}`. Firestore rules restrict each document to its owner, validate the full channel/category/quiet-hours shape, and keep Email/SMS disabled. Storing preferences does not initialize Cloud Messaging or imply consent.
 

@@ -16,8 +16,10 @@ import {
   type Notification,
 } from "../../src/domain/notification/Notification";
 import { NotificationPreferencesCard } from "../../src/presentation/components/NotificationPreferencesCard";
+import { PushNotificationRegistrationCard } from "../../src/presentation/components/PushNotificationRegistrationCard";
 import { TrustSummaryCard } from "../../src/presentation/components/TrustSummaryCard";
 import { useNotificationPreferences } from "../../src/presentation/hooks/useNotificationPreferences";
+import { usePushNotificationRegistration } from "../../src/presentation/hooks/usePushNotificationRegistration";
 import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
@@ -37,6 +39,10 @@ export default function ProfileScreen() {
     () => new Set(),
   );
   const notificationPreferences = useNotificationPreferences(auth.user?.uid ?? null);
+  const pushRegistration = usePushNotificationRegistration(
+    auth.user?.uid ?? null,
+    notificationPreferences.preferences,
+  );
 
   useEffect(() => {
     if (auth.loading) {
@@ -216,11 +222,19 @@ export default function ProfileScreen() {
           </Card>
 
           {notificationPreferences.preferences ? (
-            <NotificationPreferencesCard
-              loading={notificationPreferences.loading}
-              preferences={notificationPreferences.preferences}
-              onSave={notificationPreferences.updatePreferences}
-            />
+            <>
+              <NotificationPreferencesCard
+                loading={notificationPreferences.loading}
+                preferences={notificationPreferences.preferences}
+                onSave={notificationPreferences.updatePreferences}
+              />
+              <PushNotificationRegistrationCard
+                pushPreferenceEnabled={
+                  notificationPreferences.preferences.channels.push
+                }
+                registration={pushRegistration}
+              />
+            </>
           ) : null}
 
           <Card variant="elevated">
