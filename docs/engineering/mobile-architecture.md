@@ -6,6 +6,7 @@
 - Firebase modular SDK isolated under `src/infrastructure/firebase`.
 - Portable domain models/rules and application services.
 - React screen state and realtime repository watches; Zustand remains uninstalled.
+- Provider-neutral push contracts are present, but Expo Notifications and notification permission/runtime listeners are not installed or invoked.
 
 ## Source layout
 
@@ -15,18 +16,20 @@ apps/mobile/
   src/
     application/dto/                Service command shapes
     application/errors/             Provider-neutral error model and logging ports
+    application/notifications/      Push token and semantic action models
     application/services/           Validation and orchestration
     domain/                          Models, state guards, events, repository ports
     infrastructure/firebase/
       FirebaseOfflineStatusGateway.ts  One network listener and pending-write tracking
       firestoreCache(.native).ts       Platform-specific cache configuration
       mappers/                       Firestore/domain conversion
+      push/                          Deferred token, delivery, and payload-routing adapters
       repositories/                  Realtime Firebase adapters
     infrastructure/logging/          Replaceable diagnostics adapter
     presentation/
       components/                    Booking and trust composed views
       errors/                        Provider-neutral user messages
-      hooks/                         Auth session bridge
+      hooks/                         Auth/offline bridges and inert push capability view
       services/                      Singleton mobile service composition
 ```
 
@@ -38,6 +41,7 @@ apps/mobile/
 - Profile watches bookings and in-app notifications and requests trust summaries.
 - The shared `Screen` shell consumes `useOfflineStatus` and displays offline, queued, syncing, or failed-write state without provider imports.
 - Presentation reports caught failures through `ApplicationErrorService`; screens receive safe category-specific messages while Firebase codes and original exceptions remain diagnostic-only.
+- `PushNotificationService`, `PushRegistrationService`, and `NotificationRouter` are composed with deferred Firebase adapters. No screen uses them, no permission is requested, and no runtime listener or delivery starts.
 - No prioritized Milestone 5 screen imports the legacy Firestore helper; that helper was removed.
 
 Screens decide presentation and available controls, while services and domain guards repeat every business rule. Firebase repositories and security rules remain the persistence/access boundary.
@@ -53,6 +57,7 @@ Realtime Firestore snapshots feed small screen-local arrays. Tracking's combined
 - Expo web uses IndexedDB-backed Firestore persistence; native Expo uses an honest memory-only queue that does not survive process termination.
 - Booking status and custody timelines distinguish stored facts from planned actions.
 - Mobile business operations and asynchronous notification effects are not one atomic server transaction.
+- Push availability reports `deferred`; token values are neither requested nor persisted, and semantic routes are not executed.
 - Device testing and Firebase Emulator Suite authorization tests remain necessary.
 
 See [Application Services](../architecture/application-services.md), [Error Handling](../architecture/error-handling.md), [Offline Strategy](../architecture/offline-strategy.md), and [Technical Architecture](../architecture/technical-architecture.md).

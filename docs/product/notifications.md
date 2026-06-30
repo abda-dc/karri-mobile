@@ -32,4 +32,22 @@ The local bus is synchronous and non-durable, while Firestore creation is asynch
 
 Push, email, and SMS are not implemented.
 
+## Push notification foundation
+
+Phase 6 adds provider-neutral contracts without enabling push behavior:
+
+- `PushNotificationService` can translate an existing persisted in-app notification plus a `NotificationAction` into a delivery request for an injected gateway.
+- `PushRegistrationService` coordinates a token-registration gateway and token repository without knowing Firebase, Expo, FCM, or APNs APIs.
+- `NotificationRouter` resolves semantic actions such as opening a booking or the notification list into provider-neutral destinations.
+- Firebase infrastructure stubs report `deferred`; they do not request a token, write a token, contact FCM/APNs, or send a notification.
+- `usePushNotificationFoundation` exposes only availability and semantic action resolution. It has no permission prompt, listener, registration effect, or navigation side effect.
+
+The intended future flow is: a trusted transaction records a durable domain event, an idempotent server consumer materializes the in-app notification, and a separate push projection sends a minimal hint referring to that record. Push will not replace the in-app notification as the canonical user-visible record.
+
+Token registration will begin only after explicit user intent and approved permission copy. A future runtime adapter will obtain a platform token, associate it with the authenticated user and device, and pass it through `PushRegistrationService` to Firebase persistence. Rotation, sign-out removal, invalid-token cleanup, per-device preferences, and retention rules must be implemented before enabling registration. Token values are sensitive operational data and must never enter domain events, analytics, or logs.
+
+Future notification payloads will carry a small action discriminator and identifier only. Firebase-shaped payload parsing stays in Infrastructure; `NotificationRouter` returns a semantic destination; a later presentation adapter may map that destination to Expo Router. Screens will never parse FCM/APNs payloads directly.
+
+Delivery is intentionally deferred until Karri has permission UX, native credentials/build configuration, trusted server execution, preferences and quiet hours, payload privacy review, deep-link authorization, token lifecycle handling, retries, and delivery diagnostics.
+
 See [Event Bus](../architecture/event-bus.md) and [Event Architecture](../engineering/event-architecture.md).

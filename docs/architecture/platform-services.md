@@ -18,11 +18,14 @@ This document covers the Expo mobile runtime, Firebase platform services, source
 | Firebase Authentication | Identity and persisted mobile session | Active; anonymous MVP bridge only |
 | Cloud Firestore | Domain persistence, realtime reads, queued writes, and web IndexedDB cache | Active; native cache is memory-only |
 | Cloud Storage | Future evidence storage | Initialized but unused; rules deny access |
+| Firebase Cloud Messaging | Future minimal push hints | Contracts and deferred stubs only; SDK/runtime delivery is not initialized |
 | GitHub | Source control and collaboration | Active |
 | GitHub Actions | MkDocs validation and publication | Active for documentation only |
 | MkDocs Material | Platform handbook | Active |
 
 Firebase is the authoritative backend direction. Firebase initialization, Auth operations, Firestore cache/status behavior, mappers, and repository adapters all live under `apps/mobile/src/infrastructure/firebase`. Home, Send, Travel, Tracking, and Profile use application services or presentation hooks/components rather than direct Firestore or network APIs.
+
+The `infrastructure/firebase/push` folder contains explicit deferred adapters for delivery, token registration, token persistence, and Firebase-shaped action parsing. These adapters preserve the future provider boundary without importing messaging SDKs, requesting permission, writing token documents, or starting listeners.
 
 ## Design principles
 
@@ -38,7 +41,7 @@ Firebase is the authoritative backend direction. Firebase initialization, Auth o
 | Service | Intended use | Adoption gate |
 | --- | --- | --- |
 | Firebase Cloud Functions | Trusted booking, custody, review, notification, and trust commands | Emulator tests and command contracts |
-| Firebase Cloud Messaging | Minimal push hints for in-app records | Preferences, privacy copy, token lifecycle, and retries |
+| Firebase Cloud Messaging | Minimal push hints for canonical in-app records | Permission UX, native credentials, trusted sender, preferences, privacy copy, token lifecycle, and retries |
 | Firebase Remote Config | Validated non-secret operational configuration | Provider adapter and schema validation |
 | Firebase App Check | Abuse resistance | Platform configuration and enforcement rollout |
 | EAS Build and EAS Update | Signed releases and compatible updates | Release policy and environment separation |

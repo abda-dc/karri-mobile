@@ -1,7 +1,10 @@
 import { BookingService } from "../../application/services/BookingService";
 import { CustodyService } from "../../application/services/CustodyService";
 import { NotificationService } from "../../application/services/NotificationService";
+import { NotificationRouter } from "../../application/services/NotificationRouter";
 import { OfflineService } from "../../application/services/OfflineService";
+import { PushNotificationService } from "../../application/services/PushNotificationService";
+import { PushRegistrationService } from "../../application/services/PushRegistrationService";
 import { ReviewService } from "../../application/services/ReviewService";
 import { ShipmentService } from "../../application/services/ShipmentService";
 import { TripService } from "../../application/services/TripService";
@@ -17,6 +20,12 @@ import {
   FirebaseTrustRepository,
 } from "../../infrastructure/firebase/repositories";
 import { firebaseOfflineStatusGateway } from "../../infrastructure/firebase/FirebaseOfflineStatusGateway";
+import {
+  FirebaseNotificationRoutingSource,
+  FirebasePushNotificationGateway,
+  FirebasePushTokenRegistrationGateway,
+  FirebasePushTokenRepository,
+} from "../../infrastructure/firebase/push";
 import { reportApplicationError } from "../errors/getFriendlyError";
 
 const eventBus = new EventBus();
@@ -27,6 +36,16 @@ const reviewRepository = new FirebaseReviewRepository();
 const shipmentRepository = new FirebaseShipmentRepository();
 const tripRepository = new FirebaseTripRepository();
 const trustRepository = new FirebaseTrustRepository();
+const pushNotificationService = new PushNotificationService(
+  new FirebasePushNotificationGateway(),
+);
+const pushRegistrationService = new PushRegistrationService(
+  new FirebasePushTokenRegistrationGateway(),
+  new FirebasePushTokenRepository(),
+);
+const notificationRouter = new NotificationRouter(
+  new FirebaseNotificationRoutingSource(),
+);
 
 firebaseOfflineStatusGateway.setBackgroundErrorReporter((error, operation) => {
   reportApplicationError(error, operation);
@@ -48,7 +67,10 @@ export const mobileServices = {
   ),
   custody: new CustodyService(custodyRepository, bookingRepository),
   notification: notificationService,
+  notificationRouter,
   offline: new OfflineService(firebaseOfflineStatusGateway),
+  pushNotification: pushNotificationService,
+  pushRegistration: pushRegistrationService,
   review: new ReviewService(reviewRepository, bookingRepository, eventBus),
   shipment: new ShipmentService(shipmentRepository, eventBus),
   trip: new TripService(tripRepository, eventBus),

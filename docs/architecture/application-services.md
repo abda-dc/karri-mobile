@@ -6,7 +6,7 @@ Define the orchestration layer between presentation, portable domain rules, repo
 
 ## Scope
 
-This document covers the implemented service foundations for shipments, trips, bookings, notifications, reviews, trust, offline status, and typed remote configuration.
+This document covers the implemented service foundations for shipments, trips, bookings, in-app and future push notifications, reviews, trust, offline status, and typed remote configuration.
 
 ## Current implementation
 
@@ -16,6 +16,9 @@ This document covers the implemented service foundations for shipments, trips, b
 | `TripService` | Validate route/date/capacity data, persist it, publish `TripCreated` |
 | `BookingService` | Create requests, enforce actor roles and forward transitions, coordinate request/booking persistence, publish lifecycle events |
 | `NotificationService` | Subscribe to domain events and materialize in-app notification records |
+| `PushNotificationService` | Convert a canonical in-app notification and semantic action into a provider-neutral delivery request; current gateway returns deferred |
+| `PushRegistrationService` | Coordinate future per-user/device token registration and persistence; current adapters return deferred without prompting |
+| `NotificationRouter` | Parse injected provider payloads into semantic actions and resolve provider-neutral destinations without navigating |
 | `ReviewService` | Enforce completed-booking participation, one review per reviewer, rating bounds, and aggregate averages |
 | `TrustService` | Validate evidence inputs, invoke the versioned calculator, persist the result |
 | `OfflineService` | Expose provider-neutral connectivity/pending-write status and safely retry Firestore's existing queue |
@@ -23,6 +26,8 @@ This document covers the implemented service foundations for shipments, trips, b
 | `ApplicationErrorService` | Normalize domain/provider failures, attach recovery guidance, and report structured diagnostics through an injected logger |
 
 Services import repository interfaces and domain types; they do not import Firestore. A singleton presentation composition now injects Firebase adapters and the event bus. Home, Send, Travel, Tracking, and Profile use the service layer.
+
+Push services are composed but inert. No current domain-event handler calls `PushNotificationService`, and no presentation route calls registration. This keeps in-app notification behavior unchanged while fixing the future provider seams.
 
 ## Design principles
 
@@ -45,6 +50,7 @@ Zustand remains deferred. Screens use thin local state and service-backed realti
 - Direct Firestore access from services.
 - A giant global store or speculative store scaffolding.
 - Cloud Function deployment in this milestone.
+- Notification permission prompts, Expo Notifications runtime behavior, token storage, or FCM/APNs delivery.
 
 ## Related documents
 
