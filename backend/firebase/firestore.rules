@@ -162,6 +162,58 @@ service cloud.firestore {
         && shipment.weightKg <= trip.availableCapacityKg;
     }
 
+    function validNotificationPreferences(data) {
+      return data.keys().hasOnly([
+          'userId',
+          'channels',
+          'categories',
+          'quietHours',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.userId is string
+        && data.channels is map
+        && data.channels.keys().hasOnly(['push', 'email', 'sms'])
+        && data.channels.push is bool
+        && data.channels.email == false
+        && data.channels.sms == false
+        && data.categories is map
+        && data.categories.keys().hasOnly([
+          'booking_requests',
+          'booking_updates',
+          'custody_updates',
+          'delivery_updates',
+          'general_announcements',
+          'review_reminders',
+          'trust_profile_alerts'
+        ])
+        && data.categories.booking_requests is bool
+        && data.categories.booking_updates is bool
+        && data.categories.custody_updates is bool
+        && data.categories.delivery_updates is bool
+        && data.categories.general_announcements is bool
+        && data.categories.review_reminders is bool
+        && data.categories.trust_profile_alerts is bool
+        && (data.quietHours == null || (
+          data.quietHours is map
+          && data.quietHours.keys().hasOnly([
+            'startLocalTime',
+            'endLocalTime',
+            'timeZone'
+          ])
+          && data.quietHours.startLocalTime is string
+          && data.quietHours.startLocalTime.matches('^([01]\\d|2[0-3]):[0-5]\\d$')
+          && data.quietHours.endLocalTime is string
+          && data.quietHours.endLocalTime.matches('^([01]\\d|2[0-3]):[0-5]\\d$')
+          && data.quietHours.startLocalTime != data.quietHours.endLocalTime
+          && data.quietHours.timeZone is string
+          && data.quietHours.timeZone.size() > 0
+          && data.quietHours.timeZone.size() <= 100
+        ))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
     function bookingCoreUnchanged() {
       return request.resource.data.bookingRequestId == resource.data.bookingRequestId
         && request.resource.data.shipmentId == resource.data.shipmentId
@@ -593,6 +645,24 @@ service cloud.firestore {
         && request.resource.data.status == 'read'
         && request.resource.data.readAt == request.time
         && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    match /notificationPreferences/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validNotificationPreferences(request.resource.data);
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time
+        && validNotificationPreferences(request.resource.data);
       allow delete: if false;
     }
 

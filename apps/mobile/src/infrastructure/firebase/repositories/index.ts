@@ -1,6 +1,7 @@
 export { FirebaseBookingRepository } from "./FirebaseBookingRepository";
 export { FirebaseCustodyRepository } from "./FirebaseCustodyRepository";
 export { FirebaseNotificationRepository } from "./FirebaseNotificationRepository";
+export { FirebaseNotificationPreferenceRepository } from "./FirebaseNotificationPreferenceRepository";
 export { FirebaseProfileRepository } from "./FirebaseProfileRepository";
 export { FirebaseReviewRepository } from "./FirebaseReviewRepository";
 export { FirebaseShipmentRepository } from "./FirebaseShipmentRepository";

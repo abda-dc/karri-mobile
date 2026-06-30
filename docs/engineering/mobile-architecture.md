@@ -18,7 +18,7 @@ apps/mobile/
     application/errors/             Provider-neutral error model and logging ports
     application/notifications/      Push token and semantic action models
     application/services/           Validation and orchestration
-    domain/                          Models, state guards, events, repository ports
+    domain/                          Models, preference rules, events, repository ports
     infrastructure/firebase/
       FirebaseOfflineStatusGateway.ts  One network listener and pending-write tracking
       firestoreCache(.native).ts       Platform-specific cache configuration
@@ -29,7 +29,7 @@ apps/mobile/
     presentation/
       components/                    Booking and trust composed views
       errors/                        Provider-neutral user messages
-      hooks/                         Auth/offline bridges and inert push capability view
+      hooks/                         Auth/offline bridges plus push/preference foundations
       services/                      Singleton mobile service composition
 ```
 
@@ -42,6 +42,7 @@ apps/mobile/
 - The shared `Screen` shell consumes `useOfflineStatus` and displays offline, queued, syncing, or failed-write state without provider imports.
 - Presentation reports caught failures through `ApplicationErrorService`; screens receive safe category-specific messages while Firebase codes and original exceptions remain diagnostic-only.
 - `PushNotificationService`, `PushRegistrationService`, and `NotificationRouter` are composed with deferred Firebase adapters. No screen uses them, no permission is requested, and no runtime listener or delivery starts.
+- `NotificationPreferenceService` uses a self-scoped repository to load defaults or store immutable preference snapshots. `useNotificationPreferences` is reusable but currently has no screen consumer.
 - No prioritized Milestone 5 screen imports the legacy Firestore helper; that helper was removed.
 
 Screens decide presentation and available controls, while services and domain guards repeat every business rule. Firebase repositories and security rules remain the persistence/access boundary.
@@ -58,6 +59,7 @@ Realtime Firestore snapshots feed small screen-local arrays. Tracking's combined
 - Booking status and custody timelines distinguish stored facts from planned actions.
 - Mobile business operations and asynchronous notification effects are not one atomic server transaction.
 - Push availability reports `deferred`; token values are neither requested nor persisted, and semantic routes are not executed.
+- Preference persistence does not activate a channel. Push defaults off, Email/SMS are enforced placeholders, and quiet hours are stored but not evaluated by any delivery runtime.
 - Device testing and Firebase Emulator Suite authorization tests remain necessary.
 
 See [Application Services](../architecture/application-services.md), [Error Handling](../architecture/error-handling.md), [Offline Strategy](../architecture/offline-strategy.md), and [Technical Architecture](../architecture/technical-architecture.md).

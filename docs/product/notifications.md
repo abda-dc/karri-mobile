@@ -28,7 +28,7 @@ Booking expiration has a template but no current client command. Shipment/trip c
 
 ## Current limitations
 
-The local bus is synchronous and non-durable, while Firestore creation is asynchronous. A failed notification does not roll back the business transition. Durable server events, idempotent Cloud Function consumers, retries, failed-effect monitoring, localization, quiet hours, and preferences remain future work.
+The local bus is synchronous and non-durable, while Firestore creation is asynchronous. A failed notification does not roll back the business transition. Durable server events, idempotent Cloud Function consumers, retries, failed-effect monitoring, localization, and preference enforcement remain future work.
 
 Push, email, and SMS are not implemented.
 
@@ -49,5 +49,19 @@ Token registration will begin only after explicit user intent and approved permi
 Future notification payloads will carry a small action discriminator and identifier only. Firebase-shaped payload parsing stays in Infrastructure; `NotificationRouter` returns a semantic destination; a later presentation adapter may map that destination to Expo Router. Screens will never parse FCM/APNs payloads directly.
 
 Delivery is intentionally deferred until Karri has permission UX, native credentials/build configuration, trusted server execution, preferences and quiet hours, payload privacy review, deep-link authorization, token lifecycle handling, retries, and delivery diagnostics.
+
+## Notification preference foundation
+
+Phase 7 adds a separate, provider-neutral `NotificationPreferences` aggregate. It contains:
+
+- Category switches for booking updates, booking requests, custody updates, delivery updates, review reminders, trust/profile alerts, and general announcements.
+- Channel switches for push, email, and SMS. Every channel defaults off; Email and SMS are modeled placeholders and domain rules reject attempts to enable them.
+- Optional quiet hours with distinct local start/end times in `HH:mm` format and an explicit time zone. Overnight windows such as `22:00` to `07:00` are valid.
+
+Category defaults describe which subjects a user may choose to receive; they do not grant permission or activate delivery. A future delivery decision must require the relevant category and channel to be enabled, respect quiet hours, and still pass platform permission and server policy checks.
+
+`NotificationPreferenceService` owns read/default/save, channel enable/disable, and quiet-hours orchestration. The repository port is domain-owned. `FirebaseNotificationPreferenceRepository` stores one self-scoped `notificationPreferences/{userId}` document, with rules requiring Email/SMS to remain false. `useNotificationPreferences` can load and save through the service, but no screen consumes it yet.
+
+The preference foundation does not call the Phase 6 delivery or registration services. It does not request notification permission, register a token, start a listener, navigate, or contact FCM/APNs. Future push work must explicitly connect these preferences to trusted delivery rather than inferring consent from a stored category default.
 
 See [Event Bus](../architecture/event-bus.md) and [Event Architecture](../engineering/event-architecture.md).

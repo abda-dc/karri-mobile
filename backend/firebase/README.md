@@ -12,6 +12,7 @@ This directory is the version-controlled Firebase backend foundation for Karri P
 - Custody is participant-readable and append-only for an expected actor and booking state.
 - Signed-in users may read reviews; completed-booking participants create one deterministic review per direction.
 - Notification recipients read/mark their records; validated event actors create deterministic in-app records.
+- Signed-in users read and update only their own validated notification preference document; Email/SMS remain disabled placeholders.
 - Trust-score persistence remains denied.
 - Storage denies all access until an evidence workflow and tests exist.
 
@@ -35,4 +36,4 @@ firebase deploy --only firestore:rules,firestore:indexes
 firebase deploy --only storage
 ```
 
-The Milestone 5 rules are an MVP policy boundary while Cloud Functions remain out of scope. Do not deploy them to production without emulator tests, command/idempotency hardening, a data/privacy review, and configured monitoring.
+The current rules are an MVP policy boundary while Cloud Functions remain out of scope. Do not deploy them to production without emulator tests, command/idempotency hardening, a data/privacy review, and configured monitoring.

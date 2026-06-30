@@ -21,7 +21,10 @@ function mapDomainError(error: unknown): ApplicationError | null {
     return null;
   }
 
-  if (error.name === "DomainValidationError") {
+  if (
+    error.name === "DomainValidationError" ||
+    error.name === "InvalidNotificationPreferencesError"
+  ) {
     return new ApplicationError({
       code: ApplicationErrorCode.Validation,
       originalError: error,
