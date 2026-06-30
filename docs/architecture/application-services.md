@@ -6,7 +6,7 @@ Define the orchestration layer between presentation, portable domain rules, repo
 
 ## Scope
 
-This document covers the implemented service foundations for shipments, trips, bookings, notifications, reviews, trust, and typed remote configuration.
+This document covers the implemented service foundations for shipments, trips, bookings, notifications, reviews, trust, offline status, and typed remote configuration.
 
 ## Current implementation
 
@@ -18,6 +18,7 @@ This document covers the implemented service foundations for shipments, trips, b
 | `NotificationService` | Subscribe to domain events and materialize in-app notification records |
 | `ReviewService` | Enforce completed-booking participation, one review per reviewer, rating bounds, and aggregate averages |
 | `TrustService` | Validate evidence inputs, invoke the versioned calculator, persist the result |
+| `OfflineService` | Expose provider-neutral connectivity/pending-write status and safely retry Firestore's existing queue |
 | `RemoteConfigService` | Serve safe typed defaults and optionally refresh from a provider |
 
 Services import repository interfaces and domain types; they do not import Firestore. A singleton presentation composition now injects Firebase adapters and the event bus. Home, Send, Travel, Tracking, and Profile use the service layer.

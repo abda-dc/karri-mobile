@@ -16,6 +16,7 @@ import type {
   CreatedBookingRecords,
   NewBookingRecords,
 } from "../../../domain/booking/BookingRepository";
+import { firebaseOfflineStatusGateway } from "../FirebaseOfflineStatusGateway";
 import { getFirebaseServices } from "../client";
 import {
   mapBooking,
@@ -59,7 +60,7 @@ export class FirebaseBookingRepository implements BookingRepository {
       }),
       timestamp: serverTimestamp(),
     });
-    await batch.commit();
+    await firebaseOfflineStatusGateway.trackWrite(() => batch.commit());
 
     const [requestSnapshot, bookingSnapshot] = await Promise.all([
       getDoc(requestReference),
@@ -222,7 +223,7 @@ export class FirebaseBookingRepository implements BookingRepository {
         },
       );
     }
-    await batch.commit();
+    await firebaseOfflineStatusGateway.trackWrite(() => batch.commit());
 
     const [bookingSnapshot, requestSnapshot] = await Promise.all([
       getDoc(bookingReference),

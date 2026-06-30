@@ -14,6 +14,7 @@ import type {
   NewCustodyEvent,
 } from "../../../domain/custody/CustodyEvent";
 import type { CustodyRepository } from "../../../domain/custody/CustodyRepository";
+import { firebaseOfflineStatusGateway } from "../FirebaseOfflineStatusGateway";
 import { getFirebaseServices } from "../client";
 import {
   mapCustodyEvent,
@@ -24,10 +25,12 @@ export class FirebaseCustodyRepository implements CustodyRepository {
   async append(event: NewCustodyEvent): Promise<CustodyEvent> {
     const { db } = getFirebaseServices();
     const reference = doc(db, "custodyEvents", `${event.bookingId}__${event.eventType}`);
-    await setDoc(reference, {
-      ...toFirestoreCustodyEvent(event),
-      timestamp: serverTimestamp(),
-    });
+    await firebaseOfflineStatusGateway.trackWrite(() =>
+      setDoc(reference, {
+        ...toFirestoreCustodyEvent(event),
+        timestamp: serverTimestamp(),
+      }),
+    );
     return mapCustodyEvent(await getDoc(reference));
   }
 

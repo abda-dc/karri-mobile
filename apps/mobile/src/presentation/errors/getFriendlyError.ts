@@ -14,6 +14,14 @@ export function getFriendlyError(error: unknown): string {
       return "Karri could not reach Firestore. Check your connection and try again.";
     }
 
+    if (code === "aborted") {
+      return "This record changed while Karri was saving. Review the latest state and try again.";
+    }
+
+    if (code === "deadline-exceeded") {
+      return "Karri could not confirm the change in time. Check sync status before trying again.";
+    }
+
     if (code === "already-exists" || code === "failed-precondition") {
       return "That action was already completed or is no longer available.";
     }

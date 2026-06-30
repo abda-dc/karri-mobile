@@ -1,6 +1,7 @@
 import { BookingService } from "../../application/services/BookingService";
 import { CustodyService } from "../../application/services/CustodyService";
 import { NotificationService } from "../../application/services/NotificationService";
+import { OfflineService } from "../../application/services/OfflineService";
 import { ReviewService } from "../../application/services/ReviewService";
 import { ShipmentService } from "../../application/services/ShipmentService";
 import { TripService } from "../../application/services/TripService";
@@ -15,6 +16,7 @@ import {
   FirebaseTripRepository,
   FirebaseTrustRepository,
 } from "../../infrastructure/firebase/repositories";
+import { firebaseOfflineStatusGateway } from "../../infrastructure/firebase/FirebaseOfflineStatusGateway";
 
 const eventBus = new EventBus();
 const bookingRepository = new FirebaseBookingRepository();
@@ -41,6 +43,7 @@ export const mobileServices = {
   ),
   custody: new CustodyService(custodyRepository, bookingRepository),
   notification: notificationService,
+  offline: new OfflineService(firebaseOfflineStatusGateway),
   review: new ReviewService(reviewRepository, bookingRepository, eventBus),
   shipment: new ShipmentService(shipmentRepository, eventBus),
   trip: new TripService(tripRepository, eventBus),

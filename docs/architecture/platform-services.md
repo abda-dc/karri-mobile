@@ -14,14 +14,15 @@ This document covers the Expo mobile runtime, Firebase platform services, source
 | --- | --- | --- |
 | Expo and React Native | Mobile runtime and development | Active |
 | Expo Router | File-based application navigation | Active |
+| Expo Network | One app-level connectivity signal for offline UI and reconnect handling | Active |
 | Firebase Authentication | Identity and persisted mobile session | Active; anonymous MVP bridge only |
-| Cloud Firestore | Shipment and trip persistence and realtime reads | Active |
+| Cloud Firestore | Domain persistence, realtime reads, queued writes, and web IndexedDB cache | Active; native cache is memory-only |
 | Cloud Storage | Future evidence storage | Initialized but unused; rules deny access |
 | GitHub | Source control and collaboration | Active |
 | GitHub Actions | MkDocs validation and publication | Active for documentation only |
 | MkDocs Material | Platform handbook | Active |
 
-Firebase is the authoritative backend direction. Firebase initialization, Auth operations, Firestore access, mappers, and repository adapters all live under `apps/mobile/src/infrastructure/firebase`. Home, Send, Travel, Tracking, and Profile now use application services or presentation hooks/components rather than a direct Firestore helper.
+Firebase is the authoritative backend direction. Firebase initialization, Auth operations, Firestore cache/status behavior, mappers, and repository adapters all live under `apps/mobile/src/infrastructure/firebase`. Home, Send, Travel, Tracking, and Profile use application services or presentation hooks/components rather than direct Firestore or network APIs.
 
 ## Design principles
 

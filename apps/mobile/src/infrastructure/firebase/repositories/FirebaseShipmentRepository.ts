@@ -13,17 +13,20 @@ import {
 } from "firebase/firestore";
 import type { NewShipment, Shipment } from "../../../domain/shipment/Shipment";
 import type { ShipmentRepository } from "../../../domain/shipment/ShipmentRepository";
+import { firebaseOfflineStatusGateway } from "../FirebaseOfflineStatusGateway";
 import { getFirebaseServices } from "../client";
 import { mapShipment, toFirestoreShipment } from "../mappers/shipmentMapper";
 
 export class FirebaseShipmentRepository implements ShipmentRepository {
   async create(shipment: NewShipment): Promise<Shipment> {
     const { db } = getFirebaseServices();
-    const reference = await addDoc(collection(db, "shipments"), {
-      ...toFirestoreShipment(shipment),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    const reference = await firebaseOfflineStatusGateway.trackWrite(() =>
+      addDoc(collection(db, "shipments"), {
+        ...toFirestoreShipment(shipment),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    );
 
     return mapShipment(await getDoc(reference));
   }

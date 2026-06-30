@@ -9,6 +9,7 @@ import {
   ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { OfflineStatusBanner } from "../presentation/components/OfflineStatusBanner";
 import { colors, layout } from "../theme/tokens";
 
 type ScreenProps = {
@@ -49,11 +50,17 @@ export function Screen({
             showsVerticalScrollIndicator={false}
             style={styles.screen}
           >
-            <View style={styles.inner}>{children}</View>
+            <View style={styles.inner}>
+              <OfflineStatusBanner />
+              {children}
+            </View>
           </ScrollView>
         ) : (
           <View style={contentStyles}>
-            <View style={styles.inner}>{children}</View>
+            <View style={styles.inner}>
+              <OfflineStatusBanner />
+              {children}
+            </View>
           </View>
         )}
       </KeyboardAvoidingView>

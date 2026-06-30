@@ -1,6 +1,7 @@
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import type { TrustRepository } from "../../../domain/trust/TrustRepository";
 import type { TrustScore } from "../../../domain/trust/TrustScore";
+import { firebaseOfflineStatusGateway } from "../FirebaseOfflineStatusGateway";
 import { getFirebaseServices } from "../client";
 import { mapTrustScore, toFirestoreTrustScore } from "../mappers/trustMapper";
 
@@ -14,10 +15,12 @@ export class FirebaseTrustRepository implements TrustRepository {
   async save(score: TrustScore): Promise<TrustScore> {
     const { db } = getFirebaseServices();
     const reference = doc(db, "trustScores", score.userId);
-    await setDoc(reference, {
-      ...toFirestoreTrustScore(score),
-      serverCalculatedAt: serverTimestamp(),
-    });
+    await firebaseOfflineStatusGateway.trackWrite(() =>
+      setDoc(reference, {
+        ...toFirestoreTrustScore(score),
+        serverCalculatedAt: serverTimestamp(),
+      }),
+    );
     return mapTrustScore(await getDoc(reference));
   }
 }

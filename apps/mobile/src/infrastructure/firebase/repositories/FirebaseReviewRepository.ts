@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 import type { NewReview, Review } from "../../../domain/review/Review";
 import type { ReviewRepository } from "../../../domain/review/ReviewRepository";
+import { firebaseOfflineStatusGateway } from "../FirebaseOfflineStatusGateway";
 import { getFirebaseServices } from "../client";
 import { mapReview, toFirestoreReview } from "../mappers/reviewMapper";
 
@@ -21,11 +22,13 @@ export class FirebaseReviewRepository implements ReviewRepository {
       "reviews",
       `${review.bookingId}__${review.reviewerId}__${review.revieweeId}`,
     );
-    await setDoc(reference, {
-      ...toFirestoreReview(review),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    await firebaseOfflineStatusGateway.trackWrite(() =>
+      setDoc(reference, {
+        ...toFirestoreReview(review),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    );
     return mapReview(await getDoc(reference));
   }
 

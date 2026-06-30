@@ -13,17 +13,20 @@ import {
 } from "firebase/firestore";
 import type { NewTrip, Trip } from "../../../domain/trip/Trip";
 import type { TripRepository } from "../../../domain/trip/TripRepository";
+import { firebaseOfflineStatusGateway } from "../FirebaseOfflineStatusGateway";
 import { getFirebaseServices } from "../client";
 import { mapTrip, toFirestoreTrip } from "../mappers/tripMapper";
 
 export class FirebaseTripRepository implements TripRepository {
   async create(trip: NewTrip): Promise<Trip> {
     const { db } = getFirebaseServices();
-    const reference = await addDoc(collection(db, "trips"), {
-      ...toFirestoreTrip(trip),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    const reference = await firebaseOfflineStatusGateway.trackWrite(() =>
+      addDoc(collection(db, "trips"), {
+        ...toFirestoreTrip(trip),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    );
     return mapTrip(await getDoc(reference));
   }
 

@@ -1,8 +1,9 @@
 import { FirebaseApp, getApp, getApps, initializeApp } from "firebase/app";
 import { Auth, getAuth, initializeAuth } from "firebase/auth";
-import { Firestore, getFirestore } from "firebase/firestore";
+import { Firestore, getFirestore, initializeFirestore } from "firebase/firestore";
 import { FirebaseStorage, getStorage } from "firebase/storage";
 import { firebaseAuthPersistence } from "./authPersistence";
+import { firestoreLocalCache } from "./firestoreCache";
 
 const firebaseEnvironment = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -54,7 +55,12 @@ if (isFirebaseConfigured) {
     firebaseAuth = getAuth(firebaseApp);
   }
 
-  firestore = getFirestore(firebaseApp);
+  try {
+    firestore = initializeFirestore(firebaseApp, { localCache: firestoreLocalCache });
+  } catch {
+    // Expo Fast Refresh can evaluate this module after Firestore already exists.
+    firestore = getFirestore(firebaseApp);
+  }
   firebaseStorage = getStorage(firebaseApp);
 }
 

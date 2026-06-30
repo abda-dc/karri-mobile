@@ -16,6 +16,7 @@ import {
   type Notification,
 } from "../../../domain/notification/Notification";
 import type { NotificationRepository } from "../../../domain/notification/NotificationRepository";
+import { firebaseOfflineStatusGateway } from "../FirebaseOfflineStatusGateway";
 import { getFirebaseServices } from "../client";
 import {
   mapNotification,
@@ -31,12 +32,14 @@ export class FirebaseNotificationRepository implements NotificationRepository {
       notification.recipientId,
     ].join("__");
     const reference = doc(db, "notifications", effectId);
-    await setDoc(reference, {
-      ...toFirestoreNotification(notification),
-      readAt: null,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    await firebaseOfflineStatusGateway.trackWrite(() =>
+      setDoc(reference, {
+        ...toFirestoreNotification(notification),
+        readAt: null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    );
     const occurredAt = new Date().toISOString();
     return {
       ...notification,
@@ -78,10 +81,12 @@ export class FirebaseNotificationRepository implements NotificationRepository {
 
   async markRead(notificationId: string, _readAt: string): Promise<void> {
     const { db } = getFirebaseServices();
-    await updateDoc(doc(db, "notifications", notificationId), {
-      status: NotificationStatus.Read,
-      readAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    await firebaseOfflineStatusGateway.trackWrite(() =>
+      updateDoc(doc(db, "notifications", notificationId), {
+        status: NotificationStatus.Read,
+        readAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    );
   }
 }

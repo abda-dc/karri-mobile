@@ -1,6 +1,7 @@
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import type { NewProfile, Profile } from "../../../domain/profile/Profile";
 import type { ProfileRepository } from "../../../domain/profile/ProfileRepository";
+import { firebaseOfflineStatusGateway } from "../FirebaseOfflineStatusGateway";
 import { getFirebaseServices } from "../client";
 import { mapProfile, toFirestoreProfile } from "../mappers/profileMapper";
 
@@ -8,11 +9,13 @@ export class FirebaseProfileRepository implements ProfileRepository {
   async create(profile: NewProfile): Promise<Profile> {
     const { db } = getFirebaseServices();
     const reference = doc(db, "profiles", profile.userId);
-    await setDoc(reference, {
-      ...toFirestoreProfile(profile),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    await firebaseOfflineStatusGateway.trackWrite(() =>
+      setDoc(reference, {
+        ...toFirestoreProfile(profile),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    );
     return mapProfile(await getDoc(reference));
   }
 
@@ -25,10 +28,12 @@ export class FirebaseProfileRepository implements ProfileRepository {
   async save(profile: Profile): Promise<Profile> {
     const { db } = getFirebaseServices();
     const reference = doc(db, "profiles", profile.userId);
-    await setDoc(reference, {
-      ...toFirestoreProfile(profile),
-      updatedAt: serverTimestamp(),
-    });
+    await firebaseOfflineStatusGateway.trackWrite(() =>
+      setDoc(reference, {
+        ...toFirestoreProfile(profile),
+        updatedAt: serverTimestamp(),
+      }),
+    );
     return mapProfile(await getDoc(reference));
   }
 }
