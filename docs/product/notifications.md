@@ -36,17 +36,17 @@ Push, email, and SMS are not implemented.
 
 Phase 6 adds provider-neutral contracts without enabling push behavior:
 
-- `PushNotificationService` can translate an existing persisted in-app notification plus a `NotificationAction` into a delivery request for an injected gateway.
+- `PushNotificationService` can translate an existing persisted in-app notification identity plus a `NotificationAction` into a minimal delivery request for an injected gateway. Canonical title/body text is deliberately excluded from the request.
 - `PushRegistrationService` coordinates a token-registration gateway and token repository without knowing Firebase, Expo, FCM, or APNs APIs.
-- `NotificationRouter` resolves semantic actions such as opening a booking or the notification list into provider-neutral destinations.
+- `NotificationRouter` resolves semantic actions such as opening a booking or the notification list into provider-neutral destinations, and `notificationRouteAdapter` maps those destinations to current Expo Router paths without navigating.
 - Firebase infrastructure stubs report `deferred`; they do not request a token, write a token, contact FCM/APNs, or send a notification.
 - `usePushNotificationFoundation` exposes only availability and semantic action resolution. It has no permission prompt, listener, registration effect, or navigation side effect.
 
 The intended future flow is: a trusted transaction records a durable domain event, an idempotent server consumer materializes the in-app notification, and a separate push projection sends a minimal hint referring to that record. Push will not replace the in-app notification as the canonical user-visible record.
 
-Token registration will begin only after explicit user intent and approved permission copy. A future runtime adapter will obtain a platform token, associate it with the authenticated user and device, and pass it through `PushRegistrationService` to Firebase persistence. Rotation, sign-out removal, invalid-token cleanup, per-device preferences, and retention rules must be implemented before enabling registration. Token values are sensitive operational data and must never enter domain events, analytics, or logs.
+Token registration will begin only after explicit user intent and approved permission copy. A future runtime adapter will obtain a platform token, associate it with the authenticated user and app installation, and pass it through `PushRegistrationService` to an authenticated trusted registration endpoint. The server, not the client, will own token persistence. Rotation, sign-out removal, invalid-token cleanup, per-device state, and retention rules must be implemented before enabling registration. Token values are sensitive operational data and must never enter domain events, analytics, or logs.
 
-Future notification payloads will carry a small action discriminator and identifier only. Firebase-shaped payload parsing stays in Infrastructure; `NotificationRouter` returns a semantic destination; a later presentation adapter may map that destination to Expo Router. Screens will never parse FCM/APNs payloads directly.
+Future notification payloads will carry a small action discriminator and canonical notification identifier only. Firebase-shaped payload parsing stays in Infrastructure; `NotificationRouter` returns a semantic destination; the presentation adapter maps that destination to Expo Router. The current adapter carries a booking identifier separately from its path so a future tap handler can authorize access before selecting a booking. Screens will never parse FCM/APNs payloads directly.
 
 Delivery is intentionally deferred until Karri has permission UX, native credentials/build configuration, trusted server execution, preferences and quiet hours, payload privacy review, deep-link authorization, token lifecycle handling, retries, and delivery diagnostics.
 
@@ -60,8 +60,8 @@ Phase 7 adds a separate, provider-neutral `NotificationPreferences` aggregate. I
 
 Category defaults describe which subjects a user may choose to receive; they do not grant permission or activate delivery. A future delivery decision must require the relevant category and channel to be enabled, respect quiet hours, and still pass platform permission and server policy checks.
 
-`NotificationPreferenceService` owns read/default/save, channel enable/disable, and quiet-hours orchestration. The repository port is domain-owned. `FirebaseNotificationPreferenceRepository` stores one self-scoped `notificationPreferences/{userId}` document, with rules requiring Email/SMS to remain false. `useNotificationPreferences` can load and save through the service, but no screen consumes it yet.
+`NotificationPreferenceService` owns read/default/save, channel enable/disable, and quiet-hours orchestration. The repository port is domain-owned. `FirebaseNotificationPreferenceRepository` stores one self-scoped `notificationPreferences/{userId}` document, with rules requiring Email/SMS to remain false. The Profile tab consumes `useNotificationPreferences` and renders the preference card. Saves are bound to the active user, and quiet-hours values must use a runtime-supported IANA time zone.
 
 The preference foundation does not call the Phase 6 delivery or registration services. It does not request notification permission, register a token, start a listener, navigate, or contact FCM/APNs. Future push work must explicitly connect these preferences to trusted delivery rather than inferring consent from a stored category default.
 
-See [Event Bus](../architecture/event-bus.md) and [Event Architecture](../engineering/event-architecture.md).
+The reviewed native activation gates and trusted server flow are defined in [Notification Activation and Delivery Design](../architecture/notification-delivery.md). See also [Event Bus](../architecture/event-bus.md) and [Event Architecture](../engineering/event-architecture.md).

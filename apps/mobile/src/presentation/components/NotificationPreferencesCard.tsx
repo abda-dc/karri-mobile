@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Banner } from "../../components/Banner";
 import { Card } from "../../components/Card";
@@ -63,6 +63,11 @@ export function NotificationPreferencesCard({
   const [draft, setDraft] = useState(preferences);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDraft(preferences);
+    setError(null);
+  }, [preferences]);
 
   const hasChanges = useMemo(
     () => JSON.stringify(draft) !== JSON.stringify(preferences),

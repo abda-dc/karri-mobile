@@ -2,6 +2,7 @@ import type { NotificationPreferenceRepository } from "../../domain/notification
 import {
   assertNotificationPreferences,
   createDefaultNotificationPreferences,
+  InvalidNotificationPreferencesError,
   setNotificationChannel,
   setNotificationQuietHours,
   touchNotificationPreferences,
@@ -29,11 +30,17 @@ export class NotificationPreferenceService {
   }
 
   savePreferences(
+    userId: string,
     preferences: NotificationPreferences,
   ): Promise<NotificationPreferences> {
-    return this.preferences.save(
-      touchNotificationPreferences(preferences, this.clock.now()),
-    );
+    const next = touchNotificationPreferences(preferences, this.clock.now());
+    if (next.userId !== userId || next.id !== userId) {
+      throw new InvalidNotificationPreferencesError(
+        "Notification preferences can only be saved for the active user.",
+      );
+    }
+
+    return this.preferences.save(next);
   }
 
   async enableChannel(

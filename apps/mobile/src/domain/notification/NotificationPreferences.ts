@@ -46,6 +46,15 @@ const notificationChannels = Object.values(NotificationChannel);
 const notificationCategories = Object.values(NotificationPreferenceCategory);
 const localTimePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+function isSupportedTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone }).format();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function createDefaultNotificationPreferences(
   userId: string,
   occurredAt: string,
@@ -195,7 +204,11 @@ function normalizeQuietHours(quietHours: QuietHours): QuietHours {
       "Quiet hours start and end times must be different.",
     );
   }
-  if (!timeZone || timeZone.length > 100) {
+  if (
+    !timeZone ||
+    timeZone.length > 100 ||
+    !isSupportedTimeZone(timeZone)
+  ) {
     throw new InvalidNotificationPreferencesError(
       "Quiet hours require a valid time zone.",
     );

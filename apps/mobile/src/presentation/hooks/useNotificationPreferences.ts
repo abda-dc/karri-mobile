@@ -49,9 +49,14 @@ export function useNotificationPreferences(
 
   const updatePreferences = useCallback(
     async (nextPreferences: NotificationPreferences) => {
+      if (!userId) {
+        throw new Error("Sign in before saving notification preferences.");
+      }
+
       setLoading(true);
       try {
         const saved = await mobileServices.notificationPreferences.savePreferences(
+          userId,
           nextPreferences,
         );
         setPreferences(saved);
@@ -63,7 +68,7 @@ export function useNotificationPreferences(
         setLoading(false);
       }
     },
-    [],
+    [userId],
   );
 
   return { loading, preferences, updatePreferences };

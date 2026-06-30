@@ -1,19 +1,12 @@
 import {
   NotificationActionType,
+  normalizeNotificationActionEntityId,
   type NotificationAction,
 } from "../../../application/notifications/NotificationAction";
 import type { NotificationRoutingSource } from "../../../application/services/NotificationRouter";
 
 function isPayload(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function getOptionalText(
-  payload: Readonly<Record<string, unknown>>,
-  key: string,
-): string | undefined {
-  const value = payload[key];
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 export class FirebaseNotificationRoutingSource implements NotificationRoutingSource {
@@ -24,7 +17,7 @@ export class FirebaseNotificationRoutingSource implements NotificationRoutingSou
 
     switch (payload.action) {
       case NotificationActionType.OpenBooking: {
-        const bookingId = getOptionalText(payload, "bookingId");
+        const bookingId = normalizeNotificationActionEntityId(payload.bookingId);
         return bookingId
           ? {
               bookingId,
@@ -34,7 +27,8 @@ export class FirebaseNotificationRoutingSource implements NotificationRoutingSou
       }
       case NotificationActionType.OpenTracking:
         return {
-          bookingId: getOptionalText(payload, "bookingId"),
+          bookingId:
+            normalizeNotificationActionEntityId(payload.bookingId) ?? undefined,
           type: NotificationActionType.OpenTracking,
         };
       case NotificationActionType.OpenNotifications:

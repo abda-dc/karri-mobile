@@ -18,7 +18,7 @@ This document covers the synchronous local bus, event vocabulary, subscription l
 
 Publication is synchronous, in memory, and dependency-free. Subscriptions return an unsubscribe callback. The platform event union currently includes `ShipmentCreated`, `TripCreated`, `BookingRequested`, `BookingAccepted`, `BookingDeclined`, `BookingCancelled`, `BookingExpired`, `PackagePickedUp`, `PackageDelivered`, and `ReviewSubmitted` using completed-tense string types.
 
-`NotificationService` subscribes to these facts and creates in-app notification records through `NotificationRepository` when explicitly started. Nothing starts it in the current UI, and current Firestore rules deny client notification writes.
+The singleton mobile composition starts `NotificationService` once. It subscribes to the mapped facts and creates in-app notification records through `NotificationRepository`. Current Firestore rules allow only narrowly validated actor/recipient/state combinations and recipient-only reads/read-state updates; this client-side MVP exception must move to trusted durable event consumers before production.
 
 ## Design principles
 
@@ -37,11 +37,12 @@ Trusted Cloud Functions will record versioned durable events in the same transac
 
 - Network delivery, replay, queues, dead-letter storage, or cross-process guarantees.
 - Push, email, and SMS transports.
-- Starting notification handlers before write authorization exists.
+- Treating the local handler as durable, trusted, or sufficient for production notification delivery.
 
 ## Related documents
 
 - [Application Services](application-services.md)
 - [Event Architecture](../engineering/event-architecture.md)
 - [Notifications](../product/notifications.md)
+- [Notification Delivery](notification-delivery.md)
 - [Event Architecture ADR](../adr/adr-0004-why-event-architecture.md)

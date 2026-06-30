@@ -16,7 +16,7 @@ This document covers the implemented service foundations for shipments, trips, b
 | `TripService` | Validate route/date/capacity data, persist it, publish `TripCreated` |
 | `BookingService` | Create requests, enforce actor roles and forward transitions, coordinate request/booking persistence, publish lifecycle events |
 | `NotificationService` | Subscribe to domain events and materialize in-app notification records |
-| `PushNotificationService` | Convert a canonical in-app notification and semantic action into a provider-neutral delivery request; current gateway returns deferred |
+| `PushNotificationService` | Convert a canonical in-app notification identity and semantic action into a content-free provider-neutral delivery request; current gateway returns deferred |
 | `PushRegistrationService` | Coordinate future per-user/device token registration and persistence; current adapters return deferred without prompting |
 | `NotificationRouter` | Parse injected provider payloads into semantic actions and resolve provider-neutral destinations. Presentation adapts those destinations into Expo Router paths without embedding navigation inside the service layer |
 | `NotificationPreferenceService` | Load safe defaults, persist preference snapshots, enable/disable available channels, and validate quiet hours through domain helpers |
@@ -28,7 +28,7 @@ This document covers the implemented service foundations for shipments, trips, b
 
 Services import repository interfaces and domain types; they do not import Firestore. A singleton presentation composition now injects Firebase adapters and the event bus. Home, Send, Travel, Tracking, and Profile use the service layer.
 
-Push services are composed but inert. No current domain-event handler calls `PushNotificationService`, and no presentation route calls registration. This keeps in-app notification behavior unchanged while fixing the future provider seams.
+Push services are composed but inert. No current domain-event handler calls `PushNotificationService`, and no presentation route calls registration. The real delivery gateway must run in trusted server code; the mobile composition remains deferred. This keeps in-app notification behavior unchanged while preserving future provider seams.
 
 Preference reads and writes use the domain-owned `NotificationPreferenceRepository` port. The Firebase adapter may store a self-scoped preference document, but neither the service nor repository starts delivery. Email and SMS remain disabled placeholders, and stored push preference is not platform permission.
 
@@ -43,7 +43,7 @@ Preference reads and writes use the domain-owned `NotificationPreferenceReposito
 
 ## Future direction
 
-Keep the service contracts while moving sensitive persistence behind callable Cloud Functions with transactions, idempotency, and durable events. Add unit tests with in-memory repositories and Emulator Suite integration coverage.
+Keep the service contracts while moving sensitive persistence behind callable Cloud Functions with transactions, idempotency, and durable events. The notification activation and delivery boundary is specified in [Notification Delivery](notification-delivery.md). Add unit tests with in-memory repositories and Emulator Suite integration coverage.
 
 Zustand remains deferred. Screens use thin local state and service-backed realtime watches. Add small feature stores only when multiple routes genuinely coordinate the same client-owned pending state; stores must not absorb domain rules.
 
@@ -54,7 +54,7 @@ Zustand remains deferred. Screens use thin local state and service-backed realti
 - A giant global store or speculative store scaffolding.
 - Cloud Function deployment in this milestone.
 - Notification permission prompts, Expo Notifications runtime behavior, token storage, or FCM/APNs delivery.
-- Notification preference screens, Settings navigation, or delivery-time preference enforcement.
+- A separate Settings route or delivery-time preference enforcement runtime.
 
 ## Related documents
 
@@ -62,5 +62,6 @@ Zustand remains deferred. Screens use thin local state and service-backed realti
 - [Repository Pattern](repository-pattern.md)
 - [Error Handling](error-handling.md)
 - [Event Bus](event-bus.md)
+- [Notification Delivery](notification-delivery.md)
 - [Mobile Architecture](../engineering/mobile-architecture.md)
 - [API Design](../engineering/api-design.md)

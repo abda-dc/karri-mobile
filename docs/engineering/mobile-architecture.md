@@ -41,8 +41,8 @@ apps/mobile/
 - Profile watches bookings and in-app notifications and requests trust summaries.
 - The shared `Screen` shell consumes `useOfflineStatus` and displays offline, queued, syncing, or failed-write state without provider imports.
 - Presentation reports caught failures through `ApplicationErrorService`; screens receive safe category-specific messages while Firebase codes and original exceptions remain diagnostic-only.
-- `PushNotificationService`, `PushRegistrationService`, and `NotificationRouter` are composed with deferred Firebase adapters. No screen uses them, no permission is requested, and no runtime listener or delivery starts.
-- `NotificationPreferenceService` uses a self-scoped repository to load defaults or store immutable preference snapshots. `useNotificationPreferences` is reusable but currently has no screen consumer.
+- `PushNotificationService`, `PushRegistrationService`, and `NotificationRouter` are composed with deferred Firebase adapters. No screen invokes delivery or registration, no permission is requested, and no runtime listener or delivery starts. The presentation route adapter is present but has no tap/listener runtime.
+- `NotificationPreferenceService` uses a self-scoped repository to load defaults or store immutable preference snapshots. The Profile screen consumes `useNotificationPreferences`; saving preferences still does not activate push or request platform permission.
 - No prioritized Milestone 5 screen imports the legacy Firestore helper; that helper was removed.
 
 Screens decide presentation and available controls, while services and domain guards repeat every business rule. Firebase repositories and security rules remain the persistence/access boundary.
@@ -62,4 +62,4 @@ Realtime Firestore snapshots feed small screen-local arrays. Tracking's combined
 - Preference persistence does not activate a channel. Push defaults off, Email/SMS are enforced placeholders, and quiet hours are stored but not evaluated by any delivery runtime.
 - Device testing and Firebase Emulator Suite authorization tests remain necessary.
 
-See [Application Services](../architecture/application-services.md), [Error Handling](../architecture/error-handling.md), [Offline Strategy](../architecture/offline-strategy.md), and [Technical Architecture](../architecture/technical-architecture.md).
+See [Application Services](../architecture/application-services.md), [Notification Delivery](../architecture/notification-delivery.md), [Error Handling](../architecture/error-handling.md), [Offline Strategy](../architecture/offline-strategy.md), and [Technical Architecture](../architecture/technical-architecture.md).

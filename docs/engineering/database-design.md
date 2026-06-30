@@ -35,6 +35,8 @@ Reviews use `bookingId__reviewerId__revieweeId` as the document ID to enforce on
 
 Notification IDs derive from event type, related entity, and recipient. Records store recipient `userId`, template text, event type, related entity type/ID, unread/read status, and timestamps. The composite `userId ASC, createdAt DESC` index supports the Profile watcher.
 
+Future trusted delivery may add server-only `domainEvents`, `pushRegistrations`, and `notificationDeliveries` collections. They do not exist in the current schema or rules. Their proposed IDs, access boundaries, privacy fields, and retention are defined in [Notification Delivery](../architecture/notification-delivery.md).
+
 ## Time and query shapes
 
 Firestore server timestamps remain authoritative for document audit fields and custody events. Domain status-history timestamps are converted to Firestore timestamps and constrained to typed append entries.

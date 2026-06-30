@@ -25,10 +25,8 @@ export type PushDeliveryResult =
 
 export interface PushNotificationRequest {
   readonly action: NotificationAction;
-  readonly body: string;
   readonly notificationId: string;
   readonly recipientId: string;
-  readonly title: string;
 }
 
 export interface PushNotificationGateway {
@@ -49,10 +47,8 @@ export class PushNotificationService {
   ): Promise<PushDeliveryResult> {
     return this.gateway.deliver({
       action,
-      body: notification.body,
       notificationId: notification.id,
       recipientId: notification.recipientId,
-      title: notification.title,
     });
   }
 }

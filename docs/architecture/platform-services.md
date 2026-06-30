@@ -66,5 +66,6 @@ Every candidate remains replaceable at the application boundary. Firebase-specif
 - [Technical Architecture](technical-architecture.md)
 - [Repository Pattern](repository-pattern.md)
 - [Remote Configuration](remote-config.md)
+- [Notification Delivery](notification-delivery.md)
 - [Technology Roadmap](technology-roadmap.md)
 - [Firebase ADR](../adr/adr-0002-why-firebase.md)

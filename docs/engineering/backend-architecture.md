@@ -40,6 +40,8 @@ Cloud Functions will own commands that coordinate participants or create trust e
 | Recalculate trust | Protects formula inputs and auditability |
 | Dispatch notification | Centralizes templates, preferences, and retries |
 
+The future dispatcher materializes the canonical in-app record before evaluating push preferences, quiet hours, registrations, and provider delivery. Token documents and delivery effects remain server-only. See [Notification Delivery](../architecture/notification-delivery.md) for the activation gates, effect IDs, retry policy, and proposed collection boundaries.
+
 ## Function conventions
 
 - Verify `context.auth` and App Check when enabled.

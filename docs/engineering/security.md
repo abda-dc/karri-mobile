@@ -19,6 +19,7 @@ Firebase web configuration is public project metadata and is supplied through `E
 - Storage defaults to deny because no upload flow is implemented.
 - Listener and write errors are shown without exposing configuration values.
 - Server timestamps prevent clients from choosing audit timestamps.
+- Deferred push adapters request and store no tokens. Future push registrations are secrets: direct client collection access, token logging, and client-side provider delivery remain prohibited.
 
 ## Known MVP limitations
 
@@ -38,6 +39,8 @@ Firebase web configuration is public project metadata and is supplied through `E
 5. Define data retention, deletion, incident response, prohibited items, and evidence access.
 6. Add dependency, secret, and static checks to CI.
 7. Complete privacy, legal, and corridor safety review.
+
+Native push activation additionally requires the token, payload, authorization, credential, retention, and kill-switch gates in [Notification Delivery](../architecture/notification-delivery.md).
 
 ## Logging
 

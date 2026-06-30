@@ -84,6 +84,7 @@ nav:
       - Domain Model: architecture/domain-model.md
       - Repository Pattern: architecture/repository-pattern.md
       - Application Services: architecture/application-services.md
+      - Notification Delivery: architecture/notification-delivery.md
       - Error Handling: architecture/error-handling.md
       - Event Bus: architecture/event-bus.md
       - Booking State Machine: architecture/booking-state-machine.md

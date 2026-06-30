@@ -9,6 +9,24 @@ export const NotificationActionType = {
 export type NotificationActionType =
   (typeof NotificationActionType)[keyof typeof NotificationActionType];
 
+const notificationActionEntityIdMaximumLength = 128;
+const controlCharacterPattern = /[\u0000-\u001f\u007f]/;
+
+export function normalizeNotificationActionEntityId(
+  value: unknown,
+): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized &&
+    normalized.length <= notificationActionEntityIdMaximumLength &&
+    !controlCharacterPattern.test(normalized)
+    ? normalized
+    : null;
+}
+
 export type NotificationAction =
   | {
       readonly type: typeof NotificationActionType.OpenBooking;
