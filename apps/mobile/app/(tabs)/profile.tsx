@@ -15,7 +15,9 @@ import {
   NotificationStatus,
   type Notification,
 } from "../../src/domain/notification/Notification";
+import { NotificationPreferencesCard } from "../../src/presentation/components/NotificationPreferencesCard";
 import { TrustSummaryCard } from "../../src/presentation/components/TrustSummaryCard";
+import { useNotificationPreferences } from "../../src/presentation/hooks/useNotificationPreferences";
 import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
@@ -34,6 +36,7 @@ export default function ProfileScreen() {
   const [pendingReadIds, setPendingReadIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  const notificationPreferences = useNotificationPreferences(auth.user?.uid ?? null);
 
   useEffect(() => {
     if (auth.loading) {
@@ -211,6 +214,14 @@ export default function ProfileScreen() {
               </View>
             )}
           </Card>
+
+          {notificationPreferences.preferences ? (
+            <NotificationPreferencesCard
+              loading={notificationPreferences.loading}
+              preferences={notificationPreferences.preferences}
+              onSave={notificationPreferences.updatePreferences}
+            />
+          ) : null}
 
           <Card variant="elevated">
             <SectionHeader
