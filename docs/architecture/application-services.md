@@ -27,7 +27,7 @@ This document covers the implemented service foundations for shipments, trips, b
 | `RemoteConfigService` | Serve safe typed defaults and optionally refresh from a provider |
 | `ApplicationErrorService` | Normalize domain/provider failures, attach recovery guidance, and report structured diagnostics through an injected logger |
 
-Services import repository interfaces and domain types; they do not import Firestore. A singleton presentation composition now injects Firebase adapters and the event bus. Home, Send, Travel, Tracking, and Profile use the service layer.
+Services import repository interfaces and domain types; they do not import Firestore. A singleton presentation composition now injects Firebase adapters and the event bus. Home, Send, Travel, Tracking, and Profile use the service layer. Profile's read-only identity-verification hook calls `IdentityVerificationService` through that composition and never imports the Firebase repository directly.
 
 Push delivery remains inert: no domain-event handler calls `PushNotificationService`. Registration is separately user-initiated from Profile through `PushRegistrationService` and an Expo Infrastructure adapter. It can request permission/acquire a token in a configured native build, but trusted persistence returns deferred and no sender exists. The real delivery gateway must run in trusted server code.
 

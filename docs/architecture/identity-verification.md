@@ -52,6 +52,14 @@ Clients cannot self-assign `under_review`, `verified`, `rejected`, `expired`, or
 
 Storage is still deny-all. Consequently, client-written document metadata must keep `storagePath` and `uploadedAt` null. A future upload flow should use private Firebase Storage objects, short-lived authorized access, file size/type validation, malware scanning where appropriate, and server-side attachment of the object path. It must not add document bytes to Firestore.
 
+## Read-only UI foundation
+
+Phase 7.5 adds reusable Presentation components for the verification badge, status summary, progress checklist, and audit timeline. The Profile screen loads its self-scoped aggregate through `useIdentityVerification` and `mobileServices.identityVerification`; it does not import Firebase or infer authority from visible controls.
+
+The UI is intentionally read-only. An unverified account sees that identity verification is being prepared, while existing records receive transparent status, level, document-count, date, outcome, and next-action explanations. No upload, metadata-edit, submission, renewal, or reviewer control is exposed.
+
+For the signed-in user's Profile only, the loaded identity level is explicitly mapped into the existing trust vocabulary: `none` remains `none`, `basic` remains `basic`, and `identity_verified` becomes the trust engine's `identity` input. Other users' trust cards retain the safe `none` default because identity-verification records are private and self-readable.
+
 ## Privacy and retention
 
 Identity evidence is high-sensitivity data. Before real collection begins, Karri must approve purpose limitation, consent copy, regional data location, access logging, reviewer access, retention/deletion schedules, account-deletion handling, incident response, and vendor terms. Logs and analytics must use opaque record IDs and outcome codes rather than identity evidence or document metadata.
@@ -67,6 +75,7 @@ Trust-score integration is also deferred. When activated, it must map only a cur
 ## Explicitly deferred
 
 - Firebase Storage upload/download behavior and Storage rules
+- user document forms, submission controls, and renewal controls
 - OCR, liveness, biometric comparison, and automated document checks
 - third-party KYC/identity providers and credentials
 - reviewer dashboards and Cloud Functions

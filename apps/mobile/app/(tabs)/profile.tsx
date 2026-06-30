@@ -18,6 +18,10 @@ import {
 import { NotificationPreferencesCard } from "../../src/presentation/components/NotificationPreferencesCard";
 import { PushNotificationRegistrationCard } from "../../src/presentation/components/PushNotificationRegistrationCard";
 import { TrustSummaryCard } from "../../src/presentation/components/TrustSummaryCard";
+import { VerificationChecklist } from "../../src/presentation/components/VerificationChecklist";
+import { VerificationStatusCard } from "../../src/presentation/components/VerificationStatusCard";
+import { VerificationTimeline } from "../../src/presentation/components/VerificationTimeline";
+import { useIdentityVerification } from "../../src/presentation/hooks/useIdentityVerification";
 import { useNotificationPreferences } from "../../src/presentation/hooks/useNotificationPreferences";
 import { usePushNotificationRegistration } from "../../src/presentation/hooks/usePushNotificationRegistration";
 import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
@@ -39,6 +43,7 @@ export default function ProfileScreen() {
     () => new Set(),
   );
   const notificationPreferences = useNotificationPreferences(auth.user?.uid ?? null);
+  const identityVerification = useIdentityVerification(auth.user?.uid ?? null);
   const pushRegistration = usePushNotificationRegistration(
     auth.user?.uid ?? null,
     notificationPreferences.preferences,
@@ -172,12 +177,42 @@ export default function ProfileScreen() {
 
       {auth.user ? (
         <>
+          {identityVerification.loading ? (
+            <LoadingState message="Loading identity verification..." />
+          ) : identityVerification.error ? (
+            <Card padding="compact" variant="outlined">
+              <Banner
+                compact
+                message={identityVerification.error}
+                title="Identity verification unavailable"
+                variant="error"
+              />
+              <PrimaryButton
+                variant="ghost"
+                onPress={() => void identityVerification.refresh()}
+              >
+                Try again
+              </PrimaryButton>
+            </Card>
+          ) : (
+            <>
+              <VerificationStatusCard summary={identityVerification.summary} />
+              {identityVerification.summary ? (
+                <VerificationChecklist summary={identityVerification.summary} />
+              ) : null}
+              {identityVerification.verification ? (
+                <VerificationTimeline events={identityVerification.verification.events} />
+              ) : null}
+            </>
+          )}
+
           <TrustSummaryCard
             accountCreatedAt={auth.user.createdAt}
             bookings={bookings}
-            refreshKey={notifications.length}
+            refreshKey={`${notifications.length}:${identityVerification.verification?.updatedAt ?? "none"}`}
             title="Your trust score"
             userId={auth.user.uid}
+            verificationLevel={identityVerification.summary?.level}
           />
 
           <Card variant="outlined">
@@ -244,8 +279,8 @@ export default function ProfileScreen() {
             />
             <Banner
               compact
-              message="This anonymous MVP session has no identity verification credit."
-              title="Verification: none"
+              message="Profile setup is separate from the read-only identity verification foundation above."
+              title="Profile details only"
               variant="development"
             />
             <PrimaryButton variant="secondary" onPress={() => router.push("/profile-setup")}>

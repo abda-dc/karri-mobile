@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import type { Booking } from "../../domain/booking/Booking";
-import type { TrustSummary } from "../../domain/trust/TrustScore";
+import {
+  VerificationLevel as IdentityVerificationLevel,
+  type VerificationLevel as IdentityVerificationLevelValue,
+} from "../../domain/identity/IdentityVerification";
+import type {
+  TrustSummary,
+  VerificationLevel as TrustVerificationLevel,
+} from "../../domain/trust/TrustScore";
 import { Banner } from "../../components/Banner";
 import { Card } from "../../components/Card";
 import { StatusChip } from "../../components/StatusChip";
@@ -16,6 +23,32 @@ interface TrustSummaryCardProps {
   readonly refreshKey?: string | number;
   readonly title?: string;
   readonly userId: string;
+  readonly verificationLevel?: IdentityVerificationLevelValue;
+}
+
+function toTrustVerificationLevel(
+  level: IdentityVerificationLevelValue | undefined,
+): TrustVerificationLevel {
+  switch (level) {
+    case IdentityVerificationLevel.Basic:
+      return "basic";
+    case IdentityVerificationLevel.IdentityVerified:
+      return "identity";
+    case IdentityVerificationLevel.None:
+    case undefined:
+      return "none";
+  }
+}
+
+function getTrustVerificationLabel(level: TrustVerificationLevel): string {
+  switch (level) {
+    case "basic":
+      return "Basic in progress";
+    case "identity":
+      return "Identity verified";
+    case "none":
+      return "None";
+  }
 }
 
 export function TrustSummaryCard({
@@ -25,6 +58,7 @@ export function TrustSummaryCard({
   refreshKey,
   title = "Trust summary",
   userId,
+  verificationLevel,
 }: TrustSummaryCardProps) {
   const [summary, setSummary] = useState<TrustSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +70,11 @@ export function TrustSummaryCard({
     setError(null);
 
     void mobileServices.trust
-      .getVisibleSummary(userId, { accountCreatedAt, bookings, verificationLevel: "none" })
+      .getVisibleSummary(userId, {
+        accountCreatedAt,
+        bookings,
+        verificationLevel: toTrustVerificationLevel(verificationLevel),
+      })
       .then((nextSummary) => {
         if (active) {
           setSummary(nextSummary);
@@ -55,7 +93,7 @@ export function TrustSummaryCard({
     return () => {
       active = false;
     };
-  }, [accountCreatedAt, bookings, refreshKey, userId]);
+  }, [accountCreatedAt, bookings, refreshKey, userId, verificationLevel]);
 
   if (loading) {
     return (
@@ -108,7 +146,7 @@ export function TrustSummaryCard({
           <>
             <Text style={styles.factor}>Cancellations: {summary.inputs.cancellations}</Text>
             <Text style={styles.factor}>
-              Verification: {summary.inputs.verificationLevel}
+              Verification: {getTrustVerificationLabel(summary.inputs.verificationLevel)}
             </Text>
             {summary.score.factors.map((factor) => (
               <Text key={factor.key} style={styles.explanation}>
