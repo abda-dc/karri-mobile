@@ -34,6 +34,15 @@ Every Firestore-backed surface supports:
 
 Keep existing content visible when a later design adds refresh behavior; do not blank the screen unnecessarily.
 
+## Optimistic action pattern
+
+- Show pending intent immediately, but keep it visually distinct from confirmed status.
+- Disable conflicting actions while a lifecycle or custody write is pending.
+- Do not create fake booking or custody records; let realtime subscriptions provide canonical records.
+- On failure, remove the pending projection, retain editable input, and show the existing friendly error.
+- Reconcile returned reviews by ID and notification state by record ID so listener updates do not duplicate UI.
+- A queued Firestore write remains pending until its service promise settles; the offline banner explains reconnect behavior.
+
 ## Forms
 
 Group fields by the decision they support:

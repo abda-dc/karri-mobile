@@ -22,6 +22,8 @@ type CorridorMatch = {
   trip: Trip;
 };
 
+type OptimisticRequestState = "confirmed" | "pending";
+
 function normalizeRoutePart(value: string): string {
   return value.trim().replace(/\s+/g, " ");
 }
@@ -43,9 +45,15 @@ export default function AppHomeScreen() {
   const [shipmentsLoading, setShipmentsLoading] = useState(true);
   const [tripsLoading, setTripsLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
-  const [requestingMatch, setRequestingMatch] = useState<string | null>(null);
+  const [optimisticRequests, setOptimisticRequests] = useState<
+    ReadonlyMap<string, OptimisticRequestState>
+  >(() => new Map());
   const [requestMessage, setRequestMessage] = useState<string | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOptimisticRequests(new Map());
+  }, [auth.user?.uid]);
 
   useEffect(() => {
     if (auth.loading) {
@@ -118,7 +126,11 @@ export default function AppHomeScreen() {
     }
 
     const matchId = `${shipment.id}:${trip.id}`;
-    setRequestingMatch(matchId);
+    if (optimisticRequests.has(matchId)) {
+      return;
+    }
+
+    setOptimisticRequests((current) => new Map(current).set(matchId, "pending"));
     setRequestMessage(null);
     setRequestError(null);
 
@@ -129,12 +141,56 @@ export default function AppHomeScreen() {
         senderId: auth.user.uid,
         travelerId: trip.ownerId,
       });
+      setOptimisticRequests((current) => new Map(current).set(matchId, "confirmed"));
       setRequestMessage("Booking requested. The traveler has an in-app notification.");
     } catch (error) {
+      setOptimisticRequests((current) => {
+        const next = new Map(current);
+        next.delete(matchId);
+        return next;
+      });
       setRequestError(getFriendlyError(error));
-    } finally {
-      setRequestingMatch(null);
     }
+  }
+
+  function renderBookingRequestAction(shipment: Shipment, trip: Trip) {
+    if (
+      !auth.user ||
+      shipment.ownerId !== auth.user.uid ||
+      trip.ownerId === auth.user.uid
+    ) {
+      return null;
+    }
+
+    const requestState = optimisticRequests.get(`${shipment.id}:${trip.id}`);
+
+    if (requestState === "pending") {
+      return (
+        <Banner
+          compact
+          message="Karri is validating and syncing this request. It will roll back here if the write fails."
+          title="Booking request pending"
+          variant="warning"
+        />
+      );
+    }
+
+    if (requestState === "confirmed") {
+      return (
+        <Banner
+          compact
+          message="The request was confirmed. Tracking will show the canonical booking record."
+          title="Booking request sent"
+          variant="success"
+        />
+      );
+    }
+
+    return (
+      <PrimaryButton onPress={() => handleRequestBooking(shipment, trip)}>
+        Request booking
+      </PrimaryButton>
+    );
   }
 
   return (
@@ -265,14 +321,7 @@ export default function AppHomeScreen() {
 
                   <TrustSummaryCard compact title="Traveler trust" userId={trip.ownerId} />
 
-                  {shipment.ownerId === auth.user?.uid && trip.ownerId !== auth.user?.uid ? (
-                    <PrimaryButton
-                      loading={requestingMatch === `${shipment.id}:${trip.id}`}
-                      onPress={() => handleRequestBooking(shipment, trip)}
-                    >
-                      Request booking
-                    </PrimaryButton>
-                  ) : null}
+                  {renderBookingRequestAction(shipment, trip)}
                 </Card>
               ))
             : null}

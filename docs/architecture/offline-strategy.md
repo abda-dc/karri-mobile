@@ -32,6 +32,18 @@ Firestore remains the mutation queue. The app does not replay mutations in a sec
 
 The manual **Retry sync** action does not replay a booking, custody, or listing mutation. It only asks Firestore to resume its existing queue and waits for those pending writes, avoiding duplicate commands.
 
+## Optimistic UI policy
+
+Optimistic state is a screen-local projection of user intent, not a second persistence layer:
+
+- Home marks a booking request pending immediately and replaces that marker with confirmed feedback only after `BookingService.request` succeeds. Failure removes the marker and preserves the error.
+- Tracking keeps the canonical booking status and custody timeline listener-driven. Accept, decline, cancel, pickup, delivery, and completion display a separate pending target and disable all other lifecycle actions until the service promise settles.
+- Custody records are never fabricated locally. Firestore's existing local snapshot may surface an accepted queued event, while the pending lifecycle banner remains until acknowledgement.
+- Review submission locks the form with a pending banner. Success inserts the returned review once by ID; failure restores the unchanged rating and comment.
+- Notification read state uses a reversible local pending marker. Success is reconciled into the subscribed list; failure removes the marker and Firestore rolls back any rejected local write.
+
+No optimistic path manually replays a mutation. Phase 2 write tracking and Firestore's queue remain responsible for reconnect behavior, while Phase 1 subscriptions remain canonical for stored records.
+
 ## Design principles
 
 - Never describe native in-memory behavior as durable offline storage.

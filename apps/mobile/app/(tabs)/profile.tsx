@@ -10,7 +10,10 @@ import { SectionHeader } from "../../src/components/SectionHeader";
 import { StatusChip } from "../../src/components/StatusChip";
 import { TrustBadge } from "../../src/components/TrustBadge";
 import type { Booking } from "../../src/domain/booking/Booking";
-import type { Notification } from "../../src/domain/notification/Notification";
+import {
+  NotificationStatus,
+  type Notification,
+} from "../../src/domain/notification/Notification";
 import { TrustSummaryCard } from "../../src/presentation/components/TrustSummaryCard";
 import { getFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
@@ -27,7 +30,9 @@ export default function ProfileScreen() {
   const [notifications, setNotifications] = useState<ReadonlyArray<Notification>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [markingRead, setMarkingRead] = useState<string | null>(null);
+  const [pendingReadIds, setPendingReadIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
 
   useEffect(() => {
     if (auth.loading) {
@@ -38,6 +43,7 @@ export default function ProfileScreen() {
       setLoading(false);
       setBookings([]);
       setNotifications([]);
+      setPendingReadIds(new Set());
       return;
     }
 
@@ -89,18 +95,41 @@ export default function ProfileScreen() {
   }, [auth.loading, auth.user]);
 
   async function markRead(notificationId: string) {
-    setMarkingRead(notificationId);
+    if (pendingReadIds.has(notificationId)) {
+      return;
+    }
+
+    setPendingReadIds((current) => new Set(current).add(notificationId));
     setError(null);
     try {
       await mobileServices.notification.markRead(notificationId);
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id === notificationId
+            ? {
+                ...notification,
+                readAt: notification.readAt ?? new Date().toISOString(),
+                status: NotificationStatus.Read,
+              }
+            : notification,
+        ),
+      );
     } catch (markError) {
       setError(getFriendlyError(markError));
     } finally {
-      setMarkingRead(null);
+      setPendingReadIds((current) => {
+        const next = new Set(current);
+        next.delete(notificationId);
+        return next;
+      });
     }
   }
 
-  const unreadCount = notifications.filter((notification) => notification.status === "unread").length;
+  const unreadCount = notifications.filter(
+    (notification) =>
+      notification.status === NotificationStatus.Unread &&
+      !pendingReadIds.has(notification.id),
+  ).length;
 
   return (
     <Screen contentStyle={styles.page} withTabBar>
@@ -155,27 +184,32 @@ export default function ProfileScreen() {
               <Text style={styles.muted}>No in-app notifications yet.</Text>
             ) : (
               <View style={styles.notifications}>
-                {notifications.map((notification) => (
-                  <View key={notification.id} style={styles.notificationRow}>
-                    <View style={styles.notificationCopy}>
-                      <Text style={styles.notificationTitle}>{notification.title}</Text>
-                      <Text style={styles.muted}>{notification.body}</Text>
-                      <Text style={styles.muted}>{formatTimestamp(notification.createdAt)}</Text>
+                {notifications.map((notification) => {
+                  const readPending = pendingReadIds.has(notification.id);
+
+                  return (
+                    <View key={notification.id} style={styles.notificationRow}>
+                      <View style={styles.notificationCopy}>
+                        <Text style={styles.notificationTitle}>{notification.title}</Text>
+                        <Text style={styles.muted}>{notification.body}</Text>
+                        <Text style={styles.muted}>{formatTimestamp(notification.createdAt)}</Text>
+                      </View>
+                      {readPending ? (
+                        <StatusChip label="Read pending" tone="info" />
+                      ) : notification.status === NotificationStatus.Unread ? (
+                        <PrimaryButton
+                          style={styles.readButton}
+                          variant="ghost"
+                          onPress={() => markRead(notification.id)}
+                        >
+                          Mark read
+                        </PrimaryButton>
+                      ) : (
+                        <StatusChip label="Read" tone="neutral" />
+                      )}
                     </View>
-                    {notification.status === "unread" ? (
-                      <PrimaryButton
-                        loading={markingRead === notification.id}
-                        style={styles.readButton}
-                        variant="ghost"
-                        onPress={() => markRead(notification.id)}
-                      >
-                        Mark read
-                      </PrimaryButton>
-                    ) : (
-                      <StatusChip label="Read" tone="neutral" />
-                    )}
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
           </Card>

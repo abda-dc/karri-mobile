@@ -72,6 +72,8 @@ export function BookingDetailCard({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [pendingTransition, setPendingTransition] = useState<Booking["status"] | null>(null);
+  const [reviewPending, setReviewPending] = useState(false);
   const [location, setLocation] = useState("");
   const [custodyNote, setCustodyNote] = useState("");
   const [rating, setRating] = useState("");
@@ -132,6 +134,10 @@ export function BookingDetailCard({
     action: () => Promise<unknown>,
     success: string,
   ): Promise<boolean> {
+    if (actionLoading) {
+      return false;
+    }
+
     setActionLoading(key);
     setActionError(null);
     setActionMessage(null);
@@ -148,8 +154,9 @@ export function BookingDetailCard({
     }
   }
 
-  function transition(nextStatus: Booking["status"], success: string) {
-    return runAction(
+  async function transition(nextStatus: Booking["status"], success: string) {
+    setPendingTransition(nextStatus);
+    const succeeded = await runAction(
       nextStatus,
       () =>
         mobileServices.booking.transition({
@@ -161,6 +168,8 @@ export function BookingDetailCard({
         }),
       success,
     );
+    setPendingTransition(null);
+    return succeeded;
   }
 
   function recordTravelEvent(eventType: CustodyEventType, success: string) {
@@ -179,32 +188,44 @@ export function BookingDetailCard({
   }
 
   async function submitReview() {
-    const numericRating = Number(rating);
-    const revieweeId = isSender ? booking.travelerId : booking.senderId;
-
-    const submitted = await runAction(
-      "review",
-      () =>
-        mobileServices.review.submit({
-          bookingId: booking.id,
-          reviewerId: currentUserId,
-          revieweeId,
-          direction: isSender ? "sender_reviews_traveler" : "traveler_reviews_sender",
-          rating: numericRating,
-          comment,
-        }),
-      "Review submitted. The other participant has been notified.",
-    );
-
-    if (!submitted) {
+    if (actionLoading) {
       return;
     }
 
-    const nextReviews = await mobileServices.review.listForBooking(booking.id);
-    setReviews(nextReviews);
-    setRating("");
-    setComment("");
+    const numericRating = Number(rating);
+    const revieweeId = isSender ? booking.travelerId : booking.senderId;
+
+    setReviewPending(true);
+    setActionLoading("review");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const review = await mobileServices.review.submit({
+        bookingId: booking.id,
+        reviewerId: currentUserId,
+        revieweeId,
+        direction: isSender ? "sender_reviews_traveler" : "traveler_reviews_sender",
+        rating: numericRating,
+        comment,
+      });
+      setReviews((current) =>
+        current.some((existing) => existing.id === review.id)
+          ? current
+          : [...current, review],
+      );
+      setActionMessage("Review submitted. The other participant has been notified.");
+      setRating("");
+      setComment("");
+    } catch (error) {
+      setActionError(getFriendlyError(error));
+    } finally {
+      setReviewPending(false);
+      setActionLoading(null);
+    }
   }
+
+  const actionInProgress = actionLoading !== null;
 
   return (
     <Card variant="elevated">
@@ -215,10 +236,15 @@ export function BookingDetailCard({
           </Text>
           <Text style={styles.muted}>Booking {shortId(booking.id)}</Text>
         </View>
-        <StatusChip
-          label={booking.status.replace("_", " ")}
-          tone={booking.status === BookingStatus.Completed ? "success" : "active"}
-        />
+        <View style={styles.statusBlock}>
+          <StatusChip
+            label={booking.status.replace("_", " ")}
+            tone={booking.status === BookingStatus.Completed ? "success" : "active"}
+          />
+          {pendingTransition ? (
+            <StatusChip label={`${pendingTransition.replace("_", " ")} pending`} tone="warning" />
+          ) : null}
+        </View>
       </View>
 
       <View style={styles.summaryGrid}>
@@ -262,16 +288,26 @@ export function BookingDetailCard({
       {actionMessage ? (
         <Banner message={actionMessage} title="Booking updated" variant="success" />
       ) : null}
+      {pendingTransition ? (
+        <Banner
+          compact
+          message="The requested status is shown as pending until the service write succeeds. Stored status and custody history remain subscription-driven."
+          title="Booking update pending"
+          variant="warning"
+        />
+      ) : null}
 
       {booking.status === BookingStatus.Pending && isTraveler ? (
         <View style={styles.actions}>
           <PrimaryButton
+            disabled={actionInProgress}
             loading={actionLoading === BookingStatus.Accepted}
             onPress={() => transition(BookingStatus.Accepted, "Booking accepted.")}
           >
             Accept request
           </PrimaryButton>
           <PrimaryButton
+            disabled={actionInProgress}
             loading={actionLoading === BookingStatus.Declined}
             variant="secondary"
             onPress={() => transition(BookingStatus.Declined, "Booking declined.")}
@@ -283,6 +319,7 @@ export function BookingDetailCard({
 
       {booking.status === BookingStatus.Pending && isSender ? (
         <PrimaryButton
+          disabled={actionInProgress}
           loading={actionLoading === BookingStatus.Cancelled}
           variant="secondary"
           onPress={() => transition(BookingStatus.Cancelled, "Booking cancelled.")}
@@ -293,6 +330,7 @@ export function BookingDetailCard({
 
       {booking.status === BookingStatus.Accepted && isTraveler ? (
         <PrimaryButton
+          disabled={actionInProgress}
           loading={actionLoading === BookingStatus.InTransit}
           onPress={() => transition(BookingStatus.InTransit, "Pickup confirmed.")}
         >
@@ -320,6 +358,7 @@ export function BookingDetailCard({
           <View style={styles.actions}>
             {!recordedTypes.has(CustodyEventType.AirportDeparture) ? (
               <PrimaryButton
+                disabled={actionInProgress}
                 loading={actionLoading === CustodyEventType.AirportDeparture}
                 variant="secondary"
                 onPress={() =>
@@ -332,6 +371,7 @@ export function BookingDetailCard({
             {recordedTypes.has(CustodyEventType.AirportDeparture) &&
             !recordedTypes.has(CustodyEventType.AirportArrival) ? (
               <PrimaryButton
+                disabled={actionInProgress}
                 loading={actionLoading === CustodyEventType.AirportArrival}
                 variant="secondary"
                 onPress={() =>
@@ -342,6 +382,7 @@ export function BookingDetailCard({
               </PrimaryButton>
             ) : null}
             <PrimaryButton
+              disabled={actionInProgress}
               loading={actionLoading === BookingStatus.Delivered}
               onPress={() => transition(BookingStatus.Delivered, "Delivery confirmed.")}
             >
@@ -353,6 +394,7 @@ export function BookingDetailCard({
 
       {booking.status === BookingStatus.Delivered && isSender ? (
         <PrimaryButton
+          disabled={actionInProgress}
           loading={actionLoading === BookingStatus.Completed}
           onPress={() => transition(BookingStatus.Completed, "Journey completed.")}
         >
@@ -394,7 +436,16 @@ export function BookingDetailCard({
         )}
       </View>
 
-      {booking.status === BookingStatus.Completed && !alreadyReviewed ? (
+      {reviewPending ? (
+        <Banner
+          compact
+          message="The review form is locked while Karri validates this one-per-participant write. A failure restores the form and keeps your input."
+          title="Review pending"
+          variant="warning"
+        />
+      ) : null}
+
+      {booking.status === BookingStatus.Completed && !alreadyReviewed && !reviewPending ? (
         <View style={styles.form}>
           <Text style={styles.sectionTitle}>Review the other participant</Text>
           <TextField
@@ -412,7 +463,11 @@ export function BookingDetailCard({
             onChangeText={setComment}
             value={comment}
           />
-          <PrimaryButton loading={actionLoading === "review"} onPress={submitReview}>
+          <PrimaryButton
+            disabled={actionInProgress}
+            loading={actionLoading === "review"}
+            onPress={submitReview}
+          >
             Submit review
           </PrimaryButton>
         </View>
@@ -437,6 +492,10 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.xxs,
     minWidth: 210,
+  },
+  statusBlock: {
+    alignItems: "flex-end",
+    gap: spacing.xs,
   },
   title: {
     color: colors.text,
