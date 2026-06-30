@@ -6,7 +6,7 @@ Define the orchestration layer between presentation, portable domain rules, repo
 
 ## Scope
 
-This document covers the implemented service foundations for shipments, trips, bookings, in-app and future push notifications, notification preferences, reviews, trust, offline status, and typed remote configuration.
+This document covers the implemented service foundations for shipments, trips, bookings, in-app and future push notifications, notification preferences, reviews, identity verification, trust, offline status, and typed remote configuration.
 
 ## Current implementation
 
@@ -21,6 +21,7 @@ This document covers the implemented service foundations for shipments, trips, b
 | `NotificationRouter` | Parse injected provider payloads into semantic actions and resolve provider-neutral destinations. Presentation adapts those destinations into Expo Router paths without embedding navigation inside the service layer |
 | `NotificationPreferenceService` | Load safe defaults, persist preference snapshots, enable/disable available channels, and validate quiet hours through domain helpers |
 | `ReviewService` | Enforce completed-booking participation, one review per reviewer, rating bounds, and aggregate averages |
+| `IdentityVerificationService` | Validate metadata-only drafts, enforce the finite verification workflow, append audit events, and expose transparent status summaries; review commands require a future trusted host |
 | `TrustService` | Validate evidence inputs, invoke the versioned calculator, persist the result |
 | `OfflineService` | Expose provider-neutral connectivity/pending-write status and safely retry Firestore's existing queue |
 | `RemoteConfigService` | Serve safe typed defaults and optionally refresh from a provider |
@@ -63,5 +64,6 @@ Zustand remains deferred. Screens use thin local state and service-backed realti
 - [Error Handling](error-handling.md)
 - [Event Bus](event-bus.md)
 - [Notification Delivery](notification-delivery.md)
+- [Identity Verification](identity-verification.md)
 - [Mobile Architecture](../engineering/mobile-architecture.md)
 - [API Design](../engineering/api-design.md)

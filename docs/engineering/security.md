@@ -16,6 +16,7 @@ Firebase web configuration is public project metadata and is supplied through `E
 - Firestore rules constrain listing ownership, mutable fields, types, and active marketplace reads.
 - Lifecycle rules use participant membership, immutable identifiers, finite transitions, deterministic IDs, and server timestamps; unspecified access defaults to deny.
 - Custody/review updates and deletes and all `trustScores` access remain denied.
+- Identity verification is self-readable; clients can write only an empty draft, draft metadata, and the draft-to-submitted transition. Review states and review-only fields are denied to clients, and allowlisted nested fields exclude raw evidence and OCR text.
 - Storage defaults to deny because no upload flow is implemented.
 - Listener and write errors are shown without exposing configuration values.
 - Server timestamps prevent clients from choosing audit timestamps.
@@ -27,6 +28,7 @@ Firebase web configuration is public project metadata and is supplied through `E
 - App Check is not yet enabled.
 - Rules require emulator/deployed-project validation before launch.
 - No abuse throttling, moderation, prohibited-item enforcement, or upload scanning exists.
+- Identity evidence collection, reviewer authorization, retention/deletion controls, and KYC/OCR safeguards are not implemented; the current model is metadata-only and must not be treated as proof of identity.
 - Active listings expose route and package summary data to any authenticated user; fields must remain intentionally minimal.
 - Calendar strings do not yet capture timezone or airport-level precision.
 

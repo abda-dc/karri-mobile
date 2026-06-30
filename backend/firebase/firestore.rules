@@ -214,6 +214,222 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function validVerificationStatus(status) {
+      return status in [
+        'unverified',
+        'draft',
+        'submitted',
+        'under_review',
+        'verified',
+        'rejected',
+        'expired',
+        'revoked'
+      ];
+    }
+
+    function validIdentityDocument(document) {
+      return document is map
+        && document.keys().hasOnly([
+          'id',
+          'type',
+          'label',
+          'issuingCountryCode',
+          'expiresAt',
+          'storagePath',
+          'uploadedAt'
+        ])
+        && document.id is string
+        && document.id.size() > 0
+        && document.id.size() <= 128
+        && document.type in [
+          'passport',
+          'national_id',
+          'drivers_license',
+          'residence_permit',
+          'other'
+        ]
+        && document.label is string
+        && document.label.size() > 0
+        && document.label.size() <= 120
+        && (document.issuingCountryCode == null || (
+          document.issuingCountryCode is string
+          && document.issuingCountryCode.matches('^[A-Z]{2}$')
+        ))
+        && (document.expiresAt == null || document.expiresAt is timestamp)
+        // Storage remains deny-all; clients cannot claim an upload exists.
+        && document.storagePath == null
+        && document.uploadedAt == null;
+    }
+
+    function validVerificationEvent(event) {
+      return event is map
+        && event.keys().hasOnly([
+          'id',
+          'verificationId',
+          'actorId',
+          'actorType',
+          'fromStatus',
+          'toStatus',
+          'status',
+          'reason',
+          'createdAt'
+        ])
+        && event.id is string
+        && event.id.size() > 0
+        && event.id.size() <= 240
+        && event.verificationId is string
+        && event.verificationId.size() > 0
+        && event.verificationId.size() <= 128
+        && (event.actorId == null || (
+          event.actorId is string
+          && event.actorId.size() > 0
+          && event.actorId.size() <= 128
+        ))
+        && event.actorType in ['user', 'system', 'reviewer']
+        && validVerificationStatus(event.fromStatus)
+        && validVerificationStatus(event.toStatus)
+        && event.status == event.toStatus
+        && (event.reason == null || (
+          event.reason is string
+          && event.reason.size() > 0
+          && event.reason.size() <= 500
+        ))
+        && event.createdAt is timestamp;
+    }
+
+    function validIdentityDocuments(documents) {
+      return documents is list
+        && documents.size() <= 10
+        && (documents.size() < 1 || validIdentityDocument(documents[0]))
+        && (documents.size() < 2 || validIdentityDocument(documents[1]))
+        && (documents.size() < 3 || validIdentityDocument(documents[2]))
+        && (documents.size() < 4 || validIdentityDocument(documents[3]))
+        && (documents.size() < 5 || validIdentityDocument(documents[4]))
+        && (documents.size() < 6 || validIdentityDocument(documents[5]))
+        && (documents.size() < 7 || validIdentityDocument(documents[6]))
+        && (documents.size() < 8 || validIdentityDocument(documents[7]))
+        && (documents.size() < 9 || validIdentityDocument(documents[8]))
+        && (documents.size() < 10 || validIdentityDocument(documents[9]));
+    }
+
+    function validVerificationEvents(events) {
+      return events is list
+        && events.size() > 0
+        && events.size() <= 12
+        && validVerificationEvent(events[0])
+        && (events.size() < 2 || validVerificationEvent(events[1]))
+        && (events.size() < 3 || validVerificationEvent(events[2]))
+        && (events.size() < 4 || validVerificationEvent(events[3]))
+        && (events.size() < 5 || validVerificationEvent(events[4]))
+        && (events.size() < 6 || validVerificationEvent(events[5]))
+        && (events.size() < 7 || validVerificationEvent(events[6]))
+        && (events.size() < 8 || validVerificationEvent(events[7]))
+        && (events.size() < 9 || validVerificationEvent(events[8]))
+        && (events.size() < 10 || validVerificationEvent(events[9]))
+        && (events.size() < 11 || validVerificationEvent(events[10]))
+        && (events.size() < 12 || validVerificationEvent(events[11]));
+    }
+
+    function validIdentityVerification(data) {
+      return data.keys().hasOnly([
+          'userId',
+          'status',
+          'level',
+          'documents',
+          'events',
+          'submittedAt',
+          'reviewedAt',
+          'expiresAt',
+          'rejectionReason',
+          'revokedReason',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.userId is string
+        && validVerificationStatus(data.status)
+        && data.level in ['none', 'basic', 'identity_verified']
+        && validIdentityDocuments(data.documents)
+        && validVerificationEvents(data.events)
+        && (data.submittedAt == null || data.submittedAt is timestamp)
+        && (data.reviewedAt == null || data.reviewedAt is timestamp)
+        && (data.expiresAt == null || data.expiresAt is timestamp)
+        && (data.rejectionReason == null || (
+          data.rejectionReason is string
+          && data.rejectionReason.size() > 0
+          && data.rejectionReason.size() <= 500
+        ))
+        && (data.revokedReason == null || (
+          data.revokedReason is string
+          && data.revokedReason.size() > 0
+          && data.revokedReason.size() <= 500
+        ))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function identityVerificationCoreUnchanged() {
+      return request.resource.data.userId == resource.data.userId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.reviewedAt == resource.data.reviewedAt
+        && request.resource.data.expiresAt == resource.data.expiresAt
+        && request.resource.data.rejectionReason == resource.data.rejectionReason
+        && request.resource.data.revokedReason == resource.data.revokedReason;
+    }
+
+    function validAppendedVerificationEvent() {
+      let events = request.resource.data.events;
+      let previous = resource.data.events;
+      let last = events[events.size() - 1];
+      return events.size() == previous.size() + 1
+        && events[0] == previous[0]
+        && (previous.size() < 2 || events[1] == previous[1])
+        && (previous.size() < 3 || events[2] == previous[2])
+        && (previous.size() < 4 || events[3] == previous[3])
+        && (previous.size() < 5 || events[4] == previous[4])
+        && (previous.size() < 6 || events[5] == previous[5])
+        && (previous.size() < 7 || events[6] == previous[6])
+        && (previous.size() < 8 || events[7] == previous[7])
+        && (previous.size() < 9 || events[8] == previous[8])
+        && (previous.size() < 10 || events[9] == previous[9])
+        && (previous.size() < 11 || events[10] == previous[10])
+        && last.actorId == request.auth.uid
+        && last.verificationId == resource.data.userId
+        && last.actorType == 'user'
+        && last.fromStatus == 'draft'
+        && last.toStatus == 'submitted'
+        && last.status == 'submitted'
+        && last.reason == null
+        && last.createdAt == request.resource.data.submittedAt;
+    }
+
+    function validUserVerificationUpdate() {
+      return (
+          resource.data.status == 'draft'
+          && request.resource.data.status == 'draft'
+          && request.resource.data.level == 'basic'
+          && request.resource.data.events == resource.data.events
+          && request.resource.data.submittedAt == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'documents',
+            'updatedAt'
+          ])
+        ) || (
+          resource.data.status == 'draft'
+          && request.resource.data.status == 'submitted'
+          && request.resource.data.level == 'basic'
+          && request.resource.data.documents == resource.data.documents
+          && request.resource.data.submittedAt is timestamp
+          && request.resource.data.submittedAt <= request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status',
+            'events',
+            'submittedAt',
+            'updatedAt'
+          ])
+          && validAppendedVerificationEvent()
+        );
+    }
+
     function bookingCoreUnchanged() {
       return request.resource.data.bookingRequestId == resource.data.bookingRequestId
         && request.resource.data.shipmentId == resource.data.shipmentId
@@ -663,6 +879,41 @@ service cloud.firestore {
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.updatedAt == request.time
         && validNotificationPreferences(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /identityVerifications/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'draft'
+        && request.resource.data.level == 'basic'
+        && request.resource.data.documents.size() == 0
+        && request.resource.data.events.size() == 1
+        && request.resource.data.events[0].actorId == request.auth.uid
+        && request.resource.data.events[0].verificationId == request.auth.uid
+        && request.resource.data.events[0].actorType == 'user'
+        && request.resource.data.events[0].fromStatus == 'unverified'
+        && request.resource.data.events[0].toStatus == 'draft'
+        && request.resource.data.events[0].status == 'draft'
+        && request.resource.data.events[0].reason == null
+        && request.resource.data.events[0].createdAt <= request.time
+        && request.resource.data.submittedAt == null
+        && request.resource.data.reviewedAt == null
+        && request.resource.data.expiresAt == null
+        && request.resource.data.rejectionReason == null
+        && request.resource.data.revokedReason == null
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validIdentityVerification(request.resource.data);
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && resource.data.userId == request.auth.uid
+        && identityVerificationCoreUnchanged()
+        && validUserVerificationUpdate()
+        && request.resource.data.updatedAt == request.time
+        && validIdentityVerification(request.resource.data);
       allow delete: if false;
     }
 

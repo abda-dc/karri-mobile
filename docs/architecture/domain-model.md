@@ -6,7 +6,7 @@ Define the portable business vocabulary introduced in Milestone 4 and its relati
 
 ## Scope
 
-The model covers users, profiles, shipments, trips, bookings, booking requests, custody events, notifications, reviews, trust scores, configuration, and domain events.
+The model covers users, profiles, shipments, trips, bookings, booking requests, custody events, notifications, reviews, identity verification, trust scores, configuration, and domain events.
 
 ## Current implementation
 
@@ -22,6 +22,7 @@ Plain TypeScript models live under `apps/mobile/src/domain` and import no Fireba
 | `CustodyEvent` | Immutable fact appended to a booking's custody history |
 | `Notification` | Recipient-owned in-app notification record |
 | `Review` | One participant's rating of the other after a completed booking |
+| `IdentityVerification` | Provider-neutral identity workflow, metadata-only document references, and audit events |
 | `TrustScore` | Versioned result plus factor-by-factor explanations |
 | `AppConfig` | Typed non-secret operational configuration and safe defaults |
 | `DomainEvent` | A completed in-process business fact |
@@ -52,4 +53,5 @@ Move screens from compatibility aliases to service DTOs as flows adopt applicati
 - [Application Services](application-services.md)
 - [Booking State Machine](booking-state-machine.md)
 - [Custody Model](custody-model.md)
+- [Identity Verification](identity-verification.md)
 - [Database Design](../engineering/database-design.md)

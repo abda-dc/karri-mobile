@@ -17,6 +17,8 @@ Firestore uses top-level collections with explicit owner/participant IDs, finite
 | `custodyEvents` | Participants read; expected actor appends; update/delete denied |
 | `reviews` | Signed-in reads; completed-booking participant creates deterministic record; update/delete denied |
 | `notifications` | Recipient reads/marks read; validated event actor creates deterministic record |
+| `notificationPreferences` | Owner reads/writes validated channel, category, and quiet-hours settings |
+| `identityVerifications` | Owner reads; client creates/edits a draft and submits; review states are trusted-server only |
 | `trustScores` | Denied; authoritative persistence remains future work |
 
 ## Booking records
@@ -37,11 +39,17 @@ Notification IDs derive from event type, related entity, and recipient. Records 
 
 Future trusted delivery may add server-only `domainEvents`, `pushRegistrations`, and `notificationDeliveries` collections. They do not exist in the current schema or rules. Their proposed IDs, access boundaries, privacy fields, and retention are defined in [Notification Delivery](../architecture/notification-delivery.md).
 
+## Identity verification
+
+`identityVerifications/{userId}` holds one metadata-only aggregate per user. It includes the finite workflow state, derived level, allowlisted document metadata, append-only status events, and audit timestamps. Document bytes, base64, OCR output, document numbers, and public evidence URLs are not valid fields.
+
+The client may create an empty draft, edit document metadata while draft, and submit it. It may not write review states or review-only fields. Storage remains deny-all, so client records cannot claim an uploaded object yet. See [Identity Verification](../architecture/identity-verification.md).
+
 ## Time and query shapes
 
 Firestore server timestamps remain authoritative for document audit fields and custody events. Domain status-history timestamps are converted to Firestore timestamps and constrained to typed append entries.
 
-Participant booking screens run separate `senderId == uid` and `travelerId == uid` queries and merge by ID. Custody queries constrain `bookingId`; reviews constrain `bookingId` or `subjectId`; notifications constrain recipient and order newest-first.
+Participant booking screens run separate `senderId == uid` and `travelerId == uid` queries and merge by ID. Custody queries constrain `bookingId`; reviews constrain `bookingId` or `subjectId`; notifications constrain recipient and order newest-first. Identity verification uses a direct owner-document lookup and requires no collection query.
 
 ## Production hardening
 

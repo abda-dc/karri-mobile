@@ -8,3 +8,4 @@ export { FirebaseShipmentRepository } from "./FirebaseShipmentRepository";
 export { FirebaseTripRepository } from "./FirebaseTripRepository";
 export { FirebaseTrustRepository } from "./FirebaseTrustRepository";
 export { FirebaseUserRepository } from "./FirebaseUserRepository";
+export { FirebaseVerificationRepository } from "./FirebaseVerificationRepository";

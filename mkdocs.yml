@@ -90,6 +90,7 @@ nav:
       - Booking State Machine: architecture/booking-state-machine.md
       - Custody Model: architecture/custody-model.md
       - Trust Engine: architecture/trust-engine.md
+      - Identity Verification: architecture/identity-verification.md
       - Offline Strategy: architecture/offline-strategy.md
       - Remote Configuration: architecture/remote-config.md
       - ADRs:
