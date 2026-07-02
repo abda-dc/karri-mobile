@@ -32,7 +32,7 @@ Shipment timeline queries constrain `custodyEvents.shipmentId`; they read the sa
 
 ## Validation and deployment direction
 
-`firebase.json` references the versioned rules/index files and local Firestore emulator. Add Emulator Suite tests covering every allowed and denied lifecycle case. Typical reviewed deployment commands will be:
+`firebase.json` references the versioned rules/index files and local Firestore emulator. The repository-root `npm run test:rules` command starts the emulator with a demo-only project ID and runs the allow/deny suite. Typical reviewed deployment commands will be:
 
 ```powershell
 firebase deploy --only firestore:rules,firestore:indexes

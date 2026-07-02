@@ -75,7 +75,7 @@ The app has no payments, disputes, carrier integration, maps, GPS, proof upload,
 | App Check absent | Open; stage and monitor enforcement |
 | Client-orchestrated multi-party writes | Open; migrate to trusted idempotent commands |
 | Presentation Firebase imports | Closed in Milestone 11; auth bootstrap now uses `AuthSessionService` through composition |
-| Rules lack automated emulator suite | Open beta gate |
+| Rules lack automated emulator suite | Closed in Milestone 12 with 49 isolated allow/deny cases |
 | Production telemetry/redaction absent | Open before external beta growth |
 | Push persistence/delivery absent | Deferred and fail-closed |
 | Identity evidence/upload/reviewer workflow absent | Deferred and Storage deny-all |
@@ -83,7 +83,7 @@ The app has no payments, disputes, carrier integration, maps, GPS, proof upload,
 
 ## Decision
 
-Automated compilation, documentation, and Firestore rule-load checks support a controlled internal beta candidate, but they do not close the manual security gates above. External beta is not approved while the configured authentication bridge fails, rules lack allow/deny tests, and the cross-account/device/privacy gates remain open.
+Automated compilation, documentation, and the Firestore Emulator allow/deny suite support a controlled internal beta candidate, but they do not close the manual security gates above. External beta is not approved while the configured authentication bridge fails and the device/privacy gates remain open.
 
 ## Related documents
 

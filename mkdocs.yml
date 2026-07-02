@@ -117,6 +117,7 @@ nav:
       - Authorization: engineering/authorization.md
       - Security: engineering/security.md
       - Security Review: engineering/security-review.md
+      - Firestore Security Testing: engineering/firestore-security-testing.md
       - Release Hardening: engineering/release-hardening.md
       - Beta Readiness Checklist: engineering/beta-readiness-checklist.md
       - API Design: engineering/api-design.md

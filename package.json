@@ -1,0 +1,14 @@
+{
+  "name": "karri-mobile-firestore-rules-tests",
+  "private": true,
+  "scripts": {
+    "test:rules": "cross-env XDG_CONFIG_HOME=node_modules/.cache/karri-firebase-cli FIREBASE_EMULATORS_PATH=node_modules/.cache/firebase/emulators firebase emulators:exec --project demo-karri-mobile --config backend/firebase/firebase.json --only firestore \"vitest run --config backend/firebase/tests/vitest.config.ts\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.1",
+    "cross-env": "10.1.0",
+    "firebase": "12.15.0",
+    "firebase-tools": "15.22.4",
+    "vitest": "4.1.9"
+  }
+}

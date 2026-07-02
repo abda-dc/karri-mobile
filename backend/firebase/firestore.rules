@@ -392,6 +392,7 @@ service cloud.firestore {
         && (previous.size() < 9 || events[8] == previous[8])
         && (previous.size() < 10 || events[9] == previous[9])
         && (previous.size() < 11 || events[10] == previous[10])
+        && validVerificationEvent(last)
         && last.actorId == request.auth.uid
         && last.verificationId == resource.data.userId
         && last.actorType == 'user'
@@ -409,6 +410,7 @@ service cloud.firestore {
           && request.resource.data.level == 'basic'
           && request.resource.data.events == resource.data.events
           && request.resource.data.submittedAt == null
+          && validIdentityDocuments(request.resource.data.documents)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'documents',
             'updatedAt'
@@ -960,8 +962,7 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid
         && identityVerificationCoreUnchanged()
         && validUserVerificationUpdate()
-        && request.resource.data.updatedAt == request.time
-        && validIdentityVerification(request.resource.data);
+        && request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
 
