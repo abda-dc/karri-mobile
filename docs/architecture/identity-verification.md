@@ -37,6 +37,8 @@ The pure state-machine helpers answer whether a transition is valid, assert a re
 
 `IdentityVerificationService` is Firebase-free. It retrieves the current record, starts an idempotent draft, validates document metadata, submits a complete draft, exposes reviewer/system transition methods, and returns a transparent status summary. Every status change appends an event with the previous state, next state, actor type, actor ID when applicable, reason when applicable, and occurrence time.
 
+For matching, `getVisibleStatusSummary(subjectUserId, viewerUserId)` enforces the current self-only visibility boundary before any repository read. A different viewer receives `null`; the matching factor explains that identity is private and scores the missing value neutrally unless verification is explicitly required.
+
 Reviewer and system methods define the future trusted use cases; the mobile Firestore client is intentionally unable to persist them. A future server command handler can compose the same service with an administrative repository and verified reviewer identity.
 
 ## Firestore and Storage boundary

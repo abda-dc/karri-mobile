@@ -36,6 +36,19 @@ export class FirebaseTripRepository implements TripRepository {
     return snapshot.exists() ? mapTrip(snapshot) : null;
   }
 
+  async listActive(): Promise<ReadonlyArray<Trip>> {
+    const { db } = getFirebaseServices();
+    const snapshot = await getDocs(
+      query(
+        collection(db, "trips"),
+        where("status", "==", "active"),
+        orderBy("createdAt", "desc"),
+        limit(100),
+      ),
+    );
+    return snapshot.docs.map(mapTrip);
+  }
+
   async listByOwner(ownerId: string): Promise<ReadonlyArray<Trip>> {
     const { db } = getFirebaseServices();
     const snapshot = await getDocs(

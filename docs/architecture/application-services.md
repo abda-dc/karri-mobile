@@ -6,7 +6,7 @@ Define the orchestration layer between presentation, portable domain rules, repo
 
 ## Scope
 
-This document covers the implemented service foundations for shipments, trips, bookings, in-app and future push notifications, notification preferences, reviews, identity verification, trust, offline status, and typed remote configuration.
+This document covers the implemented service foundations for shipments, trips, matching, bookings, in-app and future push notifications, notification preferences, reviews, identity verification, trust, offline status, and typed remote configuration.
 
 ## Current implementation
 
@@ -15,6 +15,7 @@ This document covers the implemented service foundations for shipments, trips, b
 | `ShipmentService` | Validate and normalize a listing, persist it, publish `ShipmentCreated` |
 | `ShipmentTimelineService` | Validate a shipment identifier and list/watch its canonical shipment-linked custody events |
 | `TripService` | Validate route/date/capacity data, persist it, publish `TripCreated` |
+| `MatchingService` | Read bounded active inventory through shipment/trip services, load visible evidence through trust/identity services, apply pure factors, and return ranked explainable results with offline freshness |
 | `BookingService` | Create requests, enforce actor roles and forward transitions, coordinate request/booking persistence, publish lifecycle events |
 | `NotificationService` | Subscribe to domain events and materialize in-app notification records |
 | `PushNotificationService` | Convert a canonical in-app notification identity and semantic action into a content-free provider-neutral delivery request; current gateway returns deferred |
@@ -37,6 +38,8 @@ Tracking uses `ShipmentTimelineService` for sender-owned shipment projections an
 Push delivery remains inert: no domain-event handler calls `PushNotificationService`. Registration is separately user-initiated from Profile through `PushRegistrationService` and an Expo Infrastructure adapter. It can request permission/acquire a token in a configured native build, but trusted persistence returns deferred and no sender exists. The real delivery gateway must run in trusted server code.
 
 Preference reads and writes use the domain-owned `NotificationPreferenceRepository` port. The Firebase adapter may store a self-scoped preference document, but neither the service nor repository starts delivery. Email and SMS remain disabled placeholders, and stored push preference is not platform permission.
+
+`MatchingService` is intentionally not composed into presentation yet. Its `findMatches` path reuses `ShipmentService.listActive`, `TripService.listActive`, `TrustService`, the privacy-preserving identity summary method, and `OfflineService.getStatus`. Its `evaluate` path supports already-loaded domain records and evidence without persistence.
 
 ## Design principles
 
@@ -70,6 +73,7 @@ Zustand remains deferred. Screens use thin local state and service-backed realti
 - [Event Bus](event-bus.md)
 - [Notification Delivery](notification-delivery.md)
 - [Identity Verification](identity-verification.md)
+- [Matching Engine](matching-engine.md)
 - [Shipment Timeline](shipment-timeline.md)
 - [Mobile Architecture](../engineering/mobile-architecture.md)
 - [API Design](../engineering/api-design.md)

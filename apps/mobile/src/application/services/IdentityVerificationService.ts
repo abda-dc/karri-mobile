@@ -269,6 +269,15 @@ export class IdentityVerificationService {
     };
   }
 
+  async getVisibleStatusSummary(
+    subjectUserId: string,
+    viewerUserId: string,
+  ): Promise<IdentityVerificationStatusSummary | null> {
+    const subject = this.requireUserId(subjectUserId);
+    const viewer = this.requireUserId(viewerUserId);
+    return subject === viewer ? this.getStatusSummary(subject) : null;
+  }
+
   private async reviewTransition(
     userId: string,
     reviewerId: string,

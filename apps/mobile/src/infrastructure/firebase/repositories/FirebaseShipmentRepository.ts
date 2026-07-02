@@ -37,6 +37,19 @@ export class FirebaseShipmentRepository implements ShipmentRepository {
     return snapshot.exists() ? mapShipment(snapshot) : null;
   }
 
+  async listActive(): Promise<ReadonlyArray<Shipment>> {
+    const { db } = getFirebaseServices();
+    const snapshot = await getDocs(
+      query(
+        collection(db, "shipments"),
+        where("status", "==", "active"),
+        orderBy("createdAt", "desc"),
+        limit(100),
+      ),
+    );
+    return snapshot.docs.map(mapShipment);
+  }
+
   async listByOwner(ownerId: string): Promise<ReadonlyArray<Shipment>> {
     const { db } = getFirebaseServices();
     const snapshot = await getDocs(

@@ -6,7 +6,7 @@ Define the portable business vocabulary introduced in Milestone 4 and its relati
 
 ## Scope
 
-The model covers users, profiles, shipments, trips, bookings, booking requests, custody events, notifications, reviews, identity verification, trust scores, configuration, and domain events.
+The model covers users, profiles, shipments, trips, matching results, bookings, booking requests, custody events, notifications, reviews, identity verification, trust scores, configuration, and domain events.
 
 ## Current implementation
 
@@ -17,6 +17,7 @@ Plain TypeScript models live under `apps/mobile/src/domain` and import no Fireba
 | `User`, `Profile` | Account and marketplace-role data used by repository contracts |
 | `Shipment` | Sender-owned package listing and corridor request |
 | `Trip` | Traveler-owned route and capacity listing |
+| `MatchScore`, `MatchReason`, `MatchResult`, `MatchFilter` | Explainable provider-neutral ranking, evidence, eligibility, and query controls |
 | `BookingRequest` | The sender's proposal to a traveler |
 | `Booking` | The authoritative finite lifecycle from pending through a terminal state |
 | `CustodyEvent` | Immutable fact appended to a booking's custody history and, for new records, linked to its shipment timeline |
@@ -47,7 +48,7 @@ Move screens from compatibility aliases to service DTOs as flows adopt applicati
 ## Out of scope
 
 - ORM entities, Firestore converters, React hooks, and screen state.
-- Payment, dispute, chat, or matching-ranking models.
+- Payment, dispute, or chat models.
 - Legal or safety guarantees inferred from a TypeScript type.
 
 ## Related documents
@@ -57,5 +58,6 @@ Move screens from compatibility aliases to service DTOs as flows adopt applicati
 - [Booking State Machine](booking-state-machine.md)
 - [Custody Model](custody-model.md)
 - [Shipment Timeline](shipment-timeline.md)
+- [Matching Engine](matching-engine.md)
 - [Identity Verification](identity-verification.md)
 - [Database Design](../engineering/database-design.md)

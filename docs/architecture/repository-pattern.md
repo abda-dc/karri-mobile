@@ -16,6 +16,8 @@ Firebase implementations live under `apps/mobile/src/infrastructure/firebase/rep
 
 Firebase adapters now power realtime shipment/trip, participant booking and booking-request, custody, review, and notification flows. `FirebaseCustodyRepository` also provides read-only shipment timeline queries over the same events; there is no duplicate timeline collection. Firestore rules permit only documented actor/state operations and keep custody/review destructive writes and trust-score persistence denied. Production sensitive commands remain a Cloud Functions responsibility.
 
+Shipment and trip repository ports expose bounded one-shot active-list reads in addition to realtime watches. `MatchingService` consumes those methods through `ShipmentService` and `TripService`; it never imports or constructs a Firestore query.
+
 ## Design principles
 
 - Interfaces express business persistence needs, not Firestore operations.

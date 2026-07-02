@@ -44,6 +44,7 @@ export const initialOfflineStatus: OfflineStatus = {
 };
 
 export interface OfflineStatusGateway {
+  getStatus(): OfflineStatus;
   retryPendingWrites(): Promise<void>;
   trackWrite<T>(operation: () => Promise<T>): Promise<T>;
   watchStatus(onData: (status: OfflineStatus) => void): () => void;
@@ -54,6 +55,10 @@ export class OfflineService {
 
   watchStatus(onData: (status: OfflineStatus) => void): () => void {
     return this.gateway.watchStatus(onData);
+  }
+
+  getStatus(): OfflineStatus {
+    return this.gateway.getStatus();
   }
 
   retryPendingWrites(): Promise<void> {

@@ -47,6 +47,7 @@ The roadmap is outcome-based. Dates should be added only after team capacity and
 **Outcome:** reliable history improves decisions and repeat use without overstating safety.
 
 - Explainable trust-score summary based on verified signals.
+- Provider-neutral explainable matching foundation, with presentation adoption and trusted public evidence deferred to a reviewed follow-up.
 - Feature flags and Remote Config rollout controls.
 - Corridor-specific categories, capacity guidance, and prohibited-item content.
 - Localization and accessibility validation.

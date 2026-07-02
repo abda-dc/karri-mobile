@@ -32,6 +32,11 @@ export class FirebaseOfflineStatusGateway implements OfflineStatusGateway {
     this.backgroundErrorReporter = reporter;
   }
 
+  getStatus(): OfflineStatus {
+    this.start();
+    return this.status;
+  }
+
   watchStatus(onData: (status: OfflineStatus) => void): () => void {
     this.start();
     this.observers.add(onData);

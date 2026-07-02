@@ -65,6 +65,10 @@ export class TripService {
     return this.trips.findById(tripId);
   }
 
+  listActive(): Promise<ReadonlyArray<Trip>> {
+    return this.trips.listActive();
+  }
+
   watchOwned(
     ownerId: string,
     onData: (trips: ReadonlyArray<Trip>) => void,

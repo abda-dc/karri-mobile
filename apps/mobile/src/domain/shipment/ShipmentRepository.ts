@@ -3,6 +3,7 @@ import type { NewShipment, Shipment } from "./Shipment";
 export interface ShipmentRepository {
   create(shipment: NewShipment): Promise<Shipment>;
   findById(shipmentId: string): Promise<Shipment | null>;
+  listActive(): Promise<ReadonlyArray<Shipment>>;
   listByOwner(ownerId: string): Promise<ReadonlyArray<Shipment>>;
   watchByOwner(
     ownerId: string,

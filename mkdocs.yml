@@ -90,6 +90,7 @@ nav:
       - Event Bus: architecture/event-bus.md
       - Booking State Machine: architecture/booking-state-machine.md
       - Shipment Timeline: architecture/shipment-timeline.md
+      - Matching Engine: architecture/matching-engine.md
       - Custody Model: architecture/custody-model.md
       - Trust Engine: architecture/trust-engine.md
       - Identity Verification: architecture/identity-verification.md

@@ -47,6 +47,8 @@ The identity domain derives these levels from its state machine. Starting verifi
 
 The presentation filters reviews-only explanations to evidence actually visible in that scope. Empty completed-delivery and review history displays `New` instead of a punitive `0/100` badge.
 
+`MatchingService` consumes this same scope-aware summary for two separately named ranking factors: the bounded visible trust score and the visible completed-delivery count. It does not request broader evidence or treat either factor as authorization.
+
 ## Authority boundary
 
 The current value is an on-device MVP projection. It is useful for validating the formula and explainability, but it is not an authoritative persisted reputation record. Firestore denies client access to `trustScores`, and clients cannot write the reserved profile trust field.

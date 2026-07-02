@@ -60,6 +60,10 @@ export class ShipmentService {
     return this.shipments.findById(shipmentId);
   }
 
+  listActive(): Promise<ReadonlyArray<Shipment>> {
+    return this.shipments.listActive();
+  }
+
   watchOwned(
     ownerId: string,
     onData: (shipments: ReadonlyArray<Shipment>) => void,

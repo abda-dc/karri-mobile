@@ -17,6 +17,8 @@ Firebase Authentication persists the mobile session through AsyncStorage. Firest
 
 `FirebaseOfflineStatusGateway` owns one app-lifetime Expo Network listener. All Firebase repository writes pass through its write tracker, which records pending acknowledgements, marks writes taking longer than 1.5 seconds, and surfaces failures. `OfflineService` and `useOfflineStatus` expose provider-neutral state to the shared screen shell; screens never import Expo Network or Firestore.
 
+The gateway also exposes its current provider-neutral status synchronously through `OfflineService.getStatus`. Matching uses that snapshot only to label a successful ranking result as live, cached, or unknown. It does not convert a failed read into a successful result or claim native cache durability.
+
 Firestore remains the mutation queue. The app does not replay mutations in a second custom queue. On reconnect, the gateway re-enables Firestore networking and waits for writes already accepted by the SDK to reach the backend. Realtime listeners then reconcile server state through the Phase 1 subscriptions.
 
 ## User-visible behavior
