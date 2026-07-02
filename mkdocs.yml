@@ -120,6 +120,7 @@ nav:
       - Firestore Security Testing: engineering/firestore-security-testing.md
       - Release Hardening: engineering/release-hardening.md
       - Beta Readiness Checklist: engineering/beta-readiness-checklist.md
+      - Production Deployment Transition: engineering/production-deployment-transition.md
       - API Design: engineering/api-design.md
       - Event Architecture: engineering/event-architecture.md
       - Push Notification Testing: engineering/push-notification-testing.md

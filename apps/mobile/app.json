@@ -1,15 +1,17 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "Karri Mobile",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.karri.mobile"
     },
     "android": {
+      "package": "com.karri.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -30,6 +32,13 @@
           "enableBackgroundRemoteNotifications": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b73a2031-8f5f-4f59-8222-e999d115b6cb"
+      }
+    },
+    "owner": "abda.dc"
   }
 }
