@@ -38,11 +38,13 @@ sequenceDiagram
     K-->>T: Notify traveler
     T->>K: Accept or decline
     K-->>S: Record and notify decision
-    T->>K: Confirm pickup with evidence
-    K-->>S: Record custody event
+    T->>K: Confirm pickup
+    K-->>S: Record custody transfer and in-app update
     T->>K: Confirm destination handoff
     K-->>S: Record delivery
     S->>K: Confirm/review eligible journey
 ```
 
-Every future step needs explicit failure, cancellation, and support paths before implementation.
+At every step, both participants can open Tracking to see current booking/shipment status, participant roles, the signed-in user's identity badge, compact visible trust evidence, the recommended next action, custody summary, shipment timeline, and combined Activity Feed. Booking, custody, and review controls remain authorized by application/domain rules rather than the card copy.
+
+The experience does not include payments, disputes, GPS, maps, proof of delivery, photos, admin workflows, or carrier data.

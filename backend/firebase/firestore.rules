@@ -863,6 +863,16 @@ service cloud.firestore {
                 && get(
                   /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
                 ).data.status == 'cancelled')
+              || (request.resource.data.type == 'shipment.completed'
+                && request.auth.uid == get(
+                  /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                ).data.senderId
+                && request.resource.data.userId == get(
+                  /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                ).data.travelerId
+                && get(
+                  /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
+                ).data.status == 'completed')
               || (((request.resource.data.type == 'package.picked_up'
                     && get(
                       /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)

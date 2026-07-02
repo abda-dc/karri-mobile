@@ -33,12 +33,16 @@ const templates: Partial<Record<PlatformEventType, NotificationTemplate>> = {
     body: "The booking request expired before acceptance.",
   },
   "package.picked_up": {
-    title: "Package picked up",
-    body: "The package is now in transit.",
+    title: "Shipment picked up",
+    body: "Custody was transferred and the shipment is now in transit.",
   },
   "package.delivered": {
-    title: "Package delivered",
-    body: "The package was marked delivered.",
+    title: "Shipment delivered",
+    body: "The shipment was marked delivered.",
+  },
+  "shipment.completed": {
+    title: "Shipment completed",
+    body: "The sender completed the shipment journey.",
   },
   "review.submitted": {
     title: "Review received",

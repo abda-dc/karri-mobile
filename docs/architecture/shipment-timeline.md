@@ -45,6 +45,12 @@ Airport departure and arrival are optional informational milestones. If arrival 
 
 `custodyStateMachine.ts` centralizes duplicate prevention and next-event validation for application use. Booking status rules still authorize who may cause the corresponding lifecycle action. Firestore independently checks authenticated participation, expected actor and booking state, deterministic event ID, shipment/booking linkage, allowlisted metadata, server time, and required predecessor events.
 
+## Operational UI integration
+
+Milestone 8 Phase 2 renders the projection through `ShipmentTimelineCard` and reuses each event in `ActivityFeed`. `CustodySummaryCard` derives its current wording from the newest projected event. None of these components write a new status or timeline record.
+
+For senders, `BookingDetailCard` watches `ShipmentTimelineService.watchByShipment` and keeps only the current booking's events. For travelers, it uses the participant-safe `CustodyService.watchByBooking` path and narrows shipment-linked records with `isShipmentLifecycleEvent`. Both roles retain a booking-scoped custody watch for the summary and feed, including compatible historical events without `shipmentId`. This preserves the authorization boundary described below.
+
 ## Compatibility and limitations
 
 Existing custody documents may not have `shipmentId`; the mapper reads those records with `shipmentId: null`, so booking-scoped timelines remain compatible. Shipment-level queries return only new records that carry the field. No automatic backfill is attempted in this milestone.
@@ -55,7 +61,6 @@ This remains a client-orchestrated MVP boundary. Cloud Function transactions, id
 
 ## Out of scope
 
-- UI work or a new tracking screen.
 - Payments, disputes, GPS, maps, proof of delivery, signatures, evidence uploads, admin tooling, or carrier integrations.
 - A second shipment status machine or a second timeline collection.
 - Destructive custody edits or deletes.

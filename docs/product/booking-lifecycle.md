@@ -29,9 +29,19 @@ Expired remains a trusted-system state with no current client action.
 - Request and booking outcomes change together in a Firestore batch.
 - Deterministic shipment/trip booking IDs prevent duplicate requests for the same pair.
 
-## Tracking experience
+## Operational booking experience
 
-The Tracking tab uses a single service-level activity subscription for participant bookings and their booking requests. It displays current request status/message, booking status, sender/traveler IDs, shipment and trip summaries, next expected action, append-only status history, custody timeline, trust context, and eligible actions. Completed bookings expose one review form per participant.
+The Tracking tab uses a service-level activity subscription for participant bookings and requests, then composes related data through application services. Each booking now presents:
+
+- booking status and request note;
+- sender/traveler roles and the signed-in participant's self-readable identity badge;
+- shipment, route, schedule, listing, and current operational status;
+- a compact visible trust summary for the other participant;
+- the recommended next action and only the role-eligible controls;
+- custody summary, shipment timeline, and a combined activity feed;
+- one review form per participant after completion.
+
+The screen does not infer another participant's private verification state. Other-user trust remains limited to the evidence scope returned by `TrustService`.
 
 ## Current trust boundary
 

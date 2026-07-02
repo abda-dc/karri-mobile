@@ -28,7 +28,7 @@ apps/mobile/
     infrastructure/expo/notifications/  Explicit native permission/token adapter
     infrastructure/logging/          Replaceable diagnostics adapter
     presentation/
-      components/                    Booking and trust composed views
+      components/                    Reusable booking, shipment, custody, timeline, activity, identity, and trust views
       errors/                        Provider-neutral user messages
       hooks/                         Auth/offline bridges plus push/preference foundations
       services/                      Singleton mobile service composition
@@ -38,7 +38,7 @@ apps/mobile/
 
 - Home watches active listings through `ShipmentService`/`TripService` and calls `BookingService.request`.
 - Send and Travel create and watch owner listings through services.
-- Tracking uses one combined `BookingService` subscription for participant bookings and booking requests, composes shipment/trip/custody/review detail, and calls booking/custody/review services.
+- Tracking uses one combined `BookingService` subscription for participant bookings and requests plus one recipient-scoped `NotificationService` subscription. `BookingDetailCard` composes shipment/trip/review data, sender-safe shipment timeline or traveler-safe booking custody watches, self-readable identity state, visible trust evidence, and authorized booking/custody/review commands.
 - Profile watches bookings and in-app notifications and requests trust summaries.
 - The shared `Screen` shell consumes `useOfflineStatus` and displays offline, queued, syncing, or failed-write state without provider imports.
 - Presentation reports caught failures through `ApplicationErrorService`; screens receive safe category-specific messages while Firebase codes and original exceptions remain diagnostic-only.
@@ -57,7 +57,7 @@ Realtime Firestore snapshots feed small screen-local arrays. Tracking's combined
 - Domain/application code remains Firebase-free.
 - Service and repository watches return explicit unsubscribe callbacks.
 - Expo web uses IndexedDB-backed Firestore persistence; native Expo uses an honest memory-only queue that does not survive process termination.
-- Booking status and custody timelines distinguish stored facts from planned actions.
+- Booking status, shipment timeline, custody summary, and Activity Feed distinguish stored facts from planned actions. The feed is a presentation projection, not a persistence model.
 - Mobile business operations and asynchronous notification effects are not one atomic server transaction.
 - Registration availability is `available` only in Android/iOS builds with an EAS project ID. An explicit action may request/acquire a token, but trusted persistence remains deferred; tokens are not displayed/logged and semantic routes are resolved without execution.
 - Preference persistence does not activate a channel. Push defaults off, Email/SMS are enforced placeholders, and quiet hours are stored but not evaluated by any delivery runtime.

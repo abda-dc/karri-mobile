@@ -64,6 +64,7 @@ nav:
       - Product Requirements: product/product-requirements-document.md
       - Personas: product/personas.md
       - User Journeys: product/user-journeys.md
+      - Activity Feed: product/activity-feed.md
       - Booking Lifecycle: product/booking-lifecycle.md
       - Chain of Custody: product/chain-of-custody.md
       - Matching Engine: product/matching-engine.md

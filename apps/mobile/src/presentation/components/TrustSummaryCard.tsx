@@ -22,6 +22,7 @@ interface TrustSummaryCardProps {
   readonly bookings?: ReadonlyArray<Booking>;
   readonly compact?: boolean;
   readonly refreshKey?: string | number;
+  readonly onSummaryLoaded?: (summary: TrustSummary) => void;
   readonly title?: string;
   readonly userId: string;
   readonly verificationLevel?: IdentityVerificationLevelValue;
@@ -115,6 +116,7 @@ export function TrustSummaryCard({
   accountCreatedAt,
   bookings,
   compact = false,
+  onSummaryLoaded,
   refreshKey,
   title = "Trust summary",
   userId,
@@ -141,6 +143,7 @@ export function TrustSummaryCard({
       .then((nextSummary) => {
         if (active) {
           setSummary(nextSummary);
+          onSummaryLoaded?.(nextSummary);
           setLoading(false);
         }
       })
@@ -156,7 +159,7 @@ export function TrustSummaryCard({
     return () => {
       active = false;
     };
-  }, [accountCreatedAt, bookings, refreshKey, userId, verificationLevel]);
+  }, [accountCreatedAt, bookings, onSummaryLoaded, refreshKey, userId, verificationLevel]);
 
   if (loading) {
     return (
@@ -216,6 +219,11 @@ export function TrustSummaryCard({
       </View>
 
       <View style={styles.factors}>
+        {compact ? (
+          <Text style={styles.factor}>
+            Visible factors: completed delivery history and eligible reviews
+          </Text>
+        ) : null}
         <Text style={styles.factor}>Completed deliveries: {summary.inputs.completedDeliveries}</Text>
         <Text style={styles.factor}>
           Average review: {summary.inputs.averageReview?.toFixed(1) ?? "No reviews"}

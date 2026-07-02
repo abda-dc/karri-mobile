@@ -14,7 +14,10 @@ Implemented mappings:
 | `booking.cancelled` | Other participant (currently traveler) |
 | `package.picked_up` | Sender |
 | `package.delivered` | Sender |
+| `shipment.completed` | Traveler |
 | `review.submitted` | Reviewee |
+
+Operational wording treats `package.picked_up` as the existing custody-transfer and in-transit update. Phase 2 adds the completion mapping through the same in-app event/template pipeline. No new push, email, SMS, or provider delivery path is introduced. Recipient-scoped booking notifications also appear in the Tracking Activity Feed.
 
 Booking expiration has a template but no current client command. Shipment/trip creation events do not generate notifications.
 

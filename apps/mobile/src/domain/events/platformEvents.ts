@@ -26,6 +26,7 @@ export type BookingCancelled = DomainEvent<"booking.cancelled", ParticipantPaylo
 export type BookingExpired = DomainEvent<"booking.expired", ParticipantPayload>;
 export type PackagePickedUp = DomainEvent<"package.picked_up", ParticipantPayload>;
 export type PackageDelivered = DomainEvent<"package.delivered", ParticipantPayload>;
+export type ShipmentCompleted = DomainEvent<"shipment.completed", ParticipantPayload>;
 export type ReviewSubmitted = DomainEvent<
   "review.submitted",
   ParticipantPayload & { readonly revieweeId: string }
@@ -41,6 +42,7 @@ export type PlatformDomainEvent =
   | BookingExpired
   | PackagePickedUp
   | PackageDelivered
+  | ShipmentCompleted
   | ReviewSubmitted;
 
 export type PlatformEventType = PlatformDomainEvent["type"];

@@ -30,7 +30,7 @@ This document covers the implemented service foundations for shipments, trips, b
 
 Services import repository interfaces and domain types; they do not import Firestore. A singleton presentation composition now injects Firebase adapters and the event bus. Home, Send, Travel, Tracking, and Profile use the service layer. Profile's read-only identity-verification hook calls `IdentityVerificationService` through that composition and never imports the Firebase repository directly.
 
-The shipment timeline service is composed for future use but does not add or change any screen in Milestone 8.
+Tracking uses `ShipmentTimelineService` for sender-owned shipment projections and the booking-scoped `CustodyService` path for travelers. Both paths render the same canonical custody events and do not create a second lifecycle.
 
 `TrustService.getVisibleSummary` currently returns a client-calculated display projection. Profile may supply the current user's participant history, account creation time, and self-readable identity level. Other-user summaries use visible review evidence only. Authoritative persistence remains denied and requires a future trusted server projection with durable evidence references.
 
@@ -55,7 +55,7 @@ Zustand remains deferred. Screens use thin local state and service-backed realti
 
 ## Out of scope
 
-- UI rewrites or new routes.
+- New routes or a replacement navigation architecture.
 - Direct Firestore access from services.
 - A giant global store or speculative store scaffolding.
 - Cloud Function deployment in this milestone.

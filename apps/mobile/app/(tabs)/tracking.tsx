@@ -1,8 +1,7 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { Banner } from "../../src/components/Banner";
-import { Card } from "../../src/components/Card";
 import { EmptyState } from "../../src/components/EmptyState";
 import { LoadingState } from "../../src/components/LoadingState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
@@ -11,16 +10,21 @@ import { SectionHeader } from "../../src/components/SectionHeader";
 import { StatusChip } from "../../src/components/StatusChip";
 import { TrustBadge } from "../../src/components/TrustBadge";
 import type { Booking, BookingRequest } from "../../src/domain/booking/Booking";
+import type { Notification } from "../../src/domain/notification/Notification";
 import { BookingDetailCard } from "../../src/presentation/components/BookingDetailCard";
 import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
+import { useIdentityVerification } from "../../src/presentation/hooks/useIdentityVerification";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
-import { colors, spacing, typography } from "../../src/theme/tokens";
+import { spacing } from "../../src/theme/tokens";
 
 export default function TrackingScreen() {
   const auth = useAuthSession();
+  const identity = useIdentityVerification(auth.user?.uid ?? null);
   const [bookings, setBookings] = useState<ReadonlyArray<Booking>>([]);
   const [bookingRequests, setBookingRequests] = useState<ReadonlyArray<BookingRequest>>([]);
+  const [notifications, setNotifications] = useState<ReadonlyArray<Notification>>([]);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +63,31 @@ export default function TrackingScreen() {
     }
   }, [auth.loading, auth.user]);
 
+  useEffect(() => {
+    if (auth.loading) return;
+    if (!auth.user) {
+      setNotifications([]);
+      setNotificationError(null);
+      return;
+    }
+
+    try {
+      return mobileServices.notification.watchForRecipient(
+        auth.user.uid,
+        setNotifications,
+        (watchError) =>
+          setNotificationError(
+            reportFriendlyError(watchError, "tracking.watch-notifications"),
+          ),
+      );
+    } catch (watchError) {
+      setNotificationError(
+        reportFriendlyError(watchError, "tracking.start-notification-watch"),
+      );
+      return;
+    }
+  }, [auth.loading, auth.user]);
+
   const requestsById = useMemo(
     () => new Map(bookingRequests.map((request) => [request.id, request])),
     [bookingRequests],
@@ -92,6 +121,17 @@ export default function TrackingScreen() {
       ) : null}
 
       {error ? <Banner message={error} title="Bookings could not load" variant="error" /> : null}
+      {identity.error ? (
+        <Banner compact message={identity.error} title="Identity status unavailable" variant="warning" />
+      ) : null}
+      {notificationError ? (
+        <Banner
+          compact
+          message={notificationError}
+          title="Activity notifications unavailable"
+          variant="warning"
+        />
+      ) : null}
 
       {!loading && auth.user && !error && bookings.length === 0 ? (
         <EmptyState
@@ -114,6 +154,8 @@ export default function TrackingScreen() {
               booking={booking}
               bookingRequest={requestsById.get(booking.bookingRequestId)}
               currentUserId={auth.user!.uid}
+              identityVerification={identity.verification}
+              notifications={notifications}
             />
           ))}
         </View>
@@ -128,9 +170,5 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: spacing.xl,
-  },
-  muted: {
-    color: colors.textSecondary,
-    ...typography.caption,
   },
 });

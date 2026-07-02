@@ -18,6 +18,7 @@ import {
   type PackageDelivered,
   type PackagePickedUp,
   type PlatformDomainEvent,
+  type ShipmentCompleted,
 } from "../../domain/events/platformEvents";
 import { ListingStatus } from "../../domain/shipment/Shipment";
 import type { ShipmentRepository } from "../../domain/shipment/ShipmentRepository";
@@ -359,6 +360,12 @@ export class BookingService {
           type: "package.delivered",
           ...common,
           payload: { recipientIds: [booking.senderId] },
+        });
+      case BookingStatus.Completed:
+        return createPlatformEvent<ShipmentCompleted>({
+          type: "shipment.completed",
+          ...common,
+          payload: { recipientIds: [booking.travelerId] },
         });
       default:
         return null;

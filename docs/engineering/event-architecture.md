@@ -4,7 +4,7 @@
 
 Application services publish typed completed facts to one synchronous in-memory `EventBus` created by the mobile composition root. `NotificationService` subscribes once and materializes Firestore in-app notifications.
 
-Current events are `shipment.created`, `trip.created`, `booking.requested`, `booking.accepted`, `booking.declined`, `booking.cancelled`, `booking.expired`, `package.picked_up`, `package.delivered`, and `review.submitted`. Notification handlers subscribe only to booking, package, and review events required by Milestone 5.
+Current events are `shipment.created`, `trip.created`, `booking.requested`, `booking.accepted`, `booking.declined`, `booking.cancelled`, `booking.expired`, `package.picked_up`, `package.delivered`, `shipment.completed`, and `review.submitted`. Notification handlers subscribe only to the booking, shipment/package, and review events with an implemented in-app template.
 
 ```json
 {

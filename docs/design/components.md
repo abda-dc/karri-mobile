@@ -57,3 +57,17 @@ Empty states explain why nothing is shown and offer one next action when availab
 ## SectionHeader
 
 Use section headers for hierarchy within a screen or card. An eyebrow gives context, the title names the task, the subtitle explains it, and the action slot holds only compact actions or status.
+
+## Operational booking components
+
+Milestone 8 Phase 2 adds composed components under `src/presentation/components`:
+
+- `BookingStatusCard`: booking/request state, participant roles, and the signed-in participant's identity badge.
+- `ShipmentStatusCard`: route, package, trip, listing state, and booking-derived operational status.
+- `CustodySummaryCard`: latest canonical custody event and plain-language responsibility summary.
+- `ShipmentTimelineCard`: oldest-to-newest shipment history projected from custody.
+- `ActivityFeed`: newest-first booking, shipment, custody, identity, trust, and in-app notification activity.
+- `TimelineEventRow`: shared icon, title, explanation, time, and optional actor layout.
+- `NextActionCard`: role-aware guidance derived from booking state; it does not authorize commands.
+
+Keep trust compact inside the operational flow. Identity badges display only self-readable verification state, and trust summaries must preserve the evidence scope returned by the application service.
