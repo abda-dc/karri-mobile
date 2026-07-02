@@ -2,9 +2,9 @@
 
 ## Current foundation
 
-Karri now has a provider-neutral, explainable matching engine in the domain and application layers. It ranks active shipment/trip pairs without storing a second match record or importing Firebase into business logic.
+Karri has a provider-neutral, explainable matching engine in the domain and application layers. It ranks active shipment/trip pairs without storing a second match record or importing Firebase into business logic.
 
-The existing Home screen is intentionally unchanged and still shows its exact-corridor possible matches. A later presentation phase may adopt `MatchingService`; this milestone does not silently change what users see or which bookings they can request.
+Milestone 9B composes the service into Send and Travel. Each active shipment receives a recommended-trip section, and each active trip receives a recommended-shipment section. Home remains unchanged, and recommendations do not add or alter booking actions.
 
 ## Ranked result
 
@@ -24,7 +24,7 @@ Ranking sorts by total score, then route points, departure date, and stable pair
 
 ## Filters and eligibility
 
-`MatchFilter` supports shipment/trip ID selection, minimum score, result limit, exact-route/capacity/timing/identity/package requirements, same-owner policy, category allow/block lists, and maximum timing gap. Defaults remain conservative:
+`MatchFilter` supports shipment/trip ID selection, minimum score, result limit, exact-route/capacity/timing/identity/package requirements, same-owner policy, category allow/block lists, and maximum timing gap. Grouped service queries apply the maximum result count independently to each owned shipment or trip. Defaults remain conservative:
 
 - active listings only;
 - different sender and traveler;
@@ -46,10 +46,10 @@ This is decision support, not a safety claim or authorization rule. Trust, ident
 
 ## Deliberate limits
 
-- No presentation changes, automatic booking, persisted match collection, or analytics event.
+- No automatic booking, persisted match collection, or analytics event.
 - No geospatial distance, nearby airports, maps, GPS, AI/ML model, or personalization.
 - No inference from free-form trip notes or package descriptions.
 - No authoritative public identity/trust projection or server-side ranking yet.
 - Booking authorization still uses the existing booking/domain/rules boundary; a score never authorizes a request.
 
-See [Matching Engine Architecture](../architecture/matching-engine.md), [Trust Engine](../architecture/trust-engine.md), and [Identity Verification](../architecture/identity-verification.md).
+See [Discovery Experience](discovery-experience.md), [Matching Engine Architecture](../architecture/matching-engine.md), [Trust Engine](../architecture/trust-engine.md), and [Identity Verification](../architecture/identity-verification.md).

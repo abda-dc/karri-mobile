@@ -71,3 +71,16 @@ Milestone 8 Phase 2 adds composed components under `src/presentation/components`
 - `NextActionCard`: role-aware guidance derived from booking state; it does not authorize commands.
 
 Keep trust compact inside the operational flow. Identity badges display only self-readable verification state, and trust summaries must preserve the evidence scope returned by the application service.
+
+## Matching discovery components
+
+Milestone 9B adds reusable composed components under `src/presentation/components`:
+
+- `MatchCard`: route, counterpart summary, score, eligibility, freshness, factors, and decision-support disclaimer.
+- `MatchScoreBadge`: accessible score out of 100 with visual strength bands that do not change the formula.
+- `MatchReasonList`: plain-language factor reasons with positive, neutral, cautionary, or blocking markers.
+- `MatchFiltersCard`: controlled minimum score, verified-only, eligible-only, maximum-results, and package-category filters with validation.
+- `RecommendedMatchesSection`: per-listing loading, error, count, empty, and recommendation-card composition.
+- `EmptyMatchState`: filter-aware empty copy for shipment or trip discovery.
+
+Components consume `MatchResult`; they do not recalculate points, infer eligibility, query Firebase, or create bookings. Cached and unknown freshness must remain visible rather than being styled as live.

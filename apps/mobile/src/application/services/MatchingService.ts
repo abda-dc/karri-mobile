@@ -30,6 +30,42 @@ export class MatchingService {
     input: Partial<MatchFilter> = {},
   ): Promise<ReadonlyArray<MatchResult>> {
     const filter = createMatchFilter(input);
+    return (await this.rankMatches(filter)).slice(0, filter.maximumResults);
+  }
+
+  async findMatchesForShipments(
+    shipmentIds: ReadonlyArray<string>,
+    input: Partial<MatchFilter> = {},
+  ): Promise<ReadonlyMap<string, ReadonlyArray<MatchResult>>> {
+    const filter = createMatchFilter({ ...input, shipmentIds });
+    const matches = await this.rankMatches(filter);
+    return new Map(
+      filter.shipmentIds.map((shipmentId) => [
+        shipmentId,
+        matches
+          .filter((match) => match.shipment.id === shipmentId)
+          .slice(0, filter.maximumResults),
+      ]),
+    );
+  }
+
+  async findMatchesForTrips(
+    tripIds: ReadonlyArray<string>,
+    input: Partial<MatchFilter> = {},
+  ): Promise<ReadonlyMap<string, ReadonlyArray<MatchResult>>> {
+    const filter = createMatchFilter({ ...input, tripIds });
+    const matches = await this.rankMatches(filter);
+    return new Map(
+      filter.tripIds.map((tripId) => [
+        tripId,
+        matches
+          .filter((match) => match.trip.id === tripId)
+          .slice(0, filter.maximumResults),
+      ]),
+    );
+  }
+
+  private async rankMatches(filter: MatchFilter): Promise<ReadonlyArray<MatchResult>> {
     const status = this.offline.getStatus();
     const [shipments, trips] = await Promise.all([
       this.shipments.listActive(),
@@ -56,8 +92,7 @@ export class MatchingService {
     return matches
       .filter((match) => !filter.eligibleOnly || match.eligible)
       .filter((match) => match.score.total >= filter.minimumScore)
-      .sort(compareMatches)
-      .slice(0, filter.maximumResults);
+      .sort(compareMatches);
   }
 
   evaluate(

@@ -39,7 +39,7 @@ Push delivery remains inert: no domain-event handler calls `PushNotificationServ
 
 Preference reads and writes use the domain-owned `NotificationPreferenceRepository` port. The Firebase adapter may store a self-scoped preference document, but neither the service nor repository starts delivery. Email and SMS remain disabled placeholders, and stored push preference is not platform permission.
 
-`MatchingService` is intentionally not composed into presentation yet. Its `findMatches` path reuses `ShipmentService.listActive`, `TripService.listActive`, `TrustService`, the privacy-preserving identity summary method, and `OfflineService.getStatus`. Its `evaluate` path supports already-loaded domain records and evidence without persistence.
+`MatchingService` is composed once in `mobileServices` from the existing shipment, trip, trust, identity, and offline service instances. Send uses `findMatchesForShipments`; Travel uses `findMatchesForTrips`. Both grouped paths keep filtering, ranking, eligibility, and per-listing truncation in the application/domain layers. `evaluate` still supports already-loaded domain records and evidence without persistence.
 
 ## Design principles
 

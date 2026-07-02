@@ -10,6 +10,8 @@
 6. Firestore creates an active shipment with the authenticated UID and server timestamps.
 7. The realtime owner list shows the shipment and the form clears.
 8. Home may show exact route matches when an active compatible trip exists.
+9. Send ranks recommended traveler trips for each active shipment and explains every score.
+10. The sender may refine minimum score, visible verification, eligibility, result count, and package category without creating a booking.
 
 ## Current traveler journey
 
@@ -19,6 +21,8 @@
 4. Firestore creates an active trip owned by the authenticated UID.
 5. The realtime owner list shows the trip and the form clears.
 6. Home may pair it with active shipments on the exact same corridor.
+7. Travel ranks recommended shipments for each active trip and explains every score.
+8. The traveler may refine minimum score, self-visible verification, eligibility, result count, and package category without changing the trip.
 
 ## Current match journey
 

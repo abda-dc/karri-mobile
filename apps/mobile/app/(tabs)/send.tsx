@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Badge } from "../../src/components/Badge";
 import { Banner } from "../../src/components/Banner";
@@ -12,6 +12,14 @@ import { SectionHeader } from "../../src/components/SectionHeader";
 import { StatusChip } from "../../src/components/StatusChip";
 import { TextField } from "../../src/components/TextField";
 import { TrustBadge } from "../../src/components/TrustBadge";
+import type { MatchResult } from "../../src/domain/matching/MatchResult";
+import {
+  defaultMatchDiscoveryFilters,
+  hasActiveMatchFilters,
+  MatchFiltersCard,
+  type MatchDiscoveryFilters,
+} from "../../src/presentation/components/MatchFiltersCard";
+import { RecommendedMatchesSection } from "../../src/presentation/components/RecommendedMatchesSection";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
 import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
@@ -39,6 +47,14 @@ export default function SendScreen() {
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [matchFilters, setMatchFilters] = useState<MatchDiscoveryFilters>(
+    defaultMatchDiscoveryFilters,
+  );
+  const [matchesByShipment, setMatchesByShipment] = useState<
+    ReadonlyMap<string, ReadonlyArray<MatchResult>>
+  >(() => new Map());
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [matchesError, setMatchesError] = useState<string | null>(null);
 
   useEffect(() => {
     if (auth.loading) {
@@ -72,6 +88,57 @@ export default function SendScreen() {
       setListLoading(false);
     }
   }, [auth.loading, auth.user]);
+
+  const activeShipments = useMemo(
+    () => shipments.filter((shipment) => shipment.status === "active"),
+    [shipments],
+  );
+
+  useEffect(() => {
+    if (auth.loading || listLoading) return;
+    if (!auth.user || activeShipments.length === 0) {
+      setMatchesByShipment(new Map());
+      setMatchesLoading(false);
+      setMatchesError(null);
+      return;
+    }
+
+    let active = true;
+    setMatchesLoading(true);
+    setMatchesError(null);
+    const category = matchFilters.packageCategory.trim();
+
+    void mobileServices.matching
+      .findMatchesForShipments(
+        activeShipments.map((shipment) => shipment.id),
+        {
+          allowedPackageCategories: category ? [category] : [],
+          eligibleOnly: matchFilters.eligibleOnly,
+          maximumResults: matchFilters.maximumResults,
+          minimumScore: matchFilters.minimumScore,
+          requireIdentityVerification: matchFilters.verifiedOnly,
+          requirePackageCompatibility: Boolean(category),
+          viewerId: auth.user.uid,
+        },
+      )
+      .then((matches) => {
+        if (active) {
+          setMatchesByShipment(matches);
+          setMatchesLoading(false);
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          setMatchesByShipment(new Map());
+          setMatchesError(reportFriendlyError(error, "send.load-recommended-trips"));
+          setMatchesLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [activeShipments, auth.loading, auth.user, listLoading, matchFilters]);
 
   function updateField(field: keyof typeof emptyForm, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -343,6 +410,34 @@ export default function SendScreen() {
                 ))
               : null}
           </View>
+
+          {!listLoading && !dataError && activeShipments.length > 0 ? (
+            <View style={styles.discoverySection}>
+              <SectionHeader
+                eyebrow="Discovery"
+                subtitle="Ranked traveler trips for each active shipment, with the factors behind every score."
+                title="Recommended travelers"
+              />
+              <MatchFiltersCard
+                applying={matchesLoading}
+                filters={matchFilters}
+                onApply={setMatchFilters}
+              />
+              {activeShipments.map((shipment) => (
+                <RecommendedMatchesSection
+                  key={shipment.id}
+                  error={matchesError}
+                  filtered={hasActiveMatchFilters(matchFilters)}
+                  loading={matchesLoading}
+                  matches={matchesByShipment.get(shipment.id) ?? []}
+                  recommendation="trip"
+                  subject="shipment"
+                  subtitle={`${shipment.packageCategory}, ${shipment.weightKg} kg - ${shipment.deliveryWindow}`}
+                  title={`${shipment.originCity} to ${shipment.destinationCity}`}
+                />
+              ))}
+            </View>
+          ) : null}
         </View>
       ) : null}
     </Screen>
@@ -358,6 +453,9 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: spacing.md,
+  },
+  discoverySection: {
+    gap: spacing.xl,
   },
   fieldRow: {
     flexDirection: "row",

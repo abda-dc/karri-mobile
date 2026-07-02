@@ -14,7 +14,7 @@ MatchingService
       -> MatchScore + MatchReason + MatchResult
 ```
 
-`MatchingService` imports service and domain contracts only. Firebase reads remain inside repository implementations. No match is persisted, no domain event is published, and no presentation route is composed in this phase.
+`MatchingService` imports service and domain contracts only. Firebase reads remain inside repository implementations. No match is persisted and no domain event is published. Milestone 9B composes the service once in `mobileServices`; Send and Travel call that application instance without accessing repositories.
 
 ## Domain models
 
@@ -28,7 +28,7 @@ MatchingService
 
 ## Orchestration
 
-`findMatches` performs bounded one-shot active listing reads, narrows requested IDs, loads traveler evidence once per unique owner, evaluates the Cartesian pairs, applies eligibility and minimum-score filters, sorts deterministically, and enforces the result limit. Evidence failures degrade only the affected evidence to unavailable; inventory read failures remain visible to the caller.
+`findMatches` performs bounded one-shot active listing reads, narrows requested IDs, loads traveler evidence once per unique owner, evaluates the Cartesian pairs, applies eligibility and minimum-score filters, sorts deterministically, and enforces the result limit. `findMatchesForShipments` and `findMatchesForTrips` reuse that ranking pipeline and apply the result limit per requested listing. Evidence failures degrade only the affected evidence to unavailable; inventory read failures remain visible to the caller.
 
 `evaluate` exposes deterministic pair scoring for already-loaded domain objects and injected evidence. The service clock supplies one shared evaluation timestamp. `OfflineService` supplies a snapshot of provider-neutral connection state for freshness labeling.
 
@@ -49,4 +49,4 @@ Version changes must preserve old explanations, add deterministic fixtures, docu
 - Add a project test runner and pure factor/service fixtures.
 - Introduce structured delivery windows and traveler package-category preferences before making those factors mandatory.
 - Move ranking and public evidence to a trusted service when scale or privacy policy requires it.
-- Adopt the service in presentation only through a separately reviewed screen phase.
+- Add explicit refresh/focus policy if discovery needs continuous background updates rather than filter-triggered one-shot reads.

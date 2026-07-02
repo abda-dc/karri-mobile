@@ -68,6 +68,7 @@ nav:
       - Booking Lifecycle: product/booking-lifecycle.md
       - Chain of Custody: product/chain-of-custody.md
       - Matching Engine: product/matching-engine.md
+      - Discovery Experience: product/discovery-experience.md
       - Notifications: product/notifications.md
       - Reviews: product/reviews.md
       - Trust Score: product/trust-score.md

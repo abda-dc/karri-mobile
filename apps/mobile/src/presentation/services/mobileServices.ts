@@ -1,6 +1,7 @@
 import { BookingService } from "../../application/services/BookingService";
 import { CustodyService } from "../../application/services/CustodyService";
 import { IdentityVerificationService } from "../../application/services/IdentityVerificationService";
+import { MatchingService } from "../../application/services/MatchingService";
 import { NotificationService } from "../../application/services/NotificationService";
 import { NotificationPreferenceService } from "../../application/services/NotificationPreferenceService";
 import { NotificationRouter } from "../../application/services/NotificationRouter";
@@ -44,6 +45,20 @@ const shipmentRepository = new FirebaseShipmentRepository();
 const tripRepository = new FirebaseTripRepository();
 const trustRepository = new FirebaseTrustRepository();
 const verificationRepository = new FirebaseVerificationRepository();
+const identityVerificationService = new IdentityVerificationService(
+  verificationRepository,
+);
+const offlineService = new OfflineService(firebaseOfflineStatusGateway);
+const shipmentService = new ShipmentService(shipmentRepository, eventBus);
+const tripService = new TripService(tripRepository, eventBus);
+const trustService = new TrustService(trustRepository, reviewRepository);
+const matchingService = new MatchingService(
+  shipmentService,
+  tripService,
+  trustService,
+  identityVerificationService,
+  offlineService,
+);
 const pushNotificationService = new PushNotificationService(
   new FirebasePushNotificationGateway(),
 );
@@ -74,18 +89,19 @@ export const mobileServices = {
     eventBus,
   ),
   custody: new CustodyService(custodyRepository, bookingRepository),
-  identityVerification: new IdentityVerificationService(verificationRepository),
+  identityVerification: identityVerificationService,
+  matching: matchingService,
   notification: notificationService,
   notificationPreferences: new NotificationPreferenceService(
     notificationPreferenceRepository,
   ),
   notificationRouter,
-  offline: new OfflineService(firebaseOfflineStatusGateway),
+  offline: offlineService,
   pushNotification: pushNotificationService,
   pushRegistration: pushRegistrationService,
   review: new ReviewService(reviewRepository, bookingRepository, eventBus),
-  shipment: new ShipmentService(shipmentRepository, eventBus),
+  shipment: shipmentService,
   shipmentTimeline: new ShipmentTimelineService(custodyRepository),
-  trip: new TripService(tripRepository, eventBus),
-  trust: new TrustService(trustRepository, reviewRepository),
+  trip: tripService,
+  trust: trustService,
 } as const;
