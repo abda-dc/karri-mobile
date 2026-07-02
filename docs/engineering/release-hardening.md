@@ -26,6 +26,8 @@ The reusable control layer now provides:
 - `PrimaryButton`: optional accessibility label and hint, inferred label for string children, button role, busy/disabled state, minimum touch target, and loading indicator.
 - `Badge`: optional accessible label and one grouped text element for screen readers.
 - `StatusChip`: optional accessible label and grouped text role; its decorative color dot is hidden from accessibility services.
+- Match-score badges and timeline rows expose grouped text labels while decorative timeline rails/icons stay hidden.
+- Inline loading states expose progress semantics, and tab labels allow operating-system font scaling.
 
 Color remains supplemental. Labels carry status meaning, and consumers can provide a clearer accessibility label when visible copy is abbreviated. Beta device testing must still cover VoiceOver, TalkBack, font scaling, focus order, switch announcements, keyboard navigation on web, and contrast in both theme modes.
 
@@ -56,9 +58,7 @@ Native Firestore cache remains memory-only and does not survive process terminat
 
 Marketplace/tab screens call application services through the singleton `mobileServices` composition. Domain and application matching, booking, custody, trust, identity, notification, and offline logic import no Firebase SDK.
 
-Firebase repositories, mappers, auth adapters, push adapters, and network status live under Infrastructure. New screen work must not import `firebase/*`, Firestore query functions, Firebase repositories, or provider-shaped payloads.
-
-Three bootstrap/auth routes (`index`, `login`, and `verify`) still import the Firebase Infrastructure client/auth adapter directly. They do not call Firestore or repositories, but they are recorded compatibility exceptions rather than proof that every file under `app/` is provider-independent. Moving configuration/session commands behind presentation composition remains follow-up work.
+Firebase repositories, mappers, auth adapters, push adapters, and network status live under Infrastructure. Screens, components, hooks, Application, and Domain do not import `firebase/*`, Firestore query functions, Firebase repositories, or provider-shaped payloads. The narrow `mobileServices` and error-service composition modules inject Infrastructure adapters. Bootstrap/session restore, anonymous session start, and sign-out now pass through `AuthSessionService` from that composition root.
 
 ## Performance review
 
@@ -73,6 +73,7 @@ Three bootstrap/auth routes (`index`, `login`, and `verify`) still import the Fi
 ## Known MVP limitations
 
 - Anonymous authentication remains a development bridge; verified sign-in and recovery are not complete.
+- The Firebase project validated on July 2, 2026 returned `auth/admin-restricted-operation`; authenticated external-beta testing is blocked until anonymous auth is enabled there or the bridge is replaced.
 - App Check is not enforced.
 - Multi-party booking/custody operations remain client-orchestrated rather than trusted idempotent server commands.
 - Push token persistence, listener/navigation, and delivery remain deferred.
@@ -84,6 +85,8 @@ Three bootstrap/auth routes (`index`, `login`, and `verify`) still import the Fi
 - Payments, disputes, maps, GPS, proof uploads, carrier integration, and admin tooling remain absent.
 
 ## Beta readiness checklist
+
+Milestone 11's detailed evidence, current blockers, and manual matrices live in [Beta Readiness Checklist](beta-readiness-checklist.md).
 
 ### Automated release gates
 

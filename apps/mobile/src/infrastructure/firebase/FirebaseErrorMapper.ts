@@ -85,6 +85,7 @@ function mapAuthError(error: unknown, providerCode: string): ApplicationError {
         retryGuidance: "Choose a stronger password and try again.",
         userMessage: "That password is not strong enough.",
       });
+    case "auth/admin-restricted-operation":
     case "auth/operation-not-allowed":
       return createMappedError(error, providerCode, {
         code: ApplicationErrorCode.Configuration,

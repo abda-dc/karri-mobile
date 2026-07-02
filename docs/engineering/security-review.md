@@ -42,9 +42,7 @@ The intended path is:
 screen/component -> mobileServices -> application/domain -> repository port -> Firebase Infrastructure
 ```
 
-Business tab screens follow this boundary and contain no direct Firebase/Firestore imports. Infrastructure owns SDK initialization, repositories, mappers, auth persistence, offline network state, and push adapters.
-
-Known exception: `app/index.tsx`, `app/login.tsx`, and `app/verify.tsx` call Firebase configuration/auth Infrastructure adapters directly for bootstrap behavior. They do not query Firestore, but beta review should treat this as migration debt and reject new exceptions.
+All screens and presentation hooks follow this boundary and contain no direct Firebase/Firestore imports. `AuthSessionService` keeps configuration, start, restore subscription, and sign-out behind the same composition boundary. Infrastructure owns SDK initialization, repositories, mappers, auth persistence, offline network state, and push adapters.
 
 ## Dependency and supply-chain review
 
@@ -73,10 +71,10 @@ The app has no payments, disputes, carrier integration, maps, GPS, proof upload,
 
 | Finding | Current disposition |
 | --- | --- |
-| Anonymous development authentication | Known beta limitation; verified provider required before production |
+| Anonymous development authentication | External beta blocker in the validated project: provider returned `auth/admin-restricted-operation`; enable the documented bridge or replace it |
 | App Check absent | Open; stage and monitor enforcement |
 | Client-orchestrated multi-party writes | Open; migrate to trusted idempotent commands |
-| Bootstrap routes import Firebase adapters | Accepted migration debt for MVP; no new screen exceptions |
+| Presentation Firebase imports | Closed in Milestone 11; auth bootstrap now uses `AuthSessionService` through composition |
 | Rules lack automated emulator suite | Open beta gate |
 | Production telemetry/redaction absent | Open before external beta growth |
 | Push persistence/delivery absent | Deferred and fail-closed |
@@ -85,7 +83,7 @@ The app has no payments, disputes, carrier integration, maps, GPS, proof upload,
 
 ## Decision
 
-Automated compilation and documentation checks can support a controlled internal beta candidate, but they do not close the manual security gates above. External beta or production authorization requires explicit owners to accept or remediate every open finding.
+Automated compilation, documentation, and Firestore rule-load checks support a controlled internal beta candidate, but they do not close the manual security gates above. External beta is not approved while the configured authentication bridge fails, rules lack allow/deny tests, and the cross-account/device/privacy gates remain open.
 
 ## Related documents
 

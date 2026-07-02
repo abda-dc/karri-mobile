@@ -11,6 +11,8 @@ export function MatchScoreBadge({ score }: MatchScoreBadgeProps) {
   return (
     <View
       accessibilityLabel={`Match score ${score.total} out of ${score.maximum}`}
+      accessibilityRole="text"
+      accessible
       style={[styles.badge, styles[tone]]}
     >
       <Text style={[styles.score, styles[`${tone}Text`]]}>{score.total}</Text>

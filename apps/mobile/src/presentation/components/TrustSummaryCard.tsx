@@ -163,9 +163,16 @@ export function TrustSummaryCard({
 
   if (loading) {
     return (
-      <Card padding="compact" style={styles.loading} variant="soft">
-        <ActivityIndicator color={colors.primary} size="small" />
-        <Text style={styles.muted}>Loading trust evidence...</Text>
+      <Card padding="compact" variant="soft">
+        <View
+          accessibilityLabel="Loading trust evidence"
+          accessibilityLiveRegion="polite"
+          accessibilityRole="progressbar"
+          style={styles.loading}
+        >
+          <ActivityIndicator accessible={false} color={colors.primary} size="small" />
+          <Text style={styles.muted}>Loading trust evidence...</Text>
+        </View>
       </Card>
     );
   }

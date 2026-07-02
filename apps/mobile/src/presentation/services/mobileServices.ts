@@ -1,3 +1,4 @@
+import { AuthSessionService } from "../../application/services/AuthSessionService";
 import { BookingService } from "../../application/services/BookingService";
 import { CustodyService } from "../../application/services/CustodyService";
 import { IdentityVerificationService } from "../../application/services/IdentityVerificationService";
@@ -14,6 +15,7 @@ import { ShipmentTimelineService } from "../../application/services/ShipmentTime
 import { TripService } from "../../application/services/TripService";
 import { TrustService } from "../../application/services/TrustService";
 import { EventBus } from "../../domain/events/EventBus";
+import { FirebaseAuthSessionGateway } from "../../infrastructure/firebase/auth";
 import {
   FirebaseBookingRepository,
   FirebaseCustodyRepository,
@@ -82,6 +84,7 @@ const notificationService = new NotificationService(
 notificationService.start();
 
 export const mobileServices = {
+  auth: new AuthSessionService(new FirebaseAuthSessionGateway()),
   booking: new BookingService(
     bookingRepository,
     shipmentRepository,

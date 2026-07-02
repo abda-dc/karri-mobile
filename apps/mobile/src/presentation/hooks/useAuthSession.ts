@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
-import {
-  subscribeToAuthSession,
-  type AuthIdentity,
-} from "../../infrastructure/firebase/auth";
-import { isFirebaseConfigured } from "../../infrastructure/firebase/client";
+import type { AuthIdentity } from "../../application/services/AuthSessionService";
 import { reportFriendlyError } from "../errors/getFriendlyError";
+import { mobileServices } from "../services/mobileServices";
 
 export interface AuthSessionState {
   readonly user: AuthIdentity | null;
@@ -15,19 +12,19 @@ export interface AuthSessionState {
 export function useAuthSession(): AuthSessionState {
   const [state, setState] = useState<AuthSessionState>({
     user: null,
-    loading: isFirebaseConfigured,
-    error: isFirebaseConfigured
+    loading: mobileServices.auth.isConfigured,
+    error: mobileServices.auth.isConfigured
       ? null
       : "Karri is not configured for this environment. Add the documented mobile environment values.",
   });
 
   useEffect(() => {
-    if (!isFirebaseConfigured) {
+    if (!mobileServices.auth.isConfigured) {
       return;
     }
 
     try {
-      return subscribeToAuthSession(
+      return mobileServices.auth.subscribe(
         (user) => setState({ user, loading: false, error: null }),
         (error) =>
           setState({

@@ -39,6 +39,8 @@ export default function ProfileScreen() {
   const [notifications, setNotifications] = useState<ReadonlyArray<Notification>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
   const [pendingReadIds, setPendingReadIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -137,6 +139,23 @@ export default function ProfileScreen() {
         next.delete(notificationId);
         return next;
       });
+    }
+  }
+
+  async function handleSignOut() {
+    if (signingOut) {
+      return;
+    }
+
+    setSigningOut(true);
+    setSessionError(null);
+    try {
+      await mobileServices.auth.signOut();
+      router.replace("/");
+    } catch (signOutError) {
+      setSessionError(reportFriendlyError(signOutError, "profile.sign-out"));
+    } finally {
+      setSigningOut(false);
     }
   }
 
@@ -285,6 +304,24 @@ export default function ProfileScreen() {
             />
             <PrimaryButton variant="secondary" onPress={() => router.push("/profile-setup")}>
               Review profile setup
+            </PrimaryButton>
+          </Card>
+
+          <Card variant="outlined">
+            <SectionHeader
+              subtitle="This ends the current anonymous MVP session on this device."
+              title="Session"
+            />
+            {sessionError ? (
+              <Banner message={sessionError} title="Sign out failed" variant="error" />
+            ) : null}
+            <PrimaryButton
+              disabled={signingOut}
+              loading={signingOut}
+              variant="secondary"
+              onPress={handleSignOut}
+            >
+              Sign out
             </PrimaryButton>
           </Card>
         </>

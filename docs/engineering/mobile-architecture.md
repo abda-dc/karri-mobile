@@ -37,6 +37,7 @@ apps/mobile/
 ## Current screen-to-service flow
 
 - Home watches active listings through `ShipmentService`/`TripService` and calls `BookingService.request`.
+- Welcome, Verify, Profile, and `useAuthSession` call the provider-neutral `AuthSessionService` through `mobileServices`; the Firebase auth adapter owns provider configuration, anonymous session creation, persistence callbacks, and sign-out.
 - Send and Travel create/watch owner listings through services and call the composed `MatchingService` for grouped per-listing recommendations. Screen state owns filter forms/loading/errors; scores, eligibility, reasons, sorting, and result caps stay in application/domain code.
 - Tracking uses one combined `BookingService` subscription for participant bookings and requests plus one recipient-scoped `NotificationService` subscription. `BookingDetailCard` composes shipment/trip/review data, sender-safe shipment timeline or traveler-safe booking custody watches, self-readable identity state, visible trust evidence, and authorized booking/custody/review commands.
 - Profile watches bookings and in-app notifications and requests trust summaries.
@@ -66,8 +67,8 @@ Realtime Firestore snapshots feed small screen-local arrays. Tracking's combined
 
 ## Release-hardening boundary
 
-Expo SDK package ranges are patch-aligned and verified with `expo-doctor`. Reusable buttons, badges, and status chips expose screen-reader labels/roles and non-color status text. Screens use shared loading, empty, banner, and offline patterns, and caught failures pass through `reportFriendlyError`.
+Expo SDK package ranges are patch-aligned and verified with `expo-doctor`. Reusable buttons, badges, status chips, match-score badges, timeline rows, and loading states expose screen-reader labels/roles and non-color status text. Tab labels allow system font scaling. Screens use shared loading, empty, banner, and offline patterns, and caught failures pass through `reportFriendlyError`.
 
-Marketplace/tab screens do not import Firebase or Firestore. The `index`, `login`, and `verify` bootstrap routes still call Firebase configuration/auth Infrastructure adapters directly; they are documented compatibility exceptions and should migrate behind composition rather than becoming a precedent for new screens.
+Screens, components, hooks, application services, and domain code do not import Firebase or Firestore. `mobileServices` is the presentation composition root that injects Firebase/Expo Infrastructure adapters into provider-neutral Application services.
 
 See [Release Hardening](release-hardening.md), [Security Review](security-review.md), [Application Services](../architecture/application-services.md), [Notification Delivery](../architecture/notification-delivery.md), [Error Handling](../architecture/error-handling.md), [Offline Strategy](../architecture/offline-strategy.md), and [Technical Architecture](../architecture/technical-architecture.md).

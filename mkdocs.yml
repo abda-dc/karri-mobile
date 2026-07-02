@@ -118,6 +118,7 @@ nav:
       - Security: engineering/security.md
       - Security Review: engineering/security-review.md
       - Release Hardening: engineering/release-hardening.md
+      - Beta Readiness Checklist: engineering/beta-readiness-checklist.md
       - API Design: engineering/api-design.md
       - Event Architecture: engineering/event-architecture.md
       - Push Notification Testing: engineering/push-notification-testing.md

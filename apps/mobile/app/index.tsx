@@ -1,18 +1,37 @@
 import { router } from "expo-router";
+import { useEffect } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 import { Badge } from "../src/components/Badge";
 import { Banner } from "../src/components/Banner";
 import { Card } from "../src/components/Card";
+import { LoadingState } from "../src/components/LoadingState";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
 import { TrustBadge } from "../src/components/TrustBadge";
-import { isFirebaseConfigured } from "../src/infrastructure/firebase/client";
+import { useAuthSession } from "../src/presentation/hooks/useAuthSession";
+import { mobileServices } from "../src/presentation/services/mobileServices";
 import { colors, radii, spacing, typography } from "../src/theme/tokens";
 
 export default function WelcomeScreen() {
+  const auth = useAuthSession();
+
+  useEffect(() => {
+    if (!auth.loading && auth.user) {
+      router.replace("/(tabs)/home");
+    }
+  }, [auth.loading, auth.user]);
+
+  if (auth.loading || auth.user) {
+    return (
+      <Screen centered contentStyle={styles.screenContent}>
+        <LoadingState message="Restoring your Karri session..." />
+      </Screen>
+    );
+  }
+
   return (
     <Screen centered contentStyle={styles.screenContent}>
-      {!isFirebaseConfigured ? (
+      {!mobileServices.auth.isConfigured ? (
         <Banner
           compact
           message="Add the documented mobile environment values before starting a development session."

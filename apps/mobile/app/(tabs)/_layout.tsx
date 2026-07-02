@@ -8,7 +8,7 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveBackgroundColor: colors.primarySoft,
         tabBarActiveTintColor: colors.primaryDark,
-        tabBarAllowFontScaling: false,
+        tabBarAllowFontScaling: true,
         tabBarHideOnKeyboard: true,
         tabBarInactiveTintColor: colors.muted,
         tabBarItemStyle: {

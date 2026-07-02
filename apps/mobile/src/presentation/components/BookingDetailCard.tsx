@@ -261,7 +261,14 @@ export function BookingDetailCard({
         userId={otherParticipantId}
       />
 
-      {loadingDetails ? <ActivityIndicator color={colors.primary} /> : null}
+      {loadingDetails ? (
+        <ActivityIndicator
+          accessibilityLabel="Loading booking details"
+          accessibilityLiveRegion="polite"
+          accessibilityRole="progressbar"
+          color={colors.primary}
+        />
+      ) : null}
       {actionError ? <Banner message={actionError} title="Action failed" variant="error" /> : null}
       {actionMessage ? (
         <Banner message={actionMessage} title="Booking updated" variant="success" />

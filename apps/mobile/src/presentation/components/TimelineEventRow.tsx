@@ -17,10 +17,28 @@ interface TimelineEventRowProps {
 }
 
 export function TimelineEventRow({ event, last = false }: TimelineEventRowProps) {
+  const accessibilityLabel = [
+    event.title,
+    event.explanation,
+    formatTimestamp(event.timestamp),
+    event.actor ? `By ${event.actor}` : null,
+  ]
+    .filter(Boolean)
+    .join(". ");
+
   return (
-    <View style={styles.row}>
-      <View style={styles.rail}>
-        <View accessibilityLabel={`${event.title} icon`} style={styles.icon}>
+    <View
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="text"
+      accessible
+      style={styles.row}
+    >
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={styles.rail}
+      >
+        <View style={styles.icon}>
           <Text style={styles.iconText}>{event.icon}</Text>
         </View>
         {!last ? <View style={styles.line} /> : null}
