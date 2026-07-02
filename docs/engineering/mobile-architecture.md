@@ -64,4 +64,10 @@ Realtime Firestore snapshots feed small screen-local arrays. Tracking's combined
 - Preference persistence does not activate a channel. Push defaults off, Email/SMS are enforced placeholders, and quiet hours are stored but not evaluated by any delivery runtime.
 - Device testing and Firebase Emulator Suite authorization tests remain necessary.
 
-See [Application Services](../architecture/application-services.md), [Notification Delivery](../architecture/notification-delivery.md), [Error Handling](../architecture/error-handling.md), [Offline Strategy](../architecture/offline-strategy.md), and [Technical Architecture](../architecture/technical-architecture.md).
+## Release-hardening boundary
+
+Expo SDK package ranges are patch-aligned and verified with `expo-doctor`. Reusable buttons, badges, and status chips expose screen-reader labels/roles and non-color status text. Screens use shared loading, empty, banner, and offline patterns, and caught failures pass through `reportFriendlyError`.
+
+Marketplace/tab screens do not import Firebase or Firestore. The `index`, `login`, and `verify` bootstrap routes still call Firebase configuration/auth Infrastructure adapters directly; they are documented compatibility exceptions and should migrate behind composition rather than becoming a precedent for new screens.
+
+See [Release Hardening](release-hardening.md), [Security Review](security-review.md), [Application Services](../architecture/application-services.md), [Notification Delivery](../architecture/notification-delivery.md), [Error Handling](../architecture/error-handling.md), [Offline Strategy](../architecture/offline-strategy.md), and [Technical Architecture](../architecture/technical-architecture.md).

@@ -11,6 +11,8 @@ import {
 import { colors, radii, spacing, touchTargets, typography } from "../theme/tokens";
 
 type PrimaryButtonProps = {
+  accessibilityHint?: string;
+  accessibilityLabel?: string;
   children: ReactNode;
   disabled?: boolean;
   loading?: boolean;
@@ -20,6 +22,8 @@ type PrimaryButtonProps = {
 };
 
 export function PrimaryButton({
+  accessibilityHint,
+  accessibilityLabel,
   children,
   disabled = false,
   loading = false,
@@ -32,6 +36,10 @@ export function PrimaryButton({
 
   return (
     <Pressable
+      accessibilityHint={accessibilityHint}
+      accessibilityLabel={
+        accessibilityLabel ?? (typeof children === "string" ? children : undefined)
+      }
       accessibilityRole="button"
       accessibilityState={{ busy: loading, disabled: isDisabled }}
       disabled={isDisabled}

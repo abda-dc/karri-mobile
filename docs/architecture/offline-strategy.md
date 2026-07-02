@@ -71,6 +71,8 @@ No optimistic path manually replays a mutation. Phase 2 write tracking and Fires
 4. Add Emulator Suite tests for reconnect conflicts and denied writes when the project adopts an integration-test pattern.
 5. Move sensitive commands to idempotent trusted transactions before production; no client queue can replace that boundary.
 
+The beta device/reconnect acceptance gates are tracked in [Release Hardening](../engineering/release-hardening.md). A successful TypeScript or documentation build is not evidence that native queue survival or account-change cache handling has been tested.
+
 ## Out of scope
 
 - A custom sync engine, durable native command ledger, background worker, or offline-first booking flow.

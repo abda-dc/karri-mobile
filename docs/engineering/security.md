@@ -46,6 +46,8 @@ Firebase web configuration is public project metadata and is supplied through `E
 
 Native push activation additionally requires the token, payload, authorization, credential, retention, and kill-switch gates in [Notification Delivery](../architecture/notification-delivery.md).
 
+The consolidated Milestone 10 findings and beta evidence requirements are maintained in [Security Review](security-review.md) and [Release Hardening](release-hardening.md).
+
 ## Logging
 
 Prefer stable IDs, action names, and outcome codes. Do not log auth tokens, package descriptions, addresses, uploaded evidence, or private profile fields unless an approved support workflow requires tightly controlled access.

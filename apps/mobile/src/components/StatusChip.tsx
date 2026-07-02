@@ -4,6 +4,7 @@ import { colors, radii, spacing, typography } from "../theme/tokens";
 type StatusTone = "active" | "info" | "neutral" | "success" | "warning";
 
 type StatusChipProps = {
+  accessibilityLabel?: string;
   label: string;
   tone?: StatusTone;
 };
@@ -16,12 +17,22 @@ const tones = {
   warning: { backgroundColor: colors.warningSoft, color: colors.warning },
 };
 
-export function StatusChip({ label, tone = "neutral" }: StatusChipProps) {
+export function StatusChip({ accessibilityLabel, label, tone = "neutral" }: StatusChipProps) {
   const selectedTone = tones[tone];
 
   return (
-    <View style={[styles.chip, { backgroundColor: selectedTone.backgroundColor }]}>
-      <View style={[styles.dot, { backgroundColor: selectedTone.color }]} />
+    <View
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityRole="text"
+      accessible
+      style={[styles.chip, { backgroundColor: selectedTone.backgroundColor }]}
+    >
+      <View
+        accessibilityElementsHidden
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+        style={[styles.dot, { backgroundColor: selectedTone.color }]}
+      />
       <Text style={[styles.label, { color: selectedTone.color }]}>{label}</Text>
     </View>
   );
