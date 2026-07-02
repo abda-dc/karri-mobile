@@ -6,6 +6,7 @@ import {
   type CustodyEvent,
 } from "../../domain/custody/CustodyEvent";
 import type { CustodyRepository } from "../../domain/custody/CustodyRepository";
+import { assertCanAppendCustodyEvent } from "../../domain/custody/custodyStateMachine";
 import { DomainValidationError, optionalText } from "./validation";
 
 export class CustodyService {
@@ -40,19 +41,11 @@ export class CustodyService {
 
     const existing = await this.custody.listByBooking(booking.id);
 
-    if (existing.some((event) => event.eventType === input.eventType)) {
-      throw new DomainValidationError("This custody event has already been recorded.");
-    }
-
-    if (
-      input.eventType === CustodyEventType.AirportArrival &&
-      !existing.some((event) => event.eventType === CustodyEventType.AirportDeparture)
-    ) {
-      throw new DomainValidationError("Record airport departure before airport arrival.");
-    }
+    assertCanAppendCustodyEvent(existing, input.eventType);
 
     return this.custody.append({
       bookingId: booking.id,
+      shipmentId: booking.shipmentId,
       eventType: input.eventType,
       performedBy: input.actorId,
       location: optionalText(input.location ?? "", "location", 160) || null,

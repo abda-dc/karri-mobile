@@ -18,6 +18,8 @@ export function mapCustodyEvent(
   return {
     id: snapshot.id,
     bookingId: stringValue(data.bookingId),
+    shipmentId:
+      typeof data.shipmentId === "string" ? data.shipmentId : null,
     eventType: data.eventType as CustodyEvent["eventType"],
     timestamp: toDomainTimestamp(data.timestamp),
     performedBy: stringValue(data.performedBy),
@@ -30,6 +32,7 @@ export function mapCustodyEvent(
 export function toFirestoreCustodyEvent(event: NewCustodyEvent): DocumentData {
   return {
     bookingId: event.bookingId,
+    shipmentId: event.shipmentId,
     eventType: event.eventType,
     performedBy: event.performedBy,
     location: event.location,

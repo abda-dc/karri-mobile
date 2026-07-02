@@ -122,6 +122,7 @@ export class BookingService {
         ],
       },
       initialCustodyEvent: {
+        shipmentId,
         eventType: CustodyEventType.ShipmentCreated,
         performedBy: senderId,
         location: null,
@@ -382,6 +383,7 @@ export class BookingService {
 
     return {
       bookingId: booking.id,
+      shipmentId: booking.shipmentId,
       eventType,
       performedBy: input.actorId,
       location: input.location?.trim() || null,

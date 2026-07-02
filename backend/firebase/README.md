@@ -9,7 +9,7 @@ This directory is the version-controlled Firebase backend foundation for Karri P
 - Any signed-in user can read active shipments/trips for MVP matching.
 - Inactive records remain readable to their owner.
 - Booking requests/bookings are participant-readable and accept only allowlisted actor/state transitions.
-- Custody is participant-readable and append-only for an expected actor and booking state.
+- Custody is participant-readable and append-only for an expected actor and booking state. New writes require a matching shipment link, deterministic ID, allowlisted metadata, and required predecessor event.
 - Signed-in users may read reviews; completed-booking participants create one deterministic review per direction.
 - Notification recipients read/mark their records; validated event actors create deterministic in-app records.
 - Signed-in users read and update only their own validated notification preference document; Email/SMS remain disabled placeholders.
@@ -18,6 +18,8 @@ This directory is the version-controlled Firebase backend foundation for Karri P
 - Storage denies all access until an evidence workflow and tests exist.
 
 Firestore rules do not filter query results. Mobile queries constrain owner, listing status, participant ID, booking ID, review subject, or notification recipient as required by their rule.
+
+Shipment timeline queries constrain `custodyEvents.shipmentId`; they read the same immutable custody records rather than a second collection. They are sender-facing because a shipment may have bookings with different travelers, and Firestore does not filter unauthorized results. Travelers continue to use booking-scoped custody queries. Historical custody records without this additive field remain available only through their booking-scoped query until a reviewed backfill exists.
 
 ## Project setup
 

@@ -19,7 +19,8 @@ Plain TypeScript models live under `apps/mobile/src/domain` and import no Fireba
 | `Trip` | Traveler-owned route and capacity listing |
 | `BookingRequest` | The sender's proposal to a traveler |
 | `Booking` | The authoritative finite lifecycle from pending through a terminal state |
-| `CustodyEvent` | Immutable fact appended to a booking's custody history |
+| `CustodyEvent` | Immutable fact appended to a booking's custody history and, for new records, linked to its shipment timeline |
+| `ShipmentLifecycleEvent` | A typed shipment-linked view of `CustodyEvent`, not a second persisted lifecycle model |
 | `Notification` | Recipient-owned in-app notification record |
 | `Review` | One participant's rating of the other after a completed booking |
 | `IdentityVerification` | Provider-neutral identity workflow, metadata-only document references, and audit events |
@@ -28,6 +29,8 @@ Plain TypeScript models live under `apps/mobile/src/domain` and import no Fireba
 | `DomainEvent` | A completed in-process business fact |
 
 Domain timestamps are ISO strings or `null`; Firestore `Timestamp` conversion belongs to infrastructure mappers. `src/types/models.ts` now exposes provider-independent compatibility aliases and input shapes for existing screens while services are adopted.
+
+Operationally, the shipment listing state, booking agreement state, and custody audit history remain separate concepts. Shipment-level timeline reads project the custody history rather than copying booking or custody state into another aggregate.
 
 ## Design principles
 
@@ -53,5 +56,6 @@ Move screens from compatibility aliases to service DTOs as flows adopt applicati
 - [Application Services](application-services.md)
 - [Booking State Machine](booking-state-machine.md)
 - [Custody Model](custody-model.md)
+- [Shipment Timeline](shipment-timeline.md)
 - [Identity Verification](identity-verification.md)
 - [Database Design](../engineering/database-design.md)

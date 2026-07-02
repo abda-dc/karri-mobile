@@ -9,6 +9,7 @@ import { PushNotificationService } from "../../application/services/PushNotifica
 import { PushRegistrationService } from "../../application/services/PushRegistrationService";
 import { ReviewService } from "../../application/services/ReviewService";
 import { ShipmentService } from "../../application/services/ShipmentService";
+import { ShipmentTimelineService } from "../../application/services/ShipmentTimelineService";
 import { TripService } from "../../application/services/TripService";
 import { TrustService } from "../../application/services/TrustService";
 import { EventBus } from "../../domain/events/EventBus";
@@ -84,6 +85,7 @@ export const mobileServices = {
   pushRegistration: pushRegistrationService,
   review: new ReviewService(reviewRepository, bookingRepository, eventBus),
   shipment: new ShipmentService(shipmentRepository, eventBus),
+  shipmentTimeline: new ShipmentTimelineService(custodyRepository),
   trip: new TripService(tripRepository, eventBus),
   trust: new TrustService(trustRepository, reviewRepository),
 } as const;

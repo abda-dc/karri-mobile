@@ -10,11 +10,11 @@ This document covers repository interfaces, Firebase implementations, mappers, c
 
 ## Current implementation
 
-Repository interfaces live beside their domain models for users, profiles, shipments, trips, bookings, custody, notifications, reviews, and trust. They depend only on domain types.
+Repository interfaces live beside their domain models for users, profiles, shipments, shipment timelines, trips, bookings, custody, notifications, reviews, and trust. They depend only on domain types.
 
 Firebase implementations live under `apps/mobile/src/infrastructure/firebase/repositories`, and Firestore conversion lives under `infrastructure/firebase/mappers`. The required implementations are present for User, Profile, Shipment, Trip, Booking, Notification, Review, and Trust; an additional Custody implementation preserves the append/read-only contract.
 
-Firebase adapters now power realtime shipment/trip, participant booking and booking-request, custody, review, and notification flows. Firestore rules permit only documented actor/state operations and keep custody/review destructive writes and trust-score persistence denied. Production sensitive commands remain a Cloud Functions responsibility.
+Firebase adapters now power realtime shipment/trip, participant booking and booking-request, custody, review, and notification flows. `FirebaseCustodyRepository` also provides read-only shipment timeline queries over the same events; there is no duplicate timeline collection. Firestore rules permit only documented actor/state operations and keep custody/review destructive writes and trust-score persistence denied. Production sensitive commands remain a Cloud Functions responsibility.
 
 ## Design principles
 
@@ -22,6 +22,7 @@ Firebase adapters now power realtime shipment/trip, participant booking and book
 - Mappers are the only place provider timestamps and field-name differences enter domain models.
 - Repositories do not decide booking transitions, review eligibility, or trust points.
 - Custody exposes append and read, never update or delete.
+- Shipment timeline persistence is a projection of shipment-linked custody events, not a second event write path.
 - Application services coordinate repositories and publish events after successful persistence.
 - Security rules and trusted functions remain authoritative even when a repository method exists.
 

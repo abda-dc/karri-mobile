@@ -14,6 +14,11 @@ import type {
   NewCustodyEvent,
 } from "../../../domain/custody/CustodyEvent";
 import type { CustodyRepository } from "../../../domain/custody/CustodyRepository";
+import {
+  isShipmentLifecycleEvent,
+  type ShipmentLifecycleEvent,
+} from "../../../domain/shipment/ShipmentLifecycleEvent";
+import type { ShipmentTimelineRepository } from "../../../domain/shipment/ShipmentTimelineRepository";
 import { firebaseOfflineStatusGateway } from "../FirebaseOfflineStatusGateway";
 import { getFirebaseServices } from "../client";
 import {
@@ -21,7 +26,9 @@ import {
   toFirestoreCustodyEvent,
 } from "../mappers/custodyMapper";
 
-export class FirebaseCustodyRepository implements CustodyRepository {
+export class FirebaseCustodyRepository
+  implements CustodyRepository, ShipmentTimelineRepository
+{
   async append(event: NewCustodyEvent): Promise<CustodyEvent> {
     const { db } = getFirebaseServices();
     const reference = doc(db, "custodyEvents", `${event.bookingId}__${event.eventType}`);
@@ -62,5 +69,45 @@ export class FirebaseCustodyRepository implements CustodyRepository {
         ),
       onError,
     );
+  }
+
+  async listByShipment(
+    shipmentId: string,
+  ): Promise<ReadonlyArray<ShipmentLifecycleEvent>> {
+    const { db } = getFirebaseServices();
+    const snapshot = await getDocs(
+      query(
+        collection(db, "custodyEvents"),
+        where("shipmentId", "==", shipmentId),
+      ),
+    );
+    return this.mapShipmentTimeline(snapshot.docs.map(mapCustodyEvent));
+  }
+
+  watchByShipment(
+    shipmentId: string,
+    onData: (events: ReadonlyArray<ShipmentLifecycleEvent>) => void,
+    onError: (error: Error) => void,
+  ): () => void {
+    const { db } = getFirebaseServices();
+    return onSnapshot(
+      query(
+        collection(db, "custodyEvents"),
+        where("shipmentId", "==", shipmentId),
+      ),
+      (snapshot) =>
+        onData(this.mapShipmentTimeline(snapshot.docs.map(mapCustodyEvent))),
+      onError,
+    );
+  }
+
+  private mapShipmentTimeline(
+    events: ReadonlyArray<CustodyEvent>,
+  ): ReadonlyArray<ShipmentLifecycleEvent> {
+    return events
+      .filter(isShipmentLifecycleEvent)
+      .sort((left, right) =>
+        (left.timestamp ?? "").localeCompare(right.timestamp ?? ""),
+      );
   }
 }

@@ -21,14 +21,17 @@ Booking lifecycle actions append Shipment Created, Traveler Accepted, Pickup Con
 ## Integrity rules
 
 - `CustodyRepository` exposes append/read/watch only; there is no update or delete method.
+- `ShipmentTimelineRepository` reads the same immutable events by shipment; it does not persist a parallel history.
 - Firestore rules deny every custody update and delete.
-- The service prevents duplicate travel events and requires departure before arrival.
-- Rules require an authenticated booking participant, expected actor, compatible booking state, server timestamp, and bounded note/location fields.
+- The custody state helper prevents duplicate or backward travel events and requires departure before arrival.
+- Rules require an authenticated booking participant, expected actor, compatible booking state, deterministic event ID, matching shipment link, predecessor event, server timestamp, allowlisted metadata, and bounded note/location fields.
 - Custody history is separate from status history; informational airport events do not change booking status.
 
 ## Current limitations
 
 Booking request/state changes and their lifecycle custody event are written in the same Firestore batch with deterministic custody IDs. In-app notification effects remain asynchronous. Production hardening still requires Cloud Function command transactions, allow/deny emulator tests, evidence policy, and correction-link semantics.
+
+New events also contain `shipmentId`, which enables a shipment-scoped timeline without duplicating the custody record. Historical events remain booking-readable and require an explicit backfill before they can appear in that shipment-scoped query.
 
 Evidence uploads, QR handoff, exact geolocation, disputes, and deletion remain out of scope.
 

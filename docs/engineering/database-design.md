@@ -14,7 +14,7 @@ Firestore uses top-level collections with explicit owner/participant IDs, finite
 | `trips` | Owner writes; signed-in users read active listings |
 | `bookingRequests` | Sender creates; participants read; allowlisted pending outcome update |
 | `bookings` | Sender creates pending record; participants read; role/state-guarded updates |
-| `custodyEvents` | Participants read; expected actor appends; update/delete denied |
+| `custodyEvents` | Participants read by booking or shipment; expected actor appends deterministic shipment-linked events; update/delete denied |
 | `reviews` | Signed-in reads; completed-booking participant creates deterministic record; update/delete denied |
 | `notifications` | Recipient reads/marks read; validated event actor creates deterministic record |
 | `notificationPreferences` | Owner reads/writes validated channel, category, and quiet-hours settings |
@@ -29,7 +29,9 @@ Rules re-read linked shipment/trip records to validate owners, active state, exa
 
 ## Custody and review records
 
-Custody events store `bookingId`, type, performer, server timestamp, optional location/note, and metadata. There is no destructive write path.
+New custody events store `bookingId`, `shipmentId`, type, performer, server timestamp, optional location/note, and allowlisted booking-status metadata. Firestore verifies that the shipment belongs to the booking, the deterministic ID is `bookingId__eventType`, and the required predecessor event exists. There is no destructive write path.
+
+Historical events without `shipmentId` remain readable through booking-scoped queries. They are intentionally absent from shipment-scoped queries until an explicit, reviewed backfill is performed.
 
 Reviews use `bookingId__reviewerId__revieweeId` as the document ID to enforce one review per direction. Comments may be empty and are limited to 1,000 characters.
 
@@ -49,10 +51,10 @@ The client may create an empty draft, edit document metadata while draft, and su
 
 Firestore server timestamps remain authoritative for document audit fields and custody events. Domain status-history timestamps are converted to Firestore timestamps and constrained to typed append entries.
 
-Participant booking screens run separate `senderId == uid` and `travelerId == uid` queries and merge by ID. Custody queries constrain `bookingId`; reviews constrain `bookingId` or `subjectId`; notifications constrain recipient and order newest-first. Identity verification uses a direct owner-document lookup and requires no collection query.
+Participant booking screens run separate `senderId == uid` and `travelerId == uid` queries and merge by ID. Custody queries constrain `bookingId` or `shipmentId`; reviews constrain `bookingId` or `subjectId`; notifications constrain recipient and order newest-first. Identity verification uses a direct owner-document lookup and requires no collection query.
 
 ## Production hardening
 
 The current rules are an MVP policy boundary. Emulator allow/deny tests, Cloud Function transactions, command idempotency, capacity reservation, durable events, and privacy review remain required before production deployment.
 
-See [Booking Lifecycle](../product/booking-lifecycle.md), [Custody Model](../architecture/custody-model.md), and [Repository Pattern](../architecture/repository-pattern.md).
+See [Booking Lifecycle](../product/booking-lifecycle.md), [Custody Model](../architecture/custody-model.md), [Shipment Timeline](../architecture/shipment-timeline.md), and [Repository Pattern](../architecture/repository-pattern.md).

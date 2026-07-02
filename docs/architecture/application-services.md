@@ -13,6 +13,7 @@ This document covers the implemented service foundations for shipments, trips, b
 | Service | Current responsibility |
 | --- | --- |
 | `ShipmentService` | Validate and normalize a listing, persist it, publish `ShipmentCreated` |
+| `ShipmentTimelineService` | Validate a shipment identifier and list/watch its canonical shipment-linked custody events |
 | `TripService` | Validate route/date/capacity data, persist it, publish `TripCreated` |
 | `BookingService` | Create requests, enforce actor roles and forward transitions, coordinate request/booking persistence, publish lifecycle events |
 | `NotificationService` | Subscribe to domain events and materialize in-app notification records |
@@ -28,6 +29,8 @@ This document covers the implemented service foundations for shipments, trips, b
 | `ApplicationErrorService` | Normalize domain/provider failures, attach recovery guidance, and report structured diagnostics through an injected logger |
 
 Services import repository interfaces and domain types; they do not import Firestore. A singleton presentation composition now injects Firebase adapters and the event bus. Home, Send, Travel, Tracking, and Profile use the service layer. Profile's read-only identity-verification hook calls `IdentityVerificationService` through that composition and never imports the Firebase repository directly.
+
+The shipment timeline service is composed for future use but does not add or change any screen in Milestone 8.
 
 `TrustService.getVisibleSummary` currently returns a client-calculated display projection. Profile may supply the current user's participant history, account creation time, and self-readable identity level. Other-user summaries use visible review evidence only. Authoritative persistence remains denied and requires a future trusted server projection with durable evidence references.
 
@@ -67,5 +70,6 @@ Zustand remains deferred. Screens use thin local state and service-backed realti
 - [Event Bus](event-bus.md)
 - [Notification Delivery](notification-delivery.md)
 - [Identity Verification](identity-verification.md)
+- [Shipment Timeline](shipment-timeline.md)
 - [Mobile Architecture](../engineering/mobile-architecture.md)
 - [API Design](../engineering/api-design.md)

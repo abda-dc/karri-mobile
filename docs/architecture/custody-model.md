@@ -10,9 +10,11 @@ Custody records cover booking association, event type, server timestamp, perform
 
 ## Current implementation
 
-`CustodyEvent` remains plain readonly TypeScript. `CustodyRepository` exposes `append`, `listByBooking`, and `watchByBooking`; it exposes no update/delete operation. `FirebaseCustodyRepository` uses Firestore server timestamps and chronological client ordering.
+`CustodyEvent` remains plain readonly TypeScript. New events carry both `bookingId` and `shipmentId`; older mapped records may expose a null shipment ID for backward compatibility. `CustodyRepository` exposes `append`, `listByBooking`, and `watchByBooking`; it exposes no update/delete operation. `FirebaseCustodyRepository` uses Firestore server timestamps and chronological client ordering.
 
 Booking actions append Shipment Created, Traveler Accepted, Pickup Confirmed, Delivery Confirmed, and Completed. `CustodyService` lets only the traveler append Airport Departure and Airport Arrival while in transit, prevents duplicates, and requires departure before arrival.
+
+`custodyStateMachine.ts` owns the forward event sequence. The same stored events implement `ShipmentTimelineRepository`, so shipment and custody timelines cannot diverge into competing histories.
 
 Tracking renders timestamp, actor, label, location, and note. Firestore rules repeat participant, actor, booking-state, field-size, and append-only checks.
 
@@ -36,6 +38,7 @@ Move the current atomic Firestore batches behind Cloud Function commands. Add al
 ## Related documents
 
 - [Chain of Custody](../product/chain-of-custody.md)
+- [Shipment Timeline](shipment-timeline.md)
 - [Booking State Machine](booking-state-machine.md)
 - [Repository Pattern](repository-pattern.md)
 - [Chain of Custody ADR](../adr/adr-0006-why-chain-of-custody.md)

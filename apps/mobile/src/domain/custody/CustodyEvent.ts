@@ -16,6 +16,7 @@ export type CustodyEventType =
 export interface CustodyEvent {
   readonly id: string;
   readonly bookingId: string;
+  readonly shipmentId: string | null;
   readonly eventType: CustodyEventType;
   readonly timestamp: DomainTimestamp;
   readonly performedBy: string;
@@ -24,4 +25,9 @@ export interface CustodyEvent {
   readonly metadata: Readonly<Record<string, unknown>>;
 }
 
-export type NewCustodyEvent = Omit<CustodyEvent, "id" | "timestamp">;
+export type NewCustodyEvent = Omit<
+  CustodyEvent,
+  "id" | "timestamp" | "shipmentId"
+> & {
+  readonly shipmentId: string;
+};

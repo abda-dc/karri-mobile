@@ -529,6 +529,28 @@ service cloud.firestore {
         && bookingRequest.status == data.status;
     }
 
+    function custodyEventExists(bookingId, eventType) {
+      return exists(
+        /databases/$(database)/documents/custodyEvents/$(bookingId + '__' + eventType)
+      );
+    }
+
+    function validCustodySequence(data) {
+      return data.eventType == 'shipment_created'
+        || (data.eventType == 'traveler_accepted'
+          && custodyEventExists(data.bookingId, 'shipment_created'))
+        || (data.eventType == 'pickup_confirmed'
+          && custodyEventExists(data.bookingId, 'traveler_accepted'))
+        || (data.eventType == 'airport_departure'
+          && custodyEventExists(data.bookingId, 'pickup_confirmed'))
+        || (data.eventType == 'airport_arrival'
+          && custodyEventExists(data.bookingId, 'airport_departure'))
+        || (data.eventType == 'delivery_confirmed'
+          && custodyEventExists(data.bookingId, 'pickup_confirmed'))
+        || (data.eventType == 'completed'
+          && custodyEventExists(data.bookingId, 'delivery_confirmed'));
+    }
+
     match /users/{userId} {
       allow read: if signedIn() && request.auth.uid == userId;
       allow create: if signedIn()
@@ -640,6 +662,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly([
           'bookingId',
+          'shipmentId',
           'eventType',
           'performedBy',
           'location',
@@ -648,6 +671,11 @@ service cloud.firestore {
           'timestamp'
         ])
         && request.resource.data.bookingId is string
+        && request.resource.data.bookingId.size() > 0
+        && request.resource.data.bookingId.size() <= 128
+        && request.resource.data.shipmentId is string
+        && request.resource.data.shipmentId.size() > 0
+        && request.resource.data.shipmentId.size() <= 128
         && request.resource.data.eventType in [
           'shipment_created',
           'traveler_accepted',
@@ -665,12 +693,22 @@ service cloud.firestore {
           || (request.resource.data.note is string
             && request.resource.data.note.size() <= 500))
         && request.resource.data.metadata is map
+        && request.resource.data.metadata.keys().hasOnly(['bookingStatus'])
+        && validBookingStatus(request.resource.data.metadata.bookingStatus)
         && request.resource.data.timestamp == request.time
+        && eventId == request.resource.data.bookingId + '__' + request.resource.data.eventType
         && isBookingParticipant(
           getAfter(
             /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
           ).data
         )
+        && request.resource.data.shipmentId == getAfter(
+          /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+        ).data.shipmentId
+        && request.resource.data.metadata.bookingStatus == getAfter(
+          /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
+        ).data.status
+        && validCustodySequence(request.resource.data)
         && (
           (request.resource.data.eventType == 'shipment_created'
             && request.auth.uid == getAfter(
