@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { colors, radii, spacing, typography } from "../theme/tokens";
 
 type TrustBadgeProps = {
@@ -20,7 +20,7 @@ export function TrustBadge({
         importantForAccessibility="no-hide-descendants"
         style={[styles.mark, compact && styles.compactMark]}
       >
-        <Text style={styles.markText}>K</Text>
+        <Image source={require("../../assets/favicon.png")} style={styles.markImage} />
       </View>
       <View style={styles.copy}>
         <Text style={styles.label}>{label}</Text>
@@ -49,8 +49,6 @@ const styles = StyleSheet.create({
   },
   mark: {
     alignItems: "center",
-    backgroundColor: colors.gold,
-    borderRadius: radii.pill,
     height: 30,
     justifyContent: "center",
     width: 30,
@@ -59,10 +57,10 @@ const styles = StyleSheet.create({
     height: 24,
     width: 24,
   },
-  markText: {
-    color: colors.white,
-    ...typography.caption,
-    fontWeight: "900",
+  markImage: {
+    height: 24,
+    resizeMode: "contain",
+    width: 24,
   },
   copy: {
     flexShrink: 1,
@@ -76,3 +74,5 @@ const styles = StyleSheet.create({
     ...typography.caption,
   },
 });
+
+

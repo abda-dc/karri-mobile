@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { Badge } from "../../src/components/Badge";
 import { Banner } from "../../src/components/Banner";
 import { Card } from "../../src/components/Card";
@@ -11,7 +11,6 @@ import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
 import { StatusChip } from "../../src/components/StatusChip";
 import { TextField } from "../../src/components/TextField";
-import { TrustBadge } from "../../src/components/TrustBadge";
 import type { MatchResult } from "../../src/domain/matching/MatchResult";
 import {
   defaultMatchDiscoveryFilters,
@@ -214,9 +213,11 @@ export default function SendScreen() {
         title="Create a shipment"
       />
 
-      <TrustBadge
-        detail="Clear package details help travelers make informed choices."
-        label="Clarity builds trust"
+      <Image
+        accessibilityLabel="Clarity builds trust"
+        resizeMode="cover"
+        source={require("../../assets/send-trust-badge-icon.png")}
+        style={styles.dashboardHeaderImage}
       />
 
       {auth.loading ? (
@@ -445,6 +446,13 @@ export default function SendScreen() {
 }
 
 const styles = StyleSheet.create({
+  dashboardHeaderImage: {
+    alignSelf: "stretch",
+    borderRadius: 28,
+    height: 180,
+    overflow: "hidden",
+    width: "100%",
+  },
   page: {
     gap: spacing.xl,
   },
@@ -500,3 +508,8 @@ const styles = StyleSheet.create({
     ...typography.caption,
   },
 });
+
+
+
+
+

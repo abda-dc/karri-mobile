@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { Badge } from "../../src/components/Badge";
 import { Banner } from "../../src/components/Banner";
 import { Card } from "../../src/components/Card";
@@ -197,10 +197,12 @@ export default function AppHomeScreen() {
   return (
     <Screen contentStyle={styles.page} withTabBar>
       <Card style={styles.hero} variant="soft">
-        <View style={styles.heroTop}>
-          <Badge label="Karri community" tone="primary" />
-          <TrustBadge compact label="Trust-first" />
-        </View>
+        <Image
+          accessibilityLabel="Karri community trust-first header"
+          resizeMode="cover"
+          source={require("../../assets/home-trust-badge-icon.png")}
+          style={styles.dashboardHeaderImage}
+        />
         <View style={styles.heroCopy}>
           <Text style={styles.heroTitle}>Move across borders with more clarity.</Text>
           <Text style={styles.heroBody}>
@@ -330,20 +332,20 @@ export default function AppHomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  dashboardHeaderImage: {
+    alignSelf: "stretch",
+    borderRadius: 28,
+    height: 180,
+    overflow: "hidden",
+    width: "100%",
+  },
   page: {
     gap: spacing.xxl,
   },
   hero: {
-    backgroundColor: colors.primarySoft,
     gap: spacing.lg,
   },
-  heroTop: {
-    alignItems: "center",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-    justifyContent: "space-between",
-  },
+
   heroCopy: {
     gap: spacing.sm,
   },
@@ -400,3 +402,8 @@ const styles = StyleSheet.create({
     ...typography.caption,
   },
 });
+
+
+
+
+

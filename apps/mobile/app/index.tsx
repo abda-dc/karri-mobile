@@ -7,7 +7,6 @@ import { Card } from "../src/components/Card";
 import { LoadingState } from "../src/components/LoadingState";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
-import { TrustBadge } from "../src/components/TrustBadge";
 import { useAuthSession } from "../src/presentation/hooks/useAuthSession";
 import { mobileServices } from "../src/presentation/services/mobileServices";
 import { colors, radii, spacing, typography } from "../src/theme/tokens";
@@ -43,11 +42,16 @@ export default function WelcomeScreen() {
       <View style={styles.hero}>
         <Image
           accessibilityLabel="Karri"
-          resizeMode="contain"
+          resizeMode="cover"
           source={require("../assets/karri-logo.jpeg")}
           style={styles.logo}
         />
-        <TrustBadge compact label="Community shipping, made clearer" />
+        <Image
+          accessibilityLabel="Karri community shipping"
+          resizeMode="cover"
+          source={require("../assets/home-trust-badge-icon.png")}
+          style={styles.dashboardHeaderImage}
+        />
         <View style={styles.heroCopy}>
           <Text style={styles.title}>Welcome to Karri</Text>
           <Text style={styles.subtitle}>
@@ -83,6 +87,13 @@ export default function WelcomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  dashboardHeaderImage: {
+    alignSelf: "stretch",
+    borderRadius: 28,
+    height: 180,
+    overflow: "hidden",
+    width: "100%",
+  },
   screenContent: {
     gap: spacing.xl,
   },
@@ -145,3 +156,8 @@ const styles = StyleSheet.create({
     width: 1,
   },
 });
+
+
+
+
+

@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 import { Banner } from "../../src/components/Banner";
 import { EmptyState } from "../../src/components/EmptyState";
 import { LoadingState } from "../../src/components/LoadingState";
@@ -8,7 +8,6 @@ import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
 import { StatusChip } from "../../src/components/StatusChip";
-import { TrustBadge } from "../../src/components/TrustBadge";
 import type { Booking, BookingRequest } from "../../src/domain/booking/Booking";
 import type { Notification } from "../../src/domain/notification/Notification";
 import { BookingDetailCard } from "../../src/presentation/components/BookingDetailCard";
@@ -102,9 +101,11 @@ export default function TrackingScreen() {
         title="Tracking with clarity"
       />
 
-      <TrustBadge
-        detail="Every lifecycle change is guarded, and custody records are appended rather than rewritten."
-        label="Visible responsibility"
+      <Image
+        accessibilityLabel="Visible responsibility"
+        resizeMode="cover"
+        source={require("../../assets/track-trust-badge-icon.png")}
+        style={styles.dashboardHeaderImage}
       />
 
       {auth.loading || loading ? (
@@ -165,6 +166,13 @@ export default function TrackingScreen() {
 }
 
 const styles = StyleSheet.create({
+  dashboardHeaderImage: {
+    alignSelf: "stretch",
+    borderRadius: 28,
+    height: 180,
+    overflow: "hidden",
+    width: "100%",
+  },
   page: {
     gap: spacing.xl,
   },
@@ -172,3 +180,10 @@ const styles = StyleSheet.create({
     gap: spacing.xl,
   },
 });
+
+
+
+
+
+
+
