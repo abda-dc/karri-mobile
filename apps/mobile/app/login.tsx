@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 import { Banner } from "../src/components/Banner";
 import { Card } from "../src/components/Card";
 import { PrimaryButton } from "../src/components/PrimaryButton";
@@ -14,11 +14,11 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
 
   return (
-    <Screen centered contentStyle={styles.content}>
-      <SectionHeader
-        eyebrow="Welcome"
-        subtitle="Trusted community shipping starts with a clear account and a shared route."
-        title="Welcome to Karri"
+    <Screen contentStyle={styles.content}>
+      <Image
+        source={require("../assets/login-trust-badge-icon.png")}
+        style={styles.loginBadge}
+        resizeMode="cover"
       />
 
       <Card variant="elevated">
@@ -49,7 +49,10 @@ export default function LoginScreen() {
         />
 
         <View style={styles.actions}>
-          <PrimaryButton disabled={!email.trim()} onPress={() => router.push("/verify")}>
+          <PrimaryButton
+            disabled={!email.trim()}
+            onPress={() => router.push("/verify")}
+          >
             Continue
           </PrimaryButton>
           <PrimaryButton variant="ghost" onPress={() => router.back()}>
@@ -63,7 +66,14 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   content: {
-    gap: spacing.xl,
+    gap: 0,
+  },
+  loginBadge: {
+    alignSelf: "stretch",
+    borderRadius: 22,
+    height: 220,
+    marginBottom: -1,
+    width: "100%",
   },
   actions: {
     gap: spacing.xs,
