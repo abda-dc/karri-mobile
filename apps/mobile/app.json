@@ -39,6 +39,12 @@
         "projectId": "b73a2031-8f5f-4f59-8222-e999d115b6cb"
       }
     },
-    "owner": "abda.dc"
+    "owner": "abda.dc",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b73a2031-8f5f-4f59-8222-e999d115b6cb"
+    }
   }
 }
