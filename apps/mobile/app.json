@@ -31,7 +31,8 @@
           "defaultChannel": "karri_activity_v1",
           "enableBackgroundRemoteNotifications": false
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "router": {},

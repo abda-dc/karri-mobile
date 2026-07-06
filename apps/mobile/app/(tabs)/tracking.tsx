@@ -1,7 +1,8 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Image, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { Banner } from "../../src/components/Banner";
+import { DashboardHeaderImage } from "../../src/components/DashboardHeaderImage";
 import { EmptyState } from "../../src/components/EmptyState";
 import { LoadingState } from "../../src/components/LoadingState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
@@ -101,11 +102,10 @@ export default function TrackingScreen() {
         title="Tracking with clarity"
       />
 
-      <Image
+      <DashboardHeaderImage
         accessibilityLabel="Visible responsibility"
-        resizeMode="cover"
+        aspectRatio={2172 / 724}
         source={require("../../assets/track-trust-badge-icon.png")}
-        style={styles.dashboardHeaderImage}
       />
 
       {auth.loading || loading ? (
@@ -166,13 +166,6 @@ export default function TrackingScreen() {
 }
 
 const styles = StyleSheet.create({
-  dashboardHeaderImage: {
-    alignSelf: "stretch",
-    borderRadius: 28,
-    height: 180,
-    overflow: "hidden",
-    width: "100%",
-  },
   page: {
     gap: spacing.xl,
   },

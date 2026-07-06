@@ -35,6 +35,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
     gap: spacing.md,
+    maxWidth: "100%",
+    minWidth: 0,
     padding: layout.cardPadding,
   },
   elevated: {

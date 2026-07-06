@@ -1,9 +1,10 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Badge } from "../../src/components/Badge";
 import { Banner } from "../../src/components/Banner";
 import { Card } from "../../src/components/Card";
+import { DashboardHeaderImage } from "../../src/components/DashboardHeaderImage";
 import { EmptyState } from "../../src/components/EmptyState";
 import { LoadingState } from "../../src/components/LoadingState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
@@ -213,11 +214,10 @@ export default function SendScreen() {
         title="Create a shipment"
       />
 
-      <Image
+      <DashboardHeaderImage
         accessibilityLabel="Clarity builds trust"
-        resizeMode="cover"
+        aspectRatio={2172 / 724}
         source={require("../../assets/send-trust-badge-icon.png")}
-        style={styles.dashboardHeaderImage}
       />
 
       {auth.loading ? (
@@ -446,13 +446,6 @@ export default function SendScreen() {
 }
 
 const styles = StyleSheet.create({
-  dashboardHeaderImage: {
-    alignSelf: "stretch",
-    borderRadius: 28,
-    height: 180,
-    overflow: "hidden",
-    width: "100%",
-  },
   page: {
     gap: spacing.xl,
   },

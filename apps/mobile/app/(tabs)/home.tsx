@@ -1,9 +1,10 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Badge } from "../../src/components/Badge";
 import { Banner } from "../../src/components/Banner";
 import { Card } from "../../src/components/Card";
+import { DashboardHeaderImage } from "../../src/components/DashboardHeaderImage";
 import { EmptyState } from "../../src/components/EmptyState";
 import { LoadingState } from "../../src/components/LoadingState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
@@ -197,11 +198,10 @@ export default function AppHomeScreen() {
   return (
     <Screen contentStyle={styles.page} withTabBar>
       <Card style={styles.hero} variant="soft">
-        <Image
+        <DashboardHeaderImage
           accessibilityLabel="Karri community trust-first header"
-          resizeMode="cover"
+          aspectRatio={1918 / 820}
           source={require("../../assets/home-trust-badge-icon.png")}
-          style={styles.dashboardHeaderImage}
         />
         <View style={styles.heroCopy}>
           <Text style={styles.heroTitle}>Move across borders with more clarity.</Text>
@@ -332,13 +332,6 @@ export default function AppHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  dashboardHeaderImage: {
-    alignSelf: "stretch",
-    borderRadius: 28,
-    height: 180,
-    overflow: "hidden",
-    width: "100%",
-  },
   page: {
     gap: spacing.xxl,
   },
