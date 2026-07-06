@@ -250,3 +250,54 @@ Recommended next sequence:
 5. Build Android preview APK through EAS.
 6. Start Milestone 13 real-device validation.
 7. Inspect Azure production resources separately before any public cutover.
+
+## Milestone 12.5 Static Web Apps validation update
+
+Temporary Azure Linux App Service validation was abandoned because Kudu/ZipDeploy extraction produced invalid mixed Linux and Windows paths during deployment. The issue was infrastructure-related, not application-related.
+
+A new temporary Azure Static Web Apps validation environment was created instead:
+
+| Item | Value |
+| --- | --- |
+| Static Web App | swa-karri-mobile-web-test |
+| Resource group | rg-karri-prod |
+| Region | Central US |
+| Validation hostname | https://nice-ground-08f721010.7.azurestaticapps.net |
+| Repository | https://github.com/abda-dc/karri-mobile |
+| Branch | main |
+| App location | apps/mobile |
+| Output location | dist |
+| Build command | npx expo export --platform web |
+
+GitHub Actions now deploys the Expo static web export through:
+
+    .github/workflows/azure-static-web-apps-nice-ground-08f721010.yml
+
+Firebase public web configuration is provided through GitHub Actions secrets. Do not commit `.env.local`, `.env`, Firebase values, or deployment tokens.
+
+Required GitHub Actions secrets:
+
+- EXPO_PUBLIC_FIREBASE_API_KEY
+- EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN
+- EXPO_PUBLIC_FIREBASE_PROJECT_ID
+- EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET
+- EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+- EXPO_PUBLIC_FIREBASE_APP_ID
+- AZURE_STATIC_WEB_APPS_API_TOKEN_NICE_GROUND_08F721010
+
+Validation result:
+
+- Static Web Apps deployment succeeded.
+- Firebase configuration loaded in the deployed Expo web build.
+- The previous "Karri is not configured for this environment" blocker was resolved.
+- Production resources remained untouched.
+
+The old temporary App Service remains non-production and should not be used for further web validation:
+
+    https://app-karri-mobile-web-test.azurewebsites.net
+
+Recommended cleanup after Milestone 12.5 is safely committed:
+
+1. Stop the old temporary App Service.
+2. Keep it briefly as a safety reference.
+3. Delete it later after the Static Web Apps validation path is accepted.
