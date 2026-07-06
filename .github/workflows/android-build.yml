@@ -53,6 +53,7 @@ jobs:
         run: |
           cd android
           chmod +x ./gradlew
+          echo 'org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8' >> gradle.properties
           ./gradlew assembleRelease
 
       - name: Sign release APK with debug key for emulator validation
@@ -70,3 +71,4 @@ jobs:
           name: karri-mobile-standalone-release-apk
           path: apps/mobile/android/app/build/outputs/apk/release/karri-mobile-standalone-release.apk
           if-no-files-found: error
+
