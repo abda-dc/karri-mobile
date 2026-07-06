@@ -5,7 +5,7 @@ on:
 
 jobs:
   android-apk:
-    name: Build Android APK
+    name: Build Standalone Android APK
     runs-on: ubuntu-latest
 
     defaults:
@@ -49,15 +49,24 @@ jobs:
       - name: Prebuild Android
         run: npx expo prebuild --platform android --clean
 
-      - name: Build debug APK
+      - name: Build release APK
         run: |
           cd android
           chmod +x ./gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
-      - name: Upload APK artifact
+      - name: Sign release APK with debug key for emulator validation
+        run: |
+          $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort -V | tail -n 1)/apksigner sign \
+            --ks ~/.android/debug.keystore \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out android/app/build/outputs/apk/release/karri-mobile-standalone-release.apk \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Upload standalone APK artifact
         uses: actions/upload-artifact@v5
         with:
-          name: karri-mobile-debug-apk
-          path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
+          name: karri-mobile-standalone-release-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/karri-mobile-standalone-release.apk
           if-no-files-found: error
