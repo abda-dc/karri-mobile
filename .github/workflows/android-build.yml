@@ -106,16 +106,23 @@ jobs:
           cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/karri-mobile-release.apk
           cp android/app/build/outputs/bundle/release/app-release.aab android/app/build/outputs/bundle/release/karri-mobile-release.aab
 
+          sha256sum android/app/build/outputs/apk/release/karri-mobile-release.apk > android/app/build/outputs/apk/release/karri-mobile-release.apk.sha256
+          sha256sum android/app/build/outputs/bundle/release/karri-mobile-release.aab > android/app/build/outputs/bundle/release/karri-mobile-release.aab.sha256
+
       - name: Upload signed APK artifact
         uses: actions/upload-artifact@v5
         with:
           name: karri-mobile-release-apk
-          path: apps/mobile/android/app/build/outputs/apk/release/karri-mobile-release.apk
+          path: |
+            apps/mobile/android/app/build/outputs/apk/release/karri-mobile-release.apk
+            apps/mobile/android/app/build/outputs/apk/release/karri-mobile-release.apk.sha256
           if-no-files-found: error
 
       - name: Upload signed AAB artifact
         uses: actions/upload-artifact@v5
         with:
           name: karri-mobile-release-aab
-          path: apps/mobile/android/app/build/outputs/bundle/release/karri-mobile-release.aab
+          path: |
+            apps/mobile/android/app/build/outputs/bundle/release/karri-mobile-release.aab
+            apps/mobile/android/app/build/outputs/bundle/release/karri-mobile-release.aab.sha256
           if-no-files-found: error
