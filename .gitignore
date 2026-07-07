@@ -30,3 +30,8 @@ Thumbs.db
 .venv/
 __pycache__/
 site/
+
+# Local Android signing keys
+keystores/
+*.jks
+*.keystore

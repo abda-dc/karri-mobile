@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  android-apk:
-    name: Build Standalone Android APK
+  android-release:
+    name: Build Signed Android Release
     runs-on: ubuntu-latest
 
     defaults:
@@ -19,6 +19,9 @@ jobs:
       EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
       EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
       EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -49,36 +52,69 @@ jobs:
       - name: Prebuild Android
         run: npx expo prebuild --platform android --clean
 
-      - name: Build release APK
+      - name: Decode production keystore
+        run: |
+          test -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}"
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/karri-mobile-release.jks
+          keytool -list \
+            -keystore android/app/karri-mobile-release.jks \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            -alias "$ANDROID_KEY_ALIAS"
+
+      - name: Configure Android release signing
+        run: |
+          cat > android/ci-release-signing.gradle <<'GRADLE'
+          gradle.projectsEvaluated {
+              def appProject = gradle.rootProject.project(":app")
+              appProject.android {
+                  signingConfigs {
+                      karriRelease {
+                          storeFile file("karri-mobile-release.jks")
+                          storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                          keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                          keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+                      }
+                  }
+
+                  buildTypes {
+                      release {
+                          signingConfig signingConfigs.karriRelease
+                      }
+                  }
+              }
+          }
+          GRADLE
+
+          cat android/ci-release-signing.gradle
+
+      - name: Build signed release APK and AAB
         run: |
           cd android
           chmod +x ./gradlew
           printf '\norg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8\nkotlin.daemon.jvmargs=-Xmx1g -XX:MaxMetaspaceSize=512m\n' >> gradle.properties
-          ./gradlew assembleRelease --stacktrace --info --console=plain
+          ./gradlew -I ci-release-signing.gradle assembleRelease bundleRelease --stacktrace --info --console=plain
 
-      - name: Sign release APK with debug key for emulator validation
+      - name: Verify signed APK
         run: |
-          mkdir -p ~/.android
-          keytool -genkeypair -noprompt \
-            -keystore ~/.android/debug.keystore \
-            -storepass android \
-            -alias androiddebugkey \
-            -keypass android \
-            -dname "CN=Android Debug,O=Android,C=US" \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000
-          $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort -V | tail -n 1)/apksigner sign \
-            --ks ~/.android/debug.keystore \
-            --ks-pass pass:android \
-            --key-pass pass:android \
-            --out android/app/build/outputs/apk/release/karri-mobile-standalone-release.apk \
-            android/app/build/outputs/apk/release/app-release.apk
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
+          if "$BUILD_TOOLS/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk | grep -q "CN=Android Debug"; then
+            echo "Release APK is debug-signed. Failing build."
+            exit 1
+          fi
+          cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/karri-mobile-release.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab android/app/build/outputs/bundle/release/karri-mobile-release.aab
 
-      - name: Upload standalone APK artifact
+      - name: Upload signed APK artifact
         uses: actions/upload-artifact@v5
         with:
-          name: karri-mobile-standalone-release-apk
-          path: apps/mobile/android/app/build/outputs/apk/release/karri-mobile-standalone-release.apk
+          name: karri-mobile-release-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/karri-mobile-release.apk
           if-no-files-found: error
 
+      - name: Upload signed AAB artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: karri-mobile-release-aab
+          path: apps/mobile/android/app/build/outputs/bundle/release/karri-mobile-release.aab
+          if-no-files-found: error
