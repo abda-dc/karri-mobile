@@ -8,10 +8,12 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.karri.mobile"
+      "bundleIdentifier": "com.karri.mobile",
+      "buildNumber": "1"
     },
     "android": {
       "package": "com.karri.mobile",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
