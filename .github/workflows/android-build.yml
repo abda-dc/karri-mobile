@@ -55,9 +55,9 @@ jobs:
       - name: Decode production keystore
         run: |
           test -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}"
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/karri-mobile-release.jks
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/karri-mobile-release.jks
           keytool -list \
-            -keystore android/app/karri-mobile-release.jks \
+            -keystore android/karri-mobile-release.jks \
             -storepass "$ANDROID_KEYSTORE_PASSWORD" \
             -alias "$ANDROID_KEY_ALIAS"
 
