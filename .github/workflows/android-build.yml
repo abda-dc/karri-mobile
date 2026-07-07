@@ -53,17 +53,27 @@ jobs:
         run: |
           cd android
           chmod +x ./gradlew
-          echo 'org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8' >> gradle.properties
-          ./gradlew assembleRelease
+          printf '\norg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8\nkotlin.daemon.jvmargs=-Xmx1g -XX:MaxMetaspaceSize=512m\n' >> gradle.properties
+          ./gradlew assembleRelease --stacktrace --info --console=plain
 
       - name: Sign release APK with debug key for emulator validation
         run: |
+          mkdir -p ~/.android
+          keytool -genkeypair -noprompt \
+            -keystore ~/.android/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000
           $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort -V | tail -n 1)/apksigner sign \
             --ks ~/.android/debug.keystore \
             --ks-pass pass:android \
             --key-pass pass:android \
             --out android/app/build/outputs/apk/release/karri-mobile-standalone-release.apk \
-            android/app/build/outputs/apk/release/app-release-unsigned.apk
+            android/app/build/outputs/apk/release/app-release.apk
 
       - name: Upload standalone APK artifact
         uses: actions/upload-artifact@v5
