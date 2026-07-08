@@ -8,6 +8,7 @@ import { DashboardHeaderImage } from "../../src/components/DashboardHeaderImage"
 import { EmptyState } from "../../src/components/EmptyState";
 import { LoadingState } from "../../src/components/LoadingState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
+import { RouteSelector, type RouteSelection } from "../../src/components/RouteSelector";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
 import { StatusChip } from "../../src/components/StatusChip";
@@ -155,9 +156,19 @@ export default function TravelScreen() {
     setSuccessMessage(null);
   }
 
+  function updateRoute(prefix: "origin" | "destination", route: RouteSelection) {
+    setForm((current) => ({
+      ...current,
+      [`${prefix}Country`]: route.country,
+      [`${prefix}City`]: route.city,
+    }));
+    setFormError(null);
+    setSuccessMessage(null);
+  }
+
   async function handleCreateTrip() {
     if (!auth.user) {
-      setFormError("Sign in before creating a trip.");
+      router.push("/login");
       return;
     }
 
@@ -239,67 +250,32 @@ export default function TravelScreen() {
         <LoadingState message="Checking your Karri session..." />
       ) : null}
 
-      {!auth.loading && !auth.user ? (
-        <View style={styles.section}>
-          {auth.error ? (
+      <View style={styles.pageStack}>
+          {!auth.loading && !auth.user ? (
+            <Banner
+              message="Sign in to post your trip and receive shipment matches. You can complete the form first."
+              title="Continue as a guest"
+              variant="info"
+            />
+          ) : null}
+          {!auth.loading && !auth.user && auth.error ? (
             <Banner compact message={auth.error} title="Development setup" variant="development" />
           ) : null}
-          <EmptyState
-            action={<PrimaryButton onPress={() => router.push("/login")}>Get started</PrimaryButton>}
-            description="Start a Karri session before creating an owner-scoped trip."
-            marker="T"
-            title="Sign in to share a trip"
-          />
-        </View>
-      ) : null}
-
-      {auth.user ? (
-        <View style={styles.pageStack}>
           <Card variant="elevated">
             <SectionHeader
               subtitle="Matches use the country and city values exactly."
               title="Route"
             />
-            <View style={styles.fieldRow}>
-              <TextField
-                containerStyle={styles.fieldColumn}
-                label="Origin country"
-                maxLength={80}
-                onChangeText={(value) => updateField("originCountry", value)}
-                placeholder="United States"
-                required
-                value={form.originCountry}
-              />
-              <TextField
-                containerStyle={styles.fieldColumn}
-                label="Origin city"
-                maxLength={120}
-                onChangeText={(value) => updateField("originCity", value)}
-                placeholder="Washington, DC"
-                required
-                value={form.originCity}
-              />
-            </View>
-            <View style={styles.fieldRow}>
-              <TextField
-                containerStyle={styles.fieldColumn}
-                label="Destination country"
-                maxLength={80}
-                onChangeText={(value) => updateField("destinationCountry", value)}
-                placeholder="Kenya"
-                required
-                value={form.destinationCountry}
-              />
-              <TextField
-                containerStyle={styles.fieldColumn}
-                label="Destination city"
-                maxLength={120}
-                onChangeText={(value) => updateField("destinationCity", value)}
-                placeholder="Nairobi"
-                required
-                value={form.destinationCity}
-              />
-            </View>
+            <RouteSelector
+              label="Origin"
+              onChange={(route) => updateRoute("origin", route)}
+              value={{ country: form.originCountry, subdivision: "", city: form.originCity }}
+            />
+            <RouteSelector
+              label="Destination"
+              onChange={(route) => updateRoute("destination", route)}
+              value={{ country: form.destinationCountry, subdivision: "", city: form.destinationCity }}
+            />
           </Card>
 
           <Card variant="outlined">
@@ -359,7 +335,7 @@ export default function TravelScreen() {
             </PrimaryButton>
           </Card>
 
-          <View style={styles.section}>
+          {auth.user ? <View style={styles.section}>
             <SectionHeader
               action={<StatusChip label={`${trips.length} total`} tone="neutral" />}
               eyebrow="Your activity"
@@ -415,7 +391,7 @@ export default function TravelScreen() {
                   </Card>
                 ))
               : null}
-          </View>
+          </View> : null}
 
           {!listLoading && !dataError && activeTrips.length > 0 ? (
             <View style={styles.discoverySection}>
@@ -445,7 +421,6 @@ export default function TravelScreen() {
             </View>
           ) : null}
         </View>
-      ) : null}
     </Screen>
   );
 }
