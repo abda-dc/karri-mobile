@@ -80,6 +80,17 @@ type WeightSelectorProps = {
   value: string;
 };
 
+type RewardSuggestion = {
+  applyValue: string;
+  high: number;
+  low: number;
+};
+
+type RewardSuggestionHelperProps = {
+  onApply: (value: string) => void;
+  suggestion: RewardSuggestion | null;
+};
+
 function PackageCategoryPicker({ onChange, value }: PackageCategoryPickerProps) {
   return (
     <View style={styles.categoryField}>
@@ -116,6 +127,125 @@ function PackageCategoryPicker({ onChange, value }: PackageCategoryPickerProps) 
           );
         })}
       </View>
+    </View>
+  );
+}
+
+function calculateDeliveryWindowDays(start: string, end: string): number | null {
+  const startParts = start.split("-").map(Number);
+  const endParts = end.split("-").map(Number);
+
+  if (
+    startParts.length !== 3 ||
+    endParts.length !== 3 ||
+    startParts.some((part) => !Number.isFinite(part)) ||
+    endParts.some((part) => !Number.isFinite(part))
+  ) {
+    return null;
+  }
+
+  const startDate = Date.UTC(startParts[0], startParts[1] - 1, startParts[2]);
+  const endDate = Date.UTC(endParts[0], endParts[1] - 1, endParts[2]);
+  const dayMs = 24 * 60 * 60 * 1000;
+  return Math.round((endDate - startDate) / dayMs) + 1;
+}
+
+function roundReward(value: number): number {
+  return Math.max(5, Math.round(value));
+}
+
+function getRewardSuggestion(
+  packageCategory: string,
+  weightKg: string,
+  deliveryWindowStart: string,
+  deliveryWindowEnd: string,
+): RewardSuggestion | null {
+  const weight = Number(weightKg);
+
+  if (!Number.isFinite(weight) || weight <= 0) {
+    return null;
+  }
+
+  let low = 10;
+  let high = 18;
+
+  if (weight > 10) {
+    low = 60;
+    high = 90;
+  } else if (weight > 5) {
+    low = 40;
+    high = 65;
+  } else if (weight > 2) {
+    low = 25;
+    high = 40;
+  } else if (weight > 1) {
+    low = 15;
+    high = 25;
+  }
+
+  if (packageCategory === "Electronics") {
+    low += 8;
+    high += 8;
+  } else if (packageCategory === "Medicine") {
+    low += 6;
+    high += 6;
+  }
+
+  const deliveryDays = calculateDeliveryWindowDays(deliveryWindowStart, deliveryWindowEnd);
+  if (deliveryDays !== null) {
+    if (deliveryDays <= 1) {
+      low += 5;
+      high += 5;
+    } else if (deliveryDays >= 5) {
+      low -= 5;
+      high -= 5;
+    }
+  }
+
+  const roundedLow = roundReward(low);
+  const roundedHigh = Math.max(roundedLow + 5, roundReward(high));
+
+  return {
+    applyValue: String(Math.round((roundedLow + roundedHigh) / 2)),
+    high: roundedHigh,
+    low: roundedLow,
+  };
+}
+
+function RewardSuggestionHelper({ onApply, suggestion }: RewardSuggestionHelperProps) {
+  if (!suggestion) {
+    return (
+      <View style={styles.rewardSuggestion}>
+        <Text style={styles.rewardSuggestionEyebrow}>Suggested starting point</Text>
+        <Text style={styles.rewardSuggestionMuted}>
+          Add package weight to see a simple reward range.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.rewardSuggestion}>
+      <View style={styles.rewardSuggestionContent}>
+        <Text style={styles.rewardSuggestionEyebrow}>Suggested starting point</Text>
+        <Text style={styles.rewardSuggestionRange}>
+          ${suggestion.low}-${suggestion.high}
+        </Text>
+        <Text style={styles.rewardSuggestionMuted}>
+          Based on weight, package type, and delivery flexibility.
+        </Text>
+      </View>
+      <Pressable
+        accessibilityLabel={`Apply suggested reward of ${suggestion.applyValue} dollars`}
+        accessibilityRole="button"
+        onPress={() => onApply(suggestion.applyValue)}
+        style={({ pressed }) => [
+          styles.rewardApplyButton,
+          pressed && styles.pressedCategoryOption,
+        ]}
+      >
+        <Text style={styles.rewardApplyButtonText}>Apply ${suggestion.applyValue}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -316,6 +446,21 @@ export default function SendScreen() {
   const activeShipments = useMemo(
     () => shipments.filter((shipment) => shipment.status === "active"),
     [shipments],
+  );
+  const rewardSuggestion = useMemo(
+    () =>
+      getRewardSuggestion(
+        form.packageCategory,
+        form.weightKg,
+        form.deliveryWindowStart,
+        form.deliveryWindowEnd,
+      ),
+    [
+      form.deliveryWindowEnd,
+      form.deliveryWindowStart,
+      form.packageCategory,
+      form.weightKg,
+    ],
   );
 
   useEffect(() => {
@@ -601,6 +746,10 @@ export default function SendScreen() {
               required
               value={form.rewardAmount}
             />
+            <RewardSuggestionHelper
+              onApply={(value) => updateField("rewardAmount", value)}
+              suggestion={rewardSuggestion}
+            />
 
             {formError ? (
               <Banner message={formError} title="Review shipment details" variant="error" />
@@ -828,6 +977,50 @@ const styles = StyleSheet.create({
   },
   selectedUnitOptionText: {
     color: colors.primaryDark,
+  },
+  rewardSuggestion: {
+    alignItems: "center",
+    backgroundColor: colors.goldSoft,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    justifyContent: "space-between",
+    padding: spacing.md,
+  },
+  rewardSuggestionContent: {
+    flex: 1,
+    gap: spacing.xxs,
+    minWidth: 180,
+  },
+  rewardSuggestionEyebrow: {
+    color: colors.gold,
+    ...typography.caption,
+    fontWeight: "800",
+  },
+  rewardSuggestionRange: {
+    color: colors.text,
+    ...typography.headline,
+  },
+  rewardSuggestionMuted: {
+    color: colors.textSecondary,
+    ...typography.caption,
+  },
+  rewardApplyButton: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.gold,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: touchTargets.minimum,
+    paddingHorizontal: spacing.md,
+  },
+  rewardApplyButtonText: {
+    color: colors.gold,
+    ...typography.label,
   },
   metaRow: {
     flexDirection: "row",
