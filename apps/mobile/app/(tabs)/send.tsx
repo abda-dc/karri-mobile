@@ -91,6 +91,18 @@ type RewardSuggestionHelperProps = {
   suggestion: RewardSuggestion | null;
 };
 
+type ValidatedShipmentValues = {
+  rewardAmount: number;
+  weightKg: number;
+};
+
+type ShipmentReviewPanelProps = {
+  form: typeof emptyForm;
+  onEdit: () => void;
+  onPost: () => void;
+  saving: boolean;
+};
+
 function PackageCategoryPicker({ onChange, value }: PackageCategoryPickerProps) {
   return (
     <View style={styles.categoryField}>
@@ -126,6 +138,59 @@ function PackageCategoryPicker({ onChange, value }: PackageCategoryPickerProps) 
             </Pressable>
           );
         })}
+      </View>
+    </View>
+  );
+}
+
+function ShipmentReviewPanel({ form, onEdit, onPost, saving }: ShipmentReviewPanelProps) {
+  return (
+    <View style={styles.reviewPanel}>
+      <View style={styles.reviewHeader}>
+        <View style={styles.reviewHeaderText}>
+          <Text style={styles.reviewEyebrow}>Review shipment</Text>
+          <Text style={styles.reviewTitle}>Ready to post?</Text>
+        </View>
+        <Badge label={form.packageCategory} tone="primary" />
+      </View>
+
+      <View style={styles.reviewRoute}>
+        <Text style={styles.reviewRouteCity}>
+          {form.originCity}, {form.originCountry}
+        </Text>
+        <Text style={styles.reviewRouteArrow}>to</Text>
+        <Text style={styles.reviewRouteDestination}>
+          {form.destinationCity}, {form.destinationCountry}
+        </Text>
+      </View>
+
+      <View style={styles.reviewGrid}>
+        <View style={styles.reviewItem}>
+          <Text style={styles.reviewLabel}>Weight</Text>
+          <Text style={styles.reviewValue}>{form.weightKg} kg</Text>
+        </View>
+        <View style={styles.reviewItem}>
+          <Text style={styles.reviewLabel}>Reward</Text>
+          <Text style={styles.reviewValue}>${form.rewardAmount} USD</Text>
+        </View>
+        <View style={styles.reviewItemWide}>
+          <Text style={styles.reviewLabel}>Delivery window</Text>
+          <Text style={styles.reviewValue}>{form.deliveryWindow}</Text>
+        </View>
+      </View>
+
+      <View style={styles.reviewDescription}>
+        <Text style={styles.reviewLabel}>Package description</Text>
+        <Text style={styles.descriptionText}>{form.packageDescription}</Text>
+      </View>
+
+      <View style={styles.reviewActions}>
+        <PrimaryButton disabled={saving} onPress={onEdit} variant="secondary">
+          Edit details
+        </PrimaryButton>
+        <PrimaryButton loading={saving} onPress={onPost}>
+          {saving ? "Posting..." : "Post shipment"}
+        </PrimaryButton>
       </View>
     </View>
   );
@@ -409,6 +474,7 @@ export default function SendScreen() {
   const [weightMode, setWeightMode] = useState<"custom" | "preset">("preset");
   const [customWeightInput, setCustomWeightInput] = useState("");
   const [customWeightUnit, setCustomWeightUnit] = useState<WeightUnit>("kg");
+  const [reviewingShipment, setReviewingShipment] = useState(false);
 
   useEffect(() => {
     if (auth.loading) {
@@ -513,6 +579,7 @@ export default function SendScreen() {
     setForm((current) => ({ ...current, [field]: value }));
     setFormError(null);
     setSuccessMessage(null);
+    setReviewingShipment(false);
   }
 
   function updateDeliveryWindow(field: "deliveryWindowEnd" | "deliveryWindowStart", value: string) {
@@ -527,6 +594,7 @@ export default function SendScreen() {
     });
     setFormError(null);
     setSuccessMessage(null);
+    setReviewingShipment(false);
   }
 
   function selectPresetWeight(value: string) {
@@ -559,14 +627,10 @@ export default function SendScreen() {
     }));
     setFormError(null);
     setSuccessMessage(null);
+    setReviewingShipment(false);
   }
 
-  async function handleCreateShipment() {
-    if (!auth.user) {
-      router.push("/login");
-      return;
-    }
-
+  function validateShipmentForm(): ValidatedShipmentValues | null {
     const requiredText = [
       form.originCountry,
       form.originCity,
@@ -579,12 +643,12 @@ export default function SendScreen() {
 
     if (requiredText.some((value) => !value.trim())) {
       setFormError("Complete every shipment field before saving.");
-      return;
+      return null;
     }
 
     if (form.deliveryWindowEnd < form.deliveryWindowStart) {
       setFormError("Delivery window end cannot be before the start date.");
-      return;
+      return null;
     }
 
     const weightKg = Number(form.weightKg);
@@ -592,13 +656,47 @@ export default function SendScreen() {
 
     if (!Number.isFinite(weightKg) || weightKg <= 0 || weightKg > 100) {
       setFormError("Enter a weight greater than 0 and no more than 100 kg.");
-      return;
+      return null;
     }
 
     if (!Number.isFinite(rewardAmount) || rewardAmount <= 0 || rewardAmount > 100000) {
       setFormError("Enter a reward greater than 0 and no more than 100,000 USD.");
+      return null;
+    }
+
+    return { rewardAmount, weightKg };
+  }
+
+  function handleReviewShipment() {
+    if (!auth.user) {
+      router.push("/login");
       return;
     }
+
+    const validated = validateShipmentForm();
+    if (!validated) {
+      setReviewingShipment(false);
+      return;
+    }
+
+    setFormError(null);
+    setSuccessMessage(null);
+    setReviewingShipment(true);
+  }
+
+  async function handleCreateShipment() {
+    if (!auth.user) {
+      router.push("/login");
+      return;
+    }
+
+    const validated = validateShipmentForm();
+    if (!validated) {
+      setReviewingShipment(false);
+      return;
+    }
+
+    const { rewardAmount, weightKg } = validated;
 
     setSaving(true);
     setFormError(null);
@@ -621,6 +719,7 @@ export default function SendScreen() {
       setWeightMode("preset");
       setCustomWeightInput("");
       setCustomWeightUnit("kg");
+      setReviewingShipment(false);
       setSuccessMessage("Shipment saved. It is now available for corridor matching.");
     } catch (error) {
       setFormError(reportFriendlyError(error, "send.create-shipment"));
@@ -750,6 +849,14 @@ export default function SendScreen() {
               onApply={(value) => updateField("rewardAmount", value)}
               suggestion={rewardSuggestion}
             />
+            {reviewingShipment ? (
+              <ShipmentReviewPanel
+                form={form}
+                onEdit={() => setReviewingShipment(false)}
+                onPost={handleCreateShipment}
+                saving={saving}
+              />
+            ) : null}
 
             {formError ? (
               <Banner message={formError} title="Review shipment details" variant="error" />
@@ -758,9 +865,11 @@ export default function SendScreen() {
               <Banner message={successMessage} title="Shipment ready" variant="success" />
             ) : null}
 
-            <PrimaryButton loading={saving} onPress={handleCreateShipment}>
-              {saving ? "Saving shipment..." : "Save shipment"}
-            </PrimaryButton>
+            {!reviewingShipment ? (
+              <PrimaryButton loading={saving} onPress={handleReviewShipment}>
+                Review shipment
+              </PrimaryButton>
+            ) : null}
           </Card>
 
           {auth.user ? <View style={styles.section}>
@@ -1021,6 +1130,97 @@ const styles = StyleSheet.create({
   rewardApplyButtonText: {
     color: colors.gold,
     ...typography.label,
+  },
+  reviewPanel: {
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.primarySoft,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  reviewHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    justifyContent: "space-between",
+  },
+  reviewHeaderText: {
+    flex: 1,
+    gap: spacing.xxs,
+    minWidth: 180,
+  },
+  reviewEyebrow: {
+    color: colors.primary,
+    ...typography.caption,
+    fontWeight: "800",
+  },
+  reviewTitle: {
+    color: colors.text,
+    ...typography.subheading,
+  },
+  reviewRoute: {
+    gap: spacing.xxs,
+  },
+  reviewRouteCity: {
+    color: colors.textSecondary,
+    ...typography.bodyStrong,
+  },
+  reviewRouteArrow: {
+    color: colors.muted,
+    ...typography.caption,
+  },
+  reviewRouteDestination: {
+    color: colors.text,
+    ...typography.headline,
+  },
+  reviewGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  reviewItem: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    flexBasis: 132,
+    flexGrow: 1,
+    gap: spacing.xxs,
+    padding: spacing.sm,
+  },
+  reviewItemWide: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    flexBasis: 220,
+    flexGrow: 1,
+    gap: spacing.xxs,
+    padding: spacing.sm,
+  },
+  reviewLabel: {
+    color: colors.textSecondary,
+    ...typography.caption,
+    fontWeight: "800",
+  },
+  reviewValue: {
+    color: colors.text,
+    ...typography.bodyStrong,
+  },
+  reviewDescription: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    gap: spacing.xs,
+    padding: spacing.sm,
+  },
+  reviewActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
   },
   metaRow: {
     flexDirection: "row",
