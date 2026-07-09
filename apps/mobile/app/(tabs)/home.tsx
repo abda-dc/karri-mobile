@@ -8,6 +8,7 @@ import { DashboardHeaderImage } from "../../src/components/DashboardHeaderImage"
 import { EmptyState } from "../../src/components/EmptyState";
 import { LoadingState } from "../../src/components/LoadingState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
+import { RouteCardHeader } from "../../src/components/RouteCardHeader";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
 import { StatusChip } from "../../src/components/StatusChip";
@@ -16,7 +17,7 @@ import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
 import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
 import { TrustSummaryCard } from "../../src/presentation/components/TrustSummaryCard";
-import { colors, spacing, typography } from "../../src/theme/tokens";
+import { colors, radii, spacing, typography } from "../../src/theme/tokens";
 import type { Shipment, Trip } from "../../src/types/models";
 
 type CorridorMatch = {
@@ -25,6 +26,37 @@ type CorridorMatch = {
 };
 
 type OptimisticRequestState = "confirmed" | "pending";
+
+type HomeActionCardProps = {
+  badgeLabel: string;
+  buttonLabel?: string;
+  description: string;
+  onPress?: () => void;
+  title: string;
+};
+
+function HomeActionCard({
+  badgeLabel,
+  buttonLabel,
+  description,
+  onPress,
+  title,
+}: HomeActionCardProps) {
+  return (
+    <View style={styles.actionCard}>
+      <View style={styles.actionCardCopy}>
+        <Badge label={badgeLabel} tone="primary" />
+        <Text style={styles.actionCardTitle}>{title}</Text>
+        <Text style={styles.actionCardDescription}>{description}</Text>
+      </View>
+      {buttonLabel ? (
+        <PrimaryButton onPress={onPress} variant="secondary">
+          {buttonLabel}
+        </PrimaryButton>
+      ) : null}
+    </View>
+  );
+}
 
 function normalizeRoutePart(value: string): string {
   return value.trim().replace(/\s+/g, " ");
@@ -210,11 +242,42 @@ export default function AppHomeScreen() {
             community routes.
           </Text>
         </View>
-        <View style={styles.actions}>
-          <PrimaryButton onPress={() => router.push("/(tabs)/send")}>Create shipment</PrimaryButton>
-          <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/travel")}>
-            Share a trip
-          </PrimaryButton>
+      </Card>
+
+      <Card style={styles.actionArea} variant="elevated">
+        <View style={styles.actionAreaHeader}>
+          <Text style={styles.actionAreaTitle}>What do you want to do?</Text>
+          <Text style={styles.actionAreaSubtitle}>
+            Start with the path that matches your next step.
+          </Text>
+        </View>
+        <View style={styles.actionList}>
+          <HomeActionCard
+            badgeLabel="1"
+            buttonLabel="Start"
+            description="Post a package route so travelers can review timing, weight, and reward."
+            onPress={() => router.push("/(tabs)/send")}
+            title="Send a Package"
+          />
+          <HomeActionCard
+            badgeLabel="2"
+            buttonLabel="Share trip"
+            description="Share an upcoming trip and the spare capacity you are comfortable offering."
+            onPress={() => router.push("/(tabs)/travel")}
+            title="I’m Traveling"
+          />
+          <HomeActionCard
+            badgeLabel="3"
+            description="Suggested route matches appear below when active shipments and trips line up."
+            title="Find Matches"
+          />
+          <HomeActionCard
+            badgeLabel="4"
+            buttonLabel="Open tracking"
+            description="Check booking progress and shipment updates from your tracking view."
+            onPress={() => router.push("/(tabs)/tracking")}
+            title="Track Shipment"
+          />
         </View>
       </Card>
 
@@ -225,9 +288,9 @@ export default function AppHomeScreen() {
           ) : null}
           <EmptyState
             action={<PrimaryButton onPress={() => router.push("/login")}>Get started</PrimaryButton>}
-            description="Start a Karri session to view active community routes and possible matches."
+            description="Sign in to create shipments, share trips, and compare matches."
             marker="M"
-            title="Your matches will appear here"
+            title="Start finding trusted routes"
           />
         </View>
       ) : null}
@@ -267,26 +330,23 @@ export default function AppHomeScreen() {
                   Create a shipment
                 </PrimaryButton>
               }
-              description="An exact match appears when a shipment and trip share the same origin and destination cities and countries."
+              description="Create a shipment or share a trip so Karri can compare active routes."
               marker="R"
-              title="No route matches yet"
+              title="No matching routes yet"
             />
           ) : null}
 
           {!isLoading && !dataError
             ? matches.map(({ shipment, trip }) => (
                 <Card key={`${shipment.id}:${trip.id}`} variant="elevated">
-                  <View style={styles.cardHeader}>
-                    <View style={styles.cardTitleBlock}>
-                      <Text style={styles.cardTitle}>
-                        {shipment.originCity} → {shipment.destinationCity}
-                      </Text>
-                      <Text style={styles.routeText}>
-                        {shipment.originCountry} → {shipment.destinationCountry}
-                      </Text>
-                    </View>
-                    <StatusChip label="Possible match" tone="info" />
-                  </View>
+                  <RouteCardHeader
+                    destinationCity={shipment.destinationCity}
+                    destinationCountry={shipment.destinationCountry}
+                    originCity={shipment.originCity}
+                    originCountry={shipment.originCountry}
+                    status="Possible match"
+                    statusTone="info"
+                  />
 
                   <TrustBadge detail="Origin and destination align" label="Exact corridor" />
 
@@ -350,31 +410,44 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     ...typography.body,
   },
-  actions: {
-    gap: spacing.sm,
-  },
-  section: {
+  actionArea: {
     gap: spacing.md,
   },
-  cardHeader: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-    justifyContent: "space-between",
-  },
-  cardTitleBlock: {
-    flex: 1,
+  actionAreaHeader: {
     gap: spacing.xxs,
-    minWidth: 210,
   },
-  cardTitle: {
+  actionAreaTitle: {
+    color: colors.text,
+    ...typography.headline,
+  },
+  actionAreaSubtitle: {
+    color: colors.textSecondary,
+    ...typography.body,
+  },
+  actionList: {
+    gap: spacing.sm,
+  },
+  actionCard: {
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  actionCardCopy: {
+    gap: spacing.sm,
+  },
+  actionCardTitle: {
     color: colors.text,
     ...typography.subheading,
   },
-  routeText: {
-    color: colors.primary,
-    ...typography.label,
+  actionCardDescription: {
+    color: colors.textSecondary,
+    ...typography.caption,
+  },
+  section: {
+    gap: spacing.md,
   },
   detailsRow: {
     flexDirection: "row",

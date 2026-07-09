@@ -36,29 +36,32 @@ const styles = StyleSheet.create({
     borderColor: colors.primarySoft,
     borderRadius: radii.xl,
     borderWidth: 1,
-    gap: spacing.md,
-    padding: spacing.xl,
+    gap: spacing.lg,
+    padding: 28,
   },
   marker: {
     alignItems: "center",
     backgroundColor: colors.primarySoft,
+    borderColor: colors.border,
     borderRadius: radii.pill,
-    height: 46,
+    borderWidth: 1,
+    height: 68,
     justifyContent: "center",
-    width: 46,
+    width: 68,
   },
   markerText: {
     color: colors.primary,
-    ...typography.subheading,
+    ...typography.headline,
   },
   copy: {
     alignItems: "center",
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   title: {
     color: colors.text,
     textAlign: "center",
     ...typography.subheading,
+    fontWeight: "800",
   },
   description: {
     color: colors.textSecondary,
@@ -68,6 +71,6 @@ const styles = StyleSheet.create({
   },
   action: {
     alignSelf: "stretch",
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
   },
 });

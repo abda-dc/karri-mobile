@@ -187,9 +187,9 @@ export default function ProfileScreen() {
       {!auth.loading && !auth.user ? (
         <EmptyState
           action={<PrimaryButton onPress={() => router.push("/login")}>Get started</PrimaryButton>}
-          description="Start a Karri session to view trust history and notifications."
+          description="View trust history, identity status, and notifications in one place."
           marker="P"
-          title="Sign in to view your profile"
+          title="Sign in to see your Karri profile"
         />
       ) : null}
 

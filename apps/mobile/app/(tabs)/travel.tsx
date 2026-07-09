@@ -8,6 +8,7 @@ import { DashboardHeaderImage } from "../../src/components/DashboardHeaderImage"
 import { EmptyState } from "../../src/components/EmptyState";
 import { LoadingState } from "../../src/components/LoadingState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
+import { RouteCardHeader } from "../../src/components/RouteCardHeader";
 import { RouteSelector, type RouteSelection } from "../../src/components/RouteSelector";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
@@ -353,29 +354,23 @@ export default function TravelScreen() {
 
             {!listLoading && !dataError && trips.length === 0 ? (
               <EmptyState
-                description="Complete the form above and your saved trip will appear here."
+                description="Post your route and available space so senders can find you."
                 marker="T"
-                title="No trips yet"
+                title="Share your next trip"
               />
             ) : null}
 
             {!listLoading && !dataError
               ? trips.map((trip) => (
                   <Card key={trip.id} variant="elevated">
-                    <View style={styles.cardHeader}>
-                      <View style={styles.cardTitleBlock}>
-                        <Text style={styles.cardTitle}>
-                          {trip.originCity} → {trip.destinationCity}
-                        </Text>
-                        <Text style={styles.routeText}>
-                          {trip.originCountry} → {trip.destinationCountry}
-                        </Text>
-                      </View>
-                      <StatusChip
-                        label={trip.status}
-                        tone={trip.status === "active" ? "active" : "neutral"}
-                      />
-                    </View>
+                    <RouteCardHeader
+                      destinationCity={trip.destinationCity}
+                      destinationCountry={trip.destinationCountry}
+                      originCity={trip.originCity}
+                      originCountry={trip.originCountry}
+                      status={trip.status}
+                      statusTone={trip.status === "active" ? "active" : "neutral"}
+                    />
                     <View style={styles.metaRow}>
                       <Badge label={trip.departureDate} tone="info" />
                       <Badge label={`${trip.availableCapacityKg} kg available`} tone="primary" />
@@ -446,26 +441,6 @@ const styles = StyleSheet.create({
   fieldColumn: {
     flexBasis: 200,
     flexGrow: 1,
-  },
-  cardHeader: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-    justifyContent: "space-between",
-  },
-  cardTitleBlock: {
-    flex: 1,
-    gap: spacing.xxs,
-    minWidth: 210,
-  },
-  cardTitle: {
-    color: colors.text,
-    ...typography.subheading,
-  },
-  routeText: {
-    color: colors.primary,
-    ...typography.label,
   },
   metaRow: {
     flexDirection: "row",

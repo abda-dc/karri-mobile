@@ -8,6 +8,7 @@ import { DashboardHeaderImage } from "../../src/components/DashboardHeaderImage"
 import { EmptyState } from "../../src/components/EmptyState";
 import { LoadingState } from "../../src/components/LoadingState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
+import { RouteCardHeader } from "../../src/components/RouteCardHeader";
 import { RouteSelector, type RouteSelection } from "../../src/components/RouteSelector";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
@@ -348,29 +349,23 @@ export default function SendScreen() {
 
             {!listLoading && !dataError && shipments.length === 0 ? (
               <EmptyState
-                description="Complete the form above and your saved shipment will appear here."
+                description="Create a shipment and Karri will look for travelers on the same route."
                 marker="S"
-                title="No shipments yet"
+                title="Ready to send your first package?"
               />
             ) : null}
 
             {!listLoading && !dataError
               ? shipments.map((shipment) => (
                   <Card key={shipment.id} variant="elevated">
-                    <View style={styles.cardHeader}>
-                      <View style={styles.cardTitleBlock}>
-                        <Text style={styles.cardTitle}>
-                          {shipment.originCity} → {shipment.destinationCity}
-                        </Text>
-                        <Text style={styles.routeText}>
-                          {shipment.originCountry} → {shipment.destinationCountry}
-                        </Text>
-                      </View>
-                      <StatusChip
-                        label={shipment.status}
-                        tone={shipment.status === "active" ? "active" : "neutral"}
-                      />
-                    </View>
+                    <RouteCardHeader
+                      destinationCity={shipment.destinationCity}
+                      destinationCountry={shipment.destinationCountry}
+                      originCity={shipment.originCity}
+                      originCountry={shipment.originCountry}
+                      status={shipment.status}
+                      statusTone={shipment.status === "active" ? "active" : "neutral"}
+                    />
                     <View style={styles.metaRow}>
                       <Badge label={shipment.packageCategory} tone="primary" />
                       <Badge label={`${shipment.weightKg} kg`} />
@@ -441,26 +436,6 @@ const styles = StyleSheet.create({
   fieldColumn: {
     flexBasis: 200,
     flexGrow: 1,
-  },
-  cardHeader: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-    justifyContent: "space-between",
-  },
-  cardTitleBlock: {
-    flex: 1,
-    gap: spacing.xxs,
-    minWidth: 210,
-  },
-  cardTitle: {
-    color: colors.text,
-    ...typography.subheading,
-  },
-  routeText: {
-    color: colors.primary,
-    ...typography.label,
   },
   metaRow: {
     flexDirection: "row",

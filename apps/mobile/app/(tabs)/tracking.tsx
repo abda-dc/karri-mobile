@@ -115,9 +115,9 @@ export default function TrackingScreen() {
       {!auth.loading && !auth.user ? (
         <EmptyState
           action={<PrimaryButton onPress={() => router.push("/login")}>Get started</PrimaryButton>}
-          description="Start a Karri session to view bookings and custody history."
+          description="Start a Karri session to view booking progress and custody updates."
           marker="C"
-          title="Sign in to track a booking"
+          title="Sign in to track shipments"
         />
       ) : null}
 
@@ -138,12 +138,12 @@ export default function TrackingScreen() {
         <EmptyState
           action={
             <PrimaryButton variant="secondary" onPress={() => router.push("/(tabs)/home")}>
-              View route matches
+              View matches
             </PrimaryButton>
           }
-          description="Request a booking from an eligible route match. Traveler requests appear here too."
+          description="Request a booking from a matching route, then track progress here."
           marker="B"
-          title="No bookings yet"
+          title="No shipments are being tracked yet"
         />
       ) : null}
 
