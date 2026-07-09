@@ -414,7 +414,7 @@ function formatWeightConversion(input: string, unit: WeightUnit): string | undef
     return undefined;
   }
 
-  return `${input} lb ≈ ${(numericValue * poundsToKilograms).toFixed(2)} kg`;
+  return `${input} lb ~ ${(numericValue * poundsToKilograms).toFixed(2)} kg`;
 }
 
 function WeightSelector({
