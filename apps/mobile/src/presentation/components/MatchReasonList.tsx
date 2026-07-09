@@ -30,8 +30,17 @@ export function MatchReasonList({
     <View style={styles.list}>
       <Text style={styles.heading}>{heading}</Text>
       {visible.map((reason) => (
-        <View key={`${reason.factor}:${reason.code}`} style={styles.reason}>
-          <View style={[styles.marker, styles[reason.tone]]}>
+        <View
+          accessibilityLabel={`${reason.title}. ${reason.explanation}`}
+          accessible
+          key={`${reason.factor}:${reason.code}`}
+          style={styles.reason}
+        >
+          <View
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
+            style={[styles.marker, styles[reason.tone]]}
+          >
             <Text style={[styles.markerText, styles[`${reason.tone}Text`]]}>
               {markers[reason.tone]}
             </Text>
