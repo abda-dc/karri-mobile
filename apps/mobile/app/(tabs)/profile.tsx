@@ -340,16 +340,18 @@ const styles = StyleSheet.create({
     ...typography.caption,
   },
   notifications: {
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   notificationRow: {
     alignItems: "flex-start",
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 14,
+    borderWidth: 1,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
-    paddingTop: spacing.md,
+    padding: spacing.md,
   },
   notificationCopy: {
     flex: 1,

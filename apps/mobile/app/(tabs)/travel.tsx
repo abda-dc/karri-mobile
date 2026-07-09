@@ -645,8 +645,8 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   trustIndicator: {
-    backgroundColor: colors.primarySoft,
-    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.primarySoft,
     borderRadius: radii.md,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
@@ -674,7 +674,7 @@ const styles = StyleSheet.create({
   },
   capacityOption: {
     backgroundColor: colors.surface,
-    borderColor: colors.borderStrong,
+    borderColor: colors.border,
     borderRadius: radii.lg,
     borderWidth: 1,
     flexBasis: 136,
@@ -686,7 +686,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   selectedCapacityOption: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primarySoft,
     borderColor: colors.primary,
   },
   capacityOptionLabel: {
@@ -700,10 +700,10 @@ const styles = StyleSheet.create({
     ...typography.caption,
   },
   selectedCapacityOptionText: {
-    color: colors.white,
+    color: colors.primaryDark,
   },
   pressedOption: {
-    opacity: 0.82,
+    opacity: 0.9,
   },
   metaRow: {
     flexDirection: "row",

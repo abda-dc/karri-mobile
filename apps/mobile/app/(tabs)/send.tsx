@@ -1154,7 +1154,7 @@ const styles = StyleSheet.create({
   categoryOption: {
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderColor: colors.borderStrong,
+    borderColor: colors.border,
     borderRadius: radii.lg,
     borderWidth: 1,
     flexBasis: 140,
@@ -1165,11 +1165,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   selectedCategoryOption: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primarySoft,
     borderColor: colors.primary,
   },
   pressedCategoryOption: {
-    opacity: 0.82,
+    opacity: 0.9,
   },
   categoryOptionText: {
     color: colors.primaryDark,
@@ -1177,11 +1177,11 @@ const styles = StyleSheet.create({
     ...typography.label,
   },
   selectedCategoryOptionText: {
-    color: colors.white,
+    color: colors.primaryDark,
   },
   trustIndicator: {
-    backgroundColor: colors.primarySoft,
-    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.primarySoft,
     borderRadius: radii.md,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
@@ -1193,7 +1193,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   draftCard: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: radii.lg,
     borderWidth: 1,
@@ -1252,7 +1252,7 @@ const styles = StyleSheet.create({
   weightOption: {
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderColor: colors.borderStrong,
+    borderColor: colors.border,
     borderRadius: radii.lg,
     borderWidth: 1,
     flexBasis: 96,
@@ -1263,7 +1263,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   selectedWeightOption: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primarySoft,
     borderColor: colors.primary,
   },
   weightOptionText: {
@@ -1272,7 +1272,7 @@ const styles = StyleSheet.create({
     ...typography.label,
   },
   selectedWeightOptionText: {
-    color: colors.white,
+    color: colors.primaryDark,
   },
   customWeight: {
     gap: spacing.sm,
@@ -1306,7 +1306,7 @@ const styles = StyleSheet.create({
   rewardSuggestion: {
     alignItems: "center",
     backgroundColor: colors.goldSoft,
-    borderColor: colors.border,
+    borderColor: colors.goldSoft,
     borderRadius: radii.lg,
     borderWidth: 1,
     flexDirection: "row",
@@ -1348,8 +1348,8 @@ const styles = StyleSheet.create({
     ...typography.label,
   },
   reviewPanel: {
-    backgroundColor: colors.surfaceSoft,
-    borderColor: colors.primarySoft,
+    backgroundColor: colors.surface,
+    borderColor: colors.borderStrong,
     borderRadius: radii.lg,
     borderWidth: 1,
     gap: spacing.md,

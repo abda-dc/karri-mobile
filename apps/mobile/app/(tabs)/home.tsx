@@ -425,22 +425,23 @@ const styles = StyleSheet.create({
     ...typography.body,
   },
   actionList: {
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   actionCard: {
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: radii.lg,
     borderWidth: 1,
-    gap: spacing.sm,
+    gap: spacing.md,
     padding: spacing.md,
   },
   actionCardCopy: {
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   actionCardTitle: {
     color: colors.text,
     ...typography.subheading,
+    fontWeight: "800",
   },
   actionCardDescription: {
     color: colors.textSecondary,
@@ -450,9 +451,14 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   detailsRow: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    borderWidth: 1,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.lg,
+    gap: spacing.md,
+    padding: spacing.md,
   },
   detailGroup: {
     flex: 1,
