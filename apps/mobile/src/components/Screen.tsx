@@ -70,7 +70,7 @@ export function Screen({
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundStrong,
     flex: 1,
   },
   keyboardArea: {

@@ -49,6 +49,9 @@ export function PrimaryButton({
         styles.button,
         styles[variant],
         pressed && !isDisabled && styles.pressed,
+        pressed && !isDisabled && variant === "primary" && styles.primaryPressed,
+        pressed && !isDisabled && variant === "secondary" && styles.secondaryPressed,
+        pressed && !isDisabled && variant === "ghost" && styles.ghostPressed,
         isDisabled && styles.disabled,
         style,
       ]}
@@ -75,16 +78,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
+  primaryPressed: {
+    backgroundColor: colors.primaryPressed,
+    borderColor: colors.primaryPressed,
+  },
   secondary: {
     backgroundColor: colors.surface,
     borderColor: colors.borderStrong,
+  },
+  secondaryPressed: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.primarySoft,
   },
   ghost: {
     backgroundColor: "transparent",
     borderColor: "transparent",
   },
+  ghostPressed: {
+    backgroundColor: colors.primarySoft,
+  },
   pressed: {
-    opacity: 0.82,
+    opacity: 0.94,
     transform: [{ scale: 0.99 }],
   },
   disabled: {

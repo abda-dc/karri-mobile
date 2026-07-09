@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
   },
   elevated: {
     ...shadows.low,
-    borderColor: colors.border,
+    borderColor: colors.borderStrong,
     borderWidth: 1,
   },
   outlined: {
@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   },
   soft: {
     backgroundColor: colors.surfaceSoft,
-    borderColor: colors.primarySoft,
+    borderColor: colors.border,
     borderWidth: 1,
   },
   compact: {
