@@ -44,6 +44,7 @@ const emptyForm = {
 };
 
 type OpenDateSelector = "deliveryEnd" | "deliveryStart" | null;
+type WeightUnit = "kg" | "lb";
 
 const packageCategories = [
   "Documents",
@@ -54,8 +55,28 @@ const packageCategories = [
   "Other",
 ];
 
+const weightPresets = [
+  { label: "1 kg", value: "1" },
+  { label: "2 kg", value: "2" },
+  { label: "5 kg", value: "5" },
+  { label: "10 kg", value: "10" },
+];
+
+const poundsToKilograms = 0.45359237;
+
 type PackageCategoryPickerProps = {
   onChange: (value: string) => void;
+  value: string;
+};
+
+type WeightSelectorProps = {
+  customInput: string;
+  onCustomInputChange: (value: string) => void;
+  onCustomSelect: () => void;
+  onPresetSelect: (value: string) => void;
+  onUnitChange: (unit: WeightUnit) => void;
+  selectedMode: "custom" | "preset";
+  unit: WeightUnit;
   value: string;
 };
 
@@ -99,6 +120,144 @@ function PackageCategoryPicker({ onChange, value }: PackageCategoryPickerProps) 
   );
 }
 
+function convertWeightToKilograms(input: string, unit: WeightUnit): string {
+  const numericValue = Number(input);
+  if (!input.trim() || !Number.isFinite(numericValue) || numericValue <= 0) {
+    return "";
+  }
+
+  if (unit === "kg") {
+    return input;
+  }
+
+  return (numericValue * poundsToKilograms).toFixed(2);
+}
+
+function formatWeightConversion(input: string, unit: WeightUnit): string | undefined {
+  if (unit !== "lb") {
+    return undefined;
+  }
+
+  const numericValue = Number(input);
+  if (!input.trim() || !Number.isFinite(numericValue) || numericValue <= 0) {
+    return undefined;
+  }
+
+  return `${input} lb ≈ ${(numericValue * poundsToKilograms).toFixed(2)} kg`;
+}
+
+function WeightSelector({
+  customInput,
+  onCustomInputChange,
+  onCustomSelect,
+  onPresetSelect,
+  onUnitChange,
+  selectedMode,
+  unit,
+  value,
+}: WeightSelectorProps) {
+  const helperText = formatWeightConversion(customInput, unit);
+
+  return (
+    <View style={styles.weightField}>
+      <Text style={styles.weightLabel}>
+        Weight estimate
+        <Text style={styles.required}> *</Text>
+      </Text>
+      <View style={styles.weightOptionGrid}>
+        {weightPresets.map((preset) => {
+          const selected = selectedMode === "preset" && preset.value === value;
+
+          return (
+            <Pressable
+              accessibilityLabel={`Weight estimate: ${preset.label}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={preset.value}
+              onPress={() => onPresetSelect(preset.value)}
+              style={({ pressed }) => [
+                styles.weightOption,
+                selected && styles.selectedWeightOption,
+                pressed && styles.pressedCategoryOption,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.weightOptionText,
+                  selected && styles.selectedWeightOptionText,
+                ]}
+              >
+                {preset.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+        <Pressable
+          accessibilityLabel="Weight estimate: Custom"
+          accessibilityRole="button"
+          accessibilityState={{ selected: selectedMode === "custom" }}
+          onPress={onCustomSelect}
+          style={({ pressed }) => [
+            styles.weightOption,
+            selectedMode === "custom" && styles.selectedWeightOption,
+            pressed && styles.pressedCategoryOption,
+          ]}
+        >
+          <Text
+            style={[
+              styles.weightOptionText,
+              selectedMode === "custom" && styles.selectedWeightOptionText,
+            ]}
+          >
+            Custom
+          </Text>
+        </Pressable>
+      </View>
+      {selectedMode === "custom" ? (
+        <View style={styles.customWeight}>
+          <TextField
+            helperText={helperText}
+            keyboardType="decimal-pad"
+            label="Custom weight"
+            onChangeText={onCustomInputChange}
+            placeholder={unit === "kg" ? "2.5" : "10"}
+            value={customInput}
+          />
+          <View style={styles.unitToggle}>
+            {(["kg", "lb"] as const).map((unitOption) => {
+              const selected = unitOption === unit;
+
+              return (
+                <Pressable
+                  accessibilityLabel={`Weight unit: ${unitOption}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  key={unitOption}
+                  onPress={() => onUnitChange(unitOption)}
+                  style={({ pressed }) => [
+                    styles.unitOption,
+                    selected && styles.selectedUnitOption,
+                    pressed && styles.pressedCategoryOption,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.unitOptionText,
+                      selected && styles.selectedUnitOptionText,
+                    ]}
+                  >
+                    {unitOption}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export default function SendScreen() {
   const auth = useAuthSession();
   const [form, setForm] = useState(emptyForm);
@@ -117,6 +276,9 @@ export default function SendScreen() {
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [matchesError, setMatchesError] = useState<string | null>(null);
   const [openDateSelector, setOpenDateSelector] = useState<OpenDateSelector>(null);
+  const [weightMode, setWeightMode] = useState<"custom" | "preset">("preset");
+  const [customWeightInput, setCustomWeightInput] = useState("");
+  const [customWeightUnit, setCustomWeightUnit] = useState<WeightUnit>("kg");
 
   useEffect(() => {
     if (auth.loading) {
@@ -222,6 +384,28 @@ export default function SendScreen() {
     setSuccessMessage(null);
   }
 
+  function selectPresetWeight(value: string) {
+    setWeightMode("preset");
+    updateField("weightKg", value);
+  }
+
+  function selectCustomWeight() {
+    setWeightMode("custom");
+    updateField("weightKg", convertWeightToKilograms(customWeightInput, customWeightUnit));
+  }
+
+  function updateCustomWeightInput(value: string) {
+    setWeightMode("custom");
+    setCustomWeightInput(value);
+    updateField("weightKg", convertWeightToKilograms(value, customWeightUnit));
+  }
+
+  function updateCustomWeightUnit(unit: WeightUnit) {
+    setWeightMode("custom");
+    setCustomWeightUnit(unit);
+    updateField("weightKg", convertWeightToKilograms(customWeightInput, unit));
+  }
+
   function updateRoute(prefix: "origin" | "destination", route: RouteSelection) {
     setForm((current) => ({
       ...current,
@@ -289,6 +473,9 @@ export default function SendScreen() {
         rewardAmount,
       });
       setForm(emptyForm);
+      setWeightMode("preset");
+      setCustomWeightInput("");
+      setCustomWeightUnit("kg");
       setSuccessMessage("Shipment saved. It is now available for corridor matching.");
     } catch (error) {
       setFormError(reportFriendlyError(error, "send.create-shipment"));
@@ -362,12 +549,14 @@ export default function SendScreen() {
               required
               value={form.packageDescription}
             />
-            <TextField
-              keyboardType="decimal-pad"
-              label="Weight estimate (kg)"
-              onChangeText={(value) => updateField("weightKg", value)}
-              placeholder="2.5"
-              required
+            <WeightSelector
+              customInput={customWeightInput}
+              onCustomInputChange={updateCustomWeightInput}
+              onCustomSelect={selectCustomWeight}
+              onPresetSelect={selectPresetWeight}
+              onUnitChange={updateCustomWeightUnit}
+              selectedMode={weightMode}
+              unit={customWeightUnit}
               value={form.weightKg}
             />
           </Card>
@@ -573,6 +762,72 @@ const styles = StyleSheet.create({
   },
   selectedCategoryOptionText: {
     color: colors.white,
+  },
+  weightField: {
+    gap: spacing.xs,
+  },
+  weightLabel: {
+    color: colors.text,
+    ...typography.label,
+  },
+  weightOptionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+  },
+  weightOption: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.borderStrong,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    flexBasis: 96,
+    flexGrow: 1,
+    justifyContent: "center",
+    minHeight: touchTargets.comfortable,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  selectedWeightOption: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  weightOptionText: {
+    color: colors.primaryDark,
+    textAlign: "center",
+    ...typography.label,
+  },
+  selectedWeightOptionText: {
+    color: colors.white,
+  },
+  customWeight: {
+    gap: spacing.sm,
+  },
+  unitToggle: {
+    flexDirection: "row",
+    gap: spacing.xs,
+  },
+  unitOption: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.borderStrong,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: touchTargets.minimum,
+    paddingHorizontal: spacing.md,
+  },
+  selectedUnitOption: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+  },
+  unitOptionText: {
+    color: colors.primaryDark,
+    ...typography.label,
+  },
+  selectedUnitOptionText: {
+    color: colors.primaryDark,
   },
   metaRow: {
     flexDirection: "row",
