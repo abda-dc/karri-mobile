@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Badge } from "../../src/components/Badge";
 import { Banner } from "../../src/components/Banner";
 import { Card } from "../../src/components/Card";
@@ -27,7 +27,7 @@ import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
 import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
 import { TrustSummaryCard } from "../../src/presentation/components/TrustSummaryCard";
-import { colors, spacing, typography } from "../../src/theme/tokens";
+import { colors, radii, spacing, touchTargets, typography } from "../../src/theme/tokens";
 import type { Trip } from "../../src/types/models";
 
 const emptyForm = {
@@ -43,6 +43,22 @@ const emptyForm = {
 
 type OpenDateSelector = "arrival" | "departure" | null;
 
+const capacityPresets = [
+  { label: "2 kg", description: "Small pouch", value: "2" },
+  { label: "5 kg", description: "Carry-on space", value: "5" },
+  { label: "10 kg", description: "Extra bag space", value: "10" },
+  { label: "20 kg", description: "Checked-bag space", value: "20" },
+];
+
+type CapacitySelectorProps = {
+  customValue: string;
+  onCustomChange: (value: string) => void;
+  onCustomSelect: () => void;
+  onPresetSelect: (value: string) => void;
+  selectedMode: "custom" | "preset";
+  value: string;
+};
+
 function isValidDateInput(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return false;
@@ -50,6 +66,98 @@ function isValidDateInput(value: string): boolean {
 
   const date = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function CapacitySelector({
+  customValue,
+  onCustomChange,
+  onCustomSelect,
+  onPresetSelect,
+  selectedMode,
+  value,
+}: CapacitySelectorProps) {
+  return (
+    <View style={styles.capacityField}>
+      <Text style={styles.capacityLabel}>
+        Available carrying capacity
+        <Text style={styles.required}> *</Text>
+      </Text>
+      <View style={styles.capacityGrid}>
+        {capacityPresets.map((preset) => {
+          const selected = selectedMode === "preset" && preset.value === value;
+
+          return (
+            <Pressable
+              accessibilityLabel={`${preset.label}: ${preset.description}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={preset.value}
+              onPress={() => onPresetSelect(preset.value)}
+              style={({ pressed }) => [
+                styles.capacityOption,
+                selected && styles.selectedCapacityOption,
+                pressed && styles.pressedOption,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.capacityOptionLabel,
+                  selected && styles.selectedCapacityOptionText,
+                ]}
+              >
+                {preset.label}
+              </Text>
+              <Text
+                style={[
+                  styles.capacityOptionDescription,
+                  selected && styles.selectedCapacityOptionText,
+                ]}
+              >
+                {preset.description}
+              </Text>
+            </Pressable>
+          );
+        })}
+        <Pressable
+          accessibilityLabel="Custom carrying capacity"
+          accessibilityRole="button"
+          accessibilityState={{ selected: selectedMode === "custom" }}
+          onPress={onCustomSelect}
+          style={({ pressed }) => [
+            styles.capacityOption,
+            selectedMode === "custom" && styles.selectedCapacityOption,
+            pressed && styles.pressedOption,
+          ]}
+        >
+          <Text
+            style={[
+              styles.capacityOptionLabel,
+              selectedMode === "custom" && styles.selectedCapacityOptionText,
+            ]}
+          >
+            Custom
+          </Text>
+          <Text
+            style={[
+              styles.capacityOptionDescription,
+              selectedMode === "custom" && styles.selectedCapacityOptionText,
+            ]}
+          >
+            Enter kg
+          </Text>
+        </Pressable>
+      </View>
+      {selectedMode === "custom" ? (
+        <TextField
+          keyboardType="decimal-pad"
+          label="Custom capacity (kg)"
+          onChangeText={onCustomChange}
+          placeholder="8"
+          value={customValue}
+        />
+      ) : null}
+    </View>
+  );
 }
 
 export default function TravelScreen() {
@@ -70,6 +178,8 @@ export default function TravelScreen() {
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [matchesError, setMatchesError] = useState<string | null>(null);
   const [openDateSelector, setOpenDateSelector] = useState<OpenDateSelector>(null);
+  const [capacityMode, setCapacityMode] = useState<"custom" | "preset">("preset");
+  const [customCapacityValue, setCustomCapacityValue] = useState("");
 
   useEffect(() => {
     if (auth.loading) {
@@ -171,6 +281,22 @@ export default function TravelScreen() {
     setSuccessMessage(null);
   }
 
+  function selectPresetCapacity(value: string) {
+    setCapacityMode("preset");
+    updateField("availableCapacityKg", value);
+  }
+
+  function selectCustomCapacity() {
+    setCapacityMode("custom");
+    updateField("availableCapacityKg", customCapacityValue);
+  }
+
+  function updateCustomCapacity(value: string) {
+    setCapacityMode("custom");
+    setCustomCapacityValue(value);
+    updateField("availableCapacityKg", value);
+  }
+
   async function handleCreateTrip() {
     if (!auth.user) {
       router.push("/login");
@@ -229,6 +355,8 @@ export default function TravelScreen() {
         notes: form.notes,
       });
       setForm(emptyForm);
+      setCapacityMode("preset");
+      setCustomCapacityValue("");
       setSuccessMessage("Trip saved. It is now available for corridor matching.");
     } catch (error) {
       setFormError(reportFriendlyError(error, "travel.create-trip"));
@@ -315,12 +443,12 @@ export default function TravelScreen() {
                 value={form.arrivalDate}
               />
             </View>
-            <TextField
-              keyboardType="decimal-pad"
-              label="Available luggage capacity (kg)"
-              onChangeText={(value) => updateField("availableCapacityKg", value)}
-              placeholder="8"
-              required
+            <CapacitySelector
+              customValue={customCapacityValue}
+              onCustomChange={updateCustomCapacity}
+              onCustomSelect={selectCustomCapacity}
+              onPresetSelect={selectPresetCapacity}
+              selectedMode={capacityMode}
               value={form.availableCapacityKg}
             />
             <TextField
@@ -450,6 +578,54 @@ const styles = StyleSheet.create({
   fieldColumn: {
     flexBasis: 200,
     flexGrow: 1,
+  },
+  capacityField: {
+    gap: spacing.xs,
+  },
+  capacityLabel: {
+    color: colors.text,
+    ...typography.label,
+  },
+  required: {
+    color: colors.error,
+  },
+  capacityGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+  },
+  capacityOption: {
+    backgroundColor: colors.surface,
+    borderColor: colors.borderStrong,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    flexBasis: 136,
+    flexGrow: 1,
+    gap: spacing.xxs,
+    justifyContent: "center",
+    minHeight: touchTargets.comfortable,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  selectedCapacityOption: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  capacityOptionLabel: {
+    color: colors.primaryDark,
+    textAlign: "center",
+    ...typography.label,
+  },
+  capacityOptionDescription: {
+    color: colors.textSecondary,
+    textAlign: "center",
+    ...typography.caption,
+  },
+  selectedCapacityOptionText: {
+    color: colors.white,
+  },
+  pressedOption: {
+    opacity: 0.82,
   },
   metaRow: {
     flexDirection: "row",

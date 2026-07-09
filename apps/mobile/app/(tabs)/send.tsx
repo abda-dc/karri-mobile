@@ -103,6 +103,13 @@ type ShipmentReviewPanelProps = {
   saving: boolean;
 };
 
+type DraftShipmentCardProps = {
+  draft: typeof emptyForm | null;
+  onClear: () => void;
+  onRestore: () => void;
+  onSave: () => void;
+};
+
 function PackageCategoryPicker({ onChange, value }: PackageCategoryPickerProps) {
   return (
     <View style={styles.categoryField}>
@@ -138,6 +145,58 @@ function PackageCategoryPicker({ onChange, value }: PackageCategoryPickerProps) 
             </Pressable>
           );
         })}
+      </View>
+    </View>
+  );
+}
+
+function DraftShipmentCard({ draft, onClear, onRestore, onSave }: DraftShipmentCardProps) {
+  return (
+    <View style={styles.draftCard}>
+      <View style={styles.draftHeader}>
+        <View style={styles.draftHeaderText}>
+          <Text style={styles.draftEyebrow}>Local draft</Text>
+          <Text style={styles.draftTitle}>
+            {draft ? "Draft saved on this device" : "Save this shipment for later"}
+          </Text>
+        </View>
+        {draft ? <Badge label="Unsynced" tone="neutral" /> : null}
+      </View>
+
+      {draft ? (
+        <View style={styles.draftSummary}>
+          <Text style={styles.draftRoute}>
+            {draft.originCity || "Origin"} to {draft.destinationCity || "Destination"}
+          </Text>
+          <Text style={styles.draftMeta}>
+            {[draft.packageCategory, draft.weightKg ? `${draft.weightKg} kg` : "", draft.rewardAmount ? `$${draft.rewardAmount}` : ""]
+              .filter(Boolean)
+              .join(" - ") || "Draft details are still in progress."}
+          </Text>
+          {draft.deliveryWindow ? (
+            <Text style={styles.draftMeta}>{draft.deliveryWindow}</Text>
+          ) : null}
+        </View>
+      ) : (
+        <Text style={styles.draftMeta}>
+          Drafts stay local for now and do not post a shipment.
+        </Text>
+      )}
+
+      <View style={styles.draftActions}>
+        <PrimaryButton onPress={onSave} variant="secondary">
+          Save draft
+        </PrimaryButton>
+        {draft ? (
+          <>
+            <PrimaryButton onPress={onRestore} variant="secondary">
+              Restore
+            </PrimaryButton>
+            <PrimaryButton onPress={onClear} variant="ghost">
+              Clear
+            </PrimaryButton>
+          </>
+        ) : null}
       </View>
     </View>
   );
@@ -475,6 +534,7 @@ export default function SendScreen() {
   const [customWeightInput, setCustomWeightInput] = useState("");
   const [customWeightUnit, setCustomWeightUnit] = useState<WeightUnit>("kg");
   const [reviewingShipment, setReviewingShipment] = useState(false);
+  const [shipmentDraft, setShipmentDraft] = useState<typeof emptyForm | null>(null);
 
   useEffect(() => {
     if (auth.loading) {
@@ -625,6 +685,31 @@ export default function SendScreen() {
       [`${prefix}Country`]: route.country,
       [`${prefix}City`]: route.city,
     }));
+    setFormError(null);
+    setSuccessMessage(null);
+    setReviewingShipment(false);
+  }
+
+  function saveShipmentDraft() {
+    setShipmentDraft({ ...form });
+    setFormError(null);
+    setSuccessMessage(null);
+    setReviewingShipment(false);
+  }
+
+  function restoreShipmentDraft() {
+    if (!shipmentDraft) {
+      return;
+    }
+
+    setForm({ ...shipmentDraft });
+    setFormError(null);
+    setSuccessMessage(null);
+    setReviewingShipment(false);
+  }
+
+  function clearShipmentDraft() {
+    setShipmentDraft(null);
     setFormError(null);
     setSuccessMessage(null);
     setReviewingShipment(false);
@@ -849,6 +934,12 @@ export default function SendScreen() {
               onApply={(value) => updateField("rewardAmount", value)}
               suggestion={rewardSuggestion}
             />
+            <DraftShipmentCard
+              draft={shipmentDraft}
+              onClear={clearShipmentDraft}
+              onRestore={restoreShipmentDraft}
+              onSave={saveShipmentDraft}
+            />
             {reviewingShipment ? (
               <ShipmentReviewPanel
                 form={form}
@@ -1020,6 +1111,51 @@ const styles = StyleSheet.create({
   },
   selectedCategoryOptionText: {
     color: colors.white,
+  },
+  draftCard: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  draftHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    justifyContent: "space-between",
+  },
+  draftHeaderText: {
+    flex: 1,
+    gap: spacing.xxs,
+    minWidth: 180,
+  },
+  draftEyebrow: {
+    color: colors.primary,
+    ...typography.caption,
+    fontWeight: "800",
+  },
+  draftTitle: {
+    color: colors.text,
+    ...typography.subheading,
+  },
+  draftSummary: {
+    gap: spacing.xxs,
+  },
+  draftRoute: {
+    color: colors.text,
+    ...typography.bodyStrong,
+  },
+  draftMeta: {
+    color: colors.textSecondary,
+    ...typography.caption,
+  },
+  draftActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
   },
   weightField: {
     gap: spacing.xs,
