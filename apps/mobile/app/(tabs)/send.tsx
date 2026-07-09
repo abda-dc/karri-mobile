@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Badge } from "../../src/components/Badge";
 import { Banner } from "../../src/components/Banner";
 import { Card } from "../../src/components/Card";
+import { DateSelector } from "../../src/components/DateSelector";
 import { DashboardHeaderImage } from "../../src/components/DashboardHeaderImage";
 import { EmptyState } from "../../src/components/EmptyState";
 import { LoadingState } from "../../src/components/LoadingState";
@@ -37,8 +38,12 @@ const emptyForm = {
   packageDescription: "",
   weightKg: "",
   deliveryWindow: "",
+  deliveryWindowEnd: "",
+  deliveryWindowStart: "",
   rewardAmount: "",
 };
+
+type OpenDateSelector = "deliveryEnd" | "deliveryStart" | null;
 
 export default function SendScreen() {
   const auth = useAuthSession();
@@ -57,6 +62,7 @@ export default function SendScreen() {
   >(() => new Map());
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [matchesError, setMatchesError] = useState<string | null>(null);
+  const [openDateSelector, setOpenDateSelector] = useState<OpenDateSelector>(null);
 
   useEffect(() => {
     if (auth.loading) {
@@ -148,6 +154,20 @@ export default function SendScreen() {
     setSuccessMessage(null);
   }
 
+  function updateDeliveryWindow(field: "deliveryWindowEnd" | "deliveryWindowStart", value: string) {
+    setForm((current) => {
+      const next = { ...current, [field]: value };
+      const start = next.deliveryWindowStart;
+      const end = next.deliveryWindowEnd;
+      return {
+        ...next,
+        deliveryWindow: start && end ? `${start} to ${end}` : "",
+      };
+    });
+    setFormError(null);
+    setSuccessMessage(null);
+  }
+
   function updateRoute(prefix: "origin" | "destination", route: RouteSelection) {
     setForm((current) => ({
       ...current,
@@ -176,6 +196,11 @@ export default function SendScreen() {
 
     if (requiredText.some((value) => !value.trim())) {
       setFormError("Complete every shipment field before saving.");
+      return;
+    }
+
+    if (form.deliveryWindowEnd < form.deliveryWindowStart) {
+      setFormError("Delivery window end cannot be before the start date.");
       return;
     }
 
@@ -302,14 +327,33 @@ export default function SendScreen() {
               subtitle="Set a practical window and a clear reward offer."
               title="Timing and reward"
             />
-            <TextField
-              label="Desired delivery window"
-              maxLength={120}
-              onChangeText={(value) => updateField("deliveryWindow", value)}
-              placeholder="July 10–20, 2026"
-              required
-              value={form.deliveryWindow}
-            />
+            <View style={styles.fieldRow}>
+              <DateSelector
+                containerStyle={styles.fieldColumn}
+                expanded={openDateSelector === "deliveryStart"}
+                helperText="First day the package can arrive."
+                label="Delivery start"
+                onChange={(value) => updateDeliveryWindow("deliveryWindowStart", value)}
+                onExpandedChange={(expanded) =>
+                  setOpenDateSelector(expanded ? "deliveryStart" : null)
+                }
+                required
+                value={form.deliveryWindowStart}
+              />
+              <DateSelector
+                containerStyle={styles.fieldColumn}
+                expanded={openDateSelector === "deliveryEnd"}
+                helperText="Last day the package can arrive."
+                label="Delivery end"
+                minimumDate={form.deliveryWindowStart || undefined}
+                onChange={(value) => updateDeliveryWindow("deliveryWindowEnd", value)}
+                onExpandedChange={(expanded) =>
+                  setOpenDateSelector(expanded ? "deliveryEnd" : null)
+                }
+                required
+                value={form.deliveryWindowEnd}
+              />
+            </View>
             <TextField
               keyboardType="decimal-pad"
               label="Reward offer (USD)"

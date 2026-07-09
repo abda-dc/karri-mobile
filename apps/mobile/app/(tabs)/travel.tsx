@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Badge } from "../../src/components/Badge";
 import { Banner } from "../../src/components/Banner";
 import { Card } from "../../src/components/Card";
+import { DateSelector } from "../../src/components/DateSelector";
 import { DashboardHeaderImage } from "../../src/components/DashboardHeaderImage";
 import { EmptyState } from "../../src/components/EmptyState";
 import { LoadingState } from "../../src/components/LoadingState";
@@ -40,6 +41,8 @@ const emptyForm = {
   notes: "",
 };
 
+type OpenDateSelector = "arrival" | "departure" | null;
+
 function isValidDateInput(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return false;
@@ -66,6 +69,7 @@ export default function TravelScreen() {
   >(() => new Map());
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [matchesError, setMatchesError] = useState<string | null>(null);
+  const [openDateSelector, setOpenDateSelector] = useState<OpenDateSelector>(null);
 
   useEffect(() => {
     if (auth.loading) {
@@ -285,23 +289,28 @@ export default function TravelScreen() {
               title="Schedule and capacity"
             />
             <View style={styles.fieldRow}>
-              <TextField
+              <DateSelector
                 containerStyle={styles.fieldColumn}
-                helperText="Use YYYY-MM-DD."
+                expanded={openDateSelector === "departure"}
+                helperText="Stored as YYYY-MM-DD."
                 label="Departure date"
-                maxLength={10}
-                onChangeText={(value) => updateField("departureDate", value)}
-                placeholder="2026-07-10"
+                onChange={(value) => updateField("departureDate", value)}
+                onExpandedChange={(expanded) =>
+                  setOpenDateSelector(expanded ? "departure" : null)
+                }
                 required
                 value={form.departureDate}
               />
-              <TextField
+              <DateSelector
                 containerStyle={styles.fieldColumn}
-                helperText="Use YYYY-MM-DD."
+                expanded={openDateSelector === "arrival"}
+                helperText="Stored as YYYY-MM-DD."
                 label="Arrival date"
-                maxLength={10}
-                onChangeText={(value) => updateField("arrivalDate", value)}
-                placeholder="2026-07-11"
+                minimumDate={form.departureDate || undefined}
+                onChange={(value) => updateField("arrivalDate", value)}
+                onExpandedChange={(expanded) =>
+                  setOpenDateSelector(expanded ? "arrival" : null)
+                }
                 required
                 value={form.arrivalDate}
               />
