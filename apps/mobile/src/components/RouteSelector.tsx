@@ -46,11 +46,20 @@ export function RouteSelector({ label, onChange, value }: RouteSelectorProps) {
     : value.city && value.country
       ? `${value.city}, ${value.country}`
       : "";
+  const selectedAccessibilityLabel = selectedAirport
+    ? `${getAirportLabel(selectedAirport)}, ${getAirportSubtitle(selectedAirport)}`
+    : value.city && value.country
+      ? `${value.city}, ${value.country}`
+      : "no airport selected";
 
   return (
     <View style={styles.container}>
       <Text style={styles.heading}>{label}</Text>
       <Pressable
+        accessibilityHint={
+          open ? "Double tap to collapse airport options." : "Double tap to choose an airport."
+        }
+        accessibilityLabel={`${label} airport, ${selectedAccessibilityLabel}`}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         onPress={() => setOpen((current) => !current)}
