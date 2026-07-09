@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Badge } from "../../src/components/Badge";
 import { Banner } from "../../src/components/Banner";
 import { Card } from "../../src/components/Card";
@@ -26,7 +26,7 @@ import { RecommendedMatchesSection } from "../../src/presentation/components/Rec
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
 import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
-import { colors, spacing, typography } from "../../src/theme/tokens";
+import { colors, radii, spacing, touchTargets, typography } from "../../src/theme/tokens";
 import type { Shipment } from "../../src/types/models";
 
 const emptyForm = {
@@ -44,6 +44,60 @@ const emptyForm = {
 };
 
 type OpenDateSelector = "deliveryEnd" | "deliveryStart" | null;
+
+const packageCategories = [
+  "Documents",
+  "Clothing",
+  "Electronics",
+  "Medicine",
+  "Food items",
+  "Other",
+];
+
+type PackageCategoryPickerProps = {
+  onChange: (value: string) => void;
+  value: string;
+};
+
+function PackageCategoryPicker({ onChange, value }: PackageCategoryPickerProps) {
+  return (
+    <View style={styles.categoryField}>
+      <Text style={styles.categoryLabel}>
+        Package category
+        <Text style={styles.required}> *</Text>
+      </Text>
+      <View style={styles.categoryGrid}>
+        {packageCategories.map((category) => {
+          const selected = category === value;
+
+          return (
+            <Pressable
+              accessibilityLabel={`Package category: ${category}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={category}
+              onPress={() => onChange(category)}
+              style={({ pressed }) => [
+                styles.categoryOption,
+                selected && styles.selectedCategoryOption,
+                pressed && styles.pressedCategoryOption,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.categoryOptionText,
+                  selected && styles.selectedCategoryOptionText,
+                ]}
+              >
+                {category}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
 export default function SendScreen() {
   const auth = useAuthSession();
@@ -294,12 +348,8 @@ export default function SendScreen() {
               subtitle="Describe only what a traveler needs to assess the package."
               title="Package details"
             />
-            <TextField
-              label="Package category"
-              maxLength={80}
-              onChangeText={(value) => updateField("packageCategory", value)}
-              placeholder="Clothing, documents, personal care..."
-              required
+            <PackageCategoryPicker
+              onChange={(value) => updateField("packageCategory", value)}
               value={form.packageCategory}
             />
             <TextField
@@ -480,6 +530,49 @@ const styles = StyleSheet.create({
   fieldColumn: {
     flexBasis: 200,
     flexGrow: 1,
+  },
+  categoryField: {
+    gap: spacing.xs,
+  },
+  categoryLabel: {
+    color: colors.text,
+    ...typography.label,
+  },
+  required: {
+    color: colors.error,
+  },
+  categoryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+  },
+  categoryOption: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.borderStrong,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    flexBasis: 140,
+    flexGrow: 1,
+    justifyContent: "center",
+    minHeight: touchTargets.comfortable,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  selectedCategoryOption: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  pressedCategoryOption: {
+    opacity: 0.82,
+  },
+  categoryOptionText: {
+    color: colors.primaryDark,
+    textAlign: "center",
+    ...typography.label,
+  },
+  selectedCategoryOptionText: {
+    color: colors.white,
   },
   metaRow: {
     flexDirection: "row",
