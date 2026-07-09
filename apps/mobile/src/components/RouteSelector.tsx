@@ -12,6 +12,12 @@ export type RouteSelection = {
   city: string;
 };
 
+export const defaultOriginRoute: RouteSelection = {
+  city: "Washington, DC",
+  country: "United States",
+  subdivision: "",
+};
+
 type RouteSelectorProps = {
   label: string;
   onChange: (value: RouteSelection) => void;

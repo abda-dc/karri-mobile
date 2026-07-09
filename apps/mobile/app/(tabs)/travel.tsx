@@ -10,7 +10,11 @@ import { EmptyState } from "../../src/components/EmptyState";
 import { LoadingState } from "../../src/components/LoadingState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { RouteCardHeader } from "../../src/components/RouteCardHeader";
-import { RouteSelector, type RouteSelection } from "../../src/components/RouteSelector";
+import {
+  defaultOriginRoute,
+  RouteSelector,
+  type RouteSelection,
+} from "../../src/components/RouteSelector";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
 import { StatusChip } from "../../src/components/StatusChip";
@@ -31,13 +35,13 @@ import { colors, radii, spacing, touchTargets, typography } from "../../src/them
 import type { Trip } from "../../src/types/models";
 
 const emptyForm = {
-  originCountry: "",
-  originCity: "",
+  originCountry: defaultOriginRoute.country,
+  originCity: defaultOriginRoute.city,
   destinationCountry: "",
   destinationCity: "",
   departureDate: "",
   arrivalDate: "",
-  availableCapacityKg: "",
+  availableCapacityKg: "5",
   notes: "",
 };
 
@@ -57,6 +61,11 @@ type CapacitySelectorProps = {
   onPresetSelect: (value: string) => void;
   selectedMode: "custom" | "preset";
   value: string;
+};
+
+type RecentRoute = {
+  destination: RouteSelection;
+  origin: RouteSelection;
 };
 
 function isValidDateInput(value: string): boolean {
@@ -160,6 +169,14 @@ function CapacitySelector({
   );
 }
 
+function TrustIndicator({ text }: { text: string }) {
+  return (
+    <View style={styles.trustIndicator}>
+      <Text style={styles.trustIndicatorText}>{text}</Text>
+    </View>
+  );
+}
+
 export default function TravelScreen() {
   const auth = useAuthSession();
   const [form, setForm] = useState(emptyForm);
@@ -180,6 +197,7 @@ export default function TravelScreen() {
   const [openDateSelector, setOpenDateSelector] = useState<OpenDateSelector>(null);
   const [capacityMode, setCapacityMode] = useState<"custom" | "preset">("preset");
   const [customCapacityValue, setCustomCapacityValue] = useState("");
+  const [recentRoute, setRecentRoute] = useState<RecentRoute | null>(null);
 
   useEffect(() => {
     if (auth.loading) {
@@ -272,10 +290,50 @@ export default function TravelScreen() {
   }
 
   function updateRoute(prefix: "origin" | "destination", route: RouteSelection) {
-    setForm((current) => ({
-      ...current,
+    const next = {
+      ...form,
       [`${prefix}Country`]: route.country,
       [`${prefix}City`]: route.city,
+    };
+    setForm(next);
+    rememberRecentRoute(next);
+    setFormError(null);
+    setSuccessMessage(null);
+  }
+
+  function rememberRecentRoute(nextForm: typeof emptyForm) {
+    if (
+      nextForm.originCountry &&
+      nextForm.originCity &&
+      nextForm.destinationCountry &&
+      nextForm.destinationCity
+    ) {
+      setRecentRoute({
+        destination: {
+          city: nextForm.destinationCity,
+          country: nextForm.destinationCountry,
+          subdivision: "",
+        },
+        origin: {
+          city: nextForm.originCity,
+          country: nextForm.originCountry,
+          subdivision: "",
+        },
+      });
+    }
+  }
+
+  function applyRecentRoute() {
+    if (!recentRoute) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      destinationCity: recentRoute.destination.city,
+      destinationCountry: recentRoute.destination.country,
+      originCity: recentRoute.origin.city,
+      originCountry: recentRoute.origin.country,
     }));
     setFormError(null);
     setSuccessMessage(null);
@@ -409,6 +467,12 @@ export default function TravelScreen() {
               onChange={(route) => updateRoute("destination", route)}
               value={{ country: form.destinationCountry, subdivision: "", city: form.destinationCity }}
             />
+            {recentRoute ? (
+              <PrimaryButton onPress={applyRecentRoute} variant="secondary">
+                Use last route
+              </PrimaryButton>
+            ) : null}
+            <TrustIndicator text="Airport routes make matching easier for senders." />
           </Card>
 
           <Card variant="outlined">
@@ -451,6 +515,7 @@ export default function TravelScreen() {
               selectedMode={capacityMode}
               value={form.availableCapacityKg}
             />
+            <TrustIndicator text="Capacity helps avoid overpromising." />
             <TextField
               helperText="Do not add private contact or travel-document details."
               label="Notes (optional)"
@@ -578,6 +643,19 @@ const styles = StyleSheet.create({
   fieldColumn: {
     flexBasis: 200,
     flexGrow: 1,
+  },
+  trustIndicator: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  trustIndicatorText: {
+    color: colors.primaryDark,
+    ...typography.caption,
+    fontWeight: "700",
   },
   capacityField: {
     gap: spacing.xs,

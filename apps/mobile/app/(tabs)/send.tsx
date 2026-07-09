@@ -10,7 +10,11 @@ import { EmptyState } from "../../src/components/EmptyState";
 import { LoadingState } from "../../src/components/LoadingState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { RouteCardHeader } from "../../src/components/RouteCardHeader";
-import { RouteSelector, type RouteSelection } from "../../src/components/RouteSelector";
+import {
+  defaultOriginRoute,
+  RouteSelector,
+  type RouteSelection,
+} from "../../src/components/RouteSelector";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
 import { StatusChip } from "../../src/components/StatusChip";
@@ -30,8 +34,8 @@ import { colors, radii, spacing, touchTargets, typography } from "../../src/them
 import type { Shipment } from "../../src/types/models";
 
 const emptyForm = {
-  originCountry: "",
-  originCity: "",
+  originCountry: defaultOriginRoute.country,
+  originCity: defaultOriginRoute.city,
   destinationCountry: "",
   destinationCity: "",
   packageCategory: "",
@@ -108,6 +112,11 @@ type DraftShipmentCardProps = {
   onClear: () => void;
   onRestore: () => void;
   onSave: () => void;
+};
+
+type RecentRoute = {
+  destination: RouteSelection;
+  origin: RouteSelection;
 };
 
 function PackageCategoryPicker({ onChange, value }: PackageCategoryPickerProps) {
@@ -198,6 +207,14 @@ function DraftShipmentCard({ draft, onClear, onRestore, onSave }: DraftShipmentC
           </>
         ) : null}
       </View>
+    </View>
+  );
+}
+
+function TrustIndicator({ text }: { text: string }) {
+  return (
+    <View style={styles.trustIndicator}>
+      <Text style={styles.trustIndicatorText}>{text}</Text>
     </View>
   );
 }
@@ -535,6 +552,7 @@ export default function SendScreen() {
   const [customWeightUnit, setCustomWeightUnit] = useState<WeightUnit>("kg");
   const [reviewingShipment, setReviewingShipment] = useState(false);
   const [shipmentDraft, setShipmentDraft] = useState<typeof emptyForm | null>(null);
+  const [recentRoute, setRecentRoute] = useState<RecentRoute | null>(null);
 
   useEffect(() => {
     if (auth.loading) {
@@ -680,10 +698,51 @@ export default function SendScreen() {
   }
 
   function updateRoute(prefix: "origin" | "destination", route: RouteSelection) {
-    setForm((current) => ({
-      ...current,
+    const next = {
+      ...form,
       [`${prefix}Country`]: route.country,
       [`${prefix}City`]: route.city,
+    };
+    setForm(next);
+    rememberRecentRoute(next);
+    setFormError(null);
+    setSuccessMessage(null);
+    setReviewingShipment(false);
+  }
+
+  function rememberRecentRoute(nextForm: typeof emptyForm) {
+    if (
+      nextForm.originCountry &&
+      nextForm.originCity &&
+      nextForm.destinationCountry &&
+      nextForm.destinationCity
+    ) {
+      setRecentRoute({
+        destination: {
+          city: nextForm.destinationCity,
+          country: nextForm.destinationCountry,
+          subdivision: "",
+        },
+        origin: {
+          city: nextForm.originCity,
+          country: nextForm.originCountry,
+          subdivision: "",
+        },
+      });
+    }
+  }
+
+  function applyRecentRoute() {
+    if (!recentRoute) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      destinationCity: recentRoute.destination.city,
+      destinationCountry: recentRoute.destination.country,
+      originCity: recentRoute.origin.city,
+      originCountry: recentRoute.origin.country,
     }));
     setFormError(null);
     setSuccessMessage(null);
@@ -857,6 +916,12 @@ export default function SendScreen() {
               onChange={(route) => updateRoute("destination", route)}
               value={{ country: form.destinationCountry, subdivision: "", city: form.destinationCity }}
             />
+            {recentRoute ? (
+              <PrimaryButton onPress={applyRecentRoute} variant="secondary">
+                Use last route
+              </PrimaryButton>
+            ) : null}
+            <TrustIndicator text="Use airports for clearer handoff planning." />
           </Card>
 
           <Card variant="outlined">
@@ -888,6 +953,7 @@ export default function SendScreen() {
               unit={customWeightUnit}
               value={form.weightKg}
             />
+            <TrustIndicator text="Keep package sealed until a traveler accepts." />
           </Card>
 
           <Card variant="outlined">
@@ -926,7 +992,7 @@ export default function SendScreen() {
               keyboardType="decimal-pad"
               label="Reward offer (USD)"
               onChangeText={(value) => updateField("rewardAmount", value)}
-              placeholder="40"
+              placeholder={rewardSuggestion?.applyValue ?? "40"}
               required
               value={form.rewardAmount}
             />
@@ -940,6 +1006,7 @@ export default function SendScreen() {
               onRestore={restoreShipmentDraft}
               onSave={saveShipmentDraft}
             />
+            <TrustIndicator text="Review details before posting." />
             {reviewingShipment ? (
               <ShipmentReviewPanel
                 form={form}
@@ -1111,6 +1178,19 @@ const styles = StyleSheet.create({
   },
   selectedCategoryOptionText: {
     color: colors.white,
+  },
+  trustIndicator: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  trustIndicatorText: {
+    color: colors.primaryDark,
+    ...typography.caption,
+    fontWeight: "700",
   },
   draftCard: {
     backgroundColor: colors.surfaceMuted,
