@@ -61,11 +61,11 @@ export function RouteCardHeader({
 const styles = StyleSheet.create({
   container: {
     alignItems: "flex-start",
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   route: {
     alignSelf: "stretch",
-    gap: spacing.xs,
+    gap: spacing.sm,
     minWidth: 0,
   },
   stop: {
@@ -81,6 +81,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     flexShrink: 1,
     ...typography.subheading,
+    fontWeight: "800",
   },
   country: {
     color: colors.muted,
@@ -90,11 +91,11 @@ const styles = StyleSheet.create({
   connector: {
     alignItems: "center",
     flexDirection: "row",
-    gap: spacing.xs,
+    gap: spacing.sm,
     paddingVertical: spacing.xxs,
   },
   connectorLine: {
-    backgroundColor: colors.borderStrong,
+    backgroundColor: colors.border,
     flex: 1,
     height: StyleSheet.hairlineWidth,
   },

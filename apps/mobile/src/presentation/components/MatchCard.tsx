@@ -95,11 +95,13 @@ export function MatchCard({ match, recommendation }: MatchCardProps) {
         <Text style={styles.freshness}>{freshness.detail}</Text>
       </View>
 
-      <MatchReasonList
-        heading={explanationHeading}
-        maximumVisible={4}
-        reasons={match.reasons}
-      />
+      <View style={styles.reasonBlock}>
+        <MatchReasonList
+          heading={explanationHeading}
+          maximumVisible={4}
+          reasons={match.reasons}
+        />
+      </View>
 
       <Text style={styles.disclaimer}>
         Ranking supports comparison; it does not guarantee safety or authorize a booking.
@@ -118,16 +120,28 @@ const styles = StyleSheet.create({
   },
   titleBlock: { flex: 1, gap: spacing.xxs, minWidth: 190 },
   eyebrow: { color: colors.primary, ...typography.overline },
-  title: { color: colors.text, ...typography.subheading },
+  title: { color: colors.text, ...typography.subheading, fontWeight: "800" },
   route: { color: colors.textSecondary, ...typography.caption },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
   meta: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
-  details: { gap: spacing.xxs },
+  details: {
+    borderTopColor: colors.border,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: spacing.xxs,
+    paddingTop: spacing.sm,
+  },
   detail: { color: colors.textSecondary, ...typography.caption },
   freshness: { color: colors.muted, ...typography.caption },
+  reasonBlock: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: spacing.sm,
+  },
   disclaimer: {
     borderTopColor: colors.border,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     color: colors.textSecondary,
     paddingTop: spacing.sm,
     ...typography.caption,

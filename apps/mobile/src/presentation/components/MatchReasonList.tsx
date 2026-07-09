@@ -59,11 +59,13 @@ export function MatchReasonList({
 }
 
 const styles = StyleSheet.create({
-  list: { gap: spacing.sm },
+  list: { gap: spacing.md },
   heading: { color: colors.text, ...typography.label },
   reason: { alignItems: "flex-start", flexDirection: "row", gap: spacing.sm },
   marker: {
     alignItems: "center",
+    borderColor: colors.border,
+    borderWidth: 1,
     borderRadius: radii.pill,
     height: 24,
     justifyContent: "center",
@@ -78,7 +80,7 @@ const styles = StyleSheet.create({
   neutralText: { color: colors.textSecondary },
   cautionaryText: { color: colors.warning },
   blockingText: { color: colors.error },
-  copy: { flex: 1, gap: spacing.xxs },
+  copy: { flex: 1, gap: spacing.xxs, minWidth: 0 },
   title: { color: colors.text, ...typography.label },
   explanation: { color: colors.textSecondary, ...typography.caption },
   more: { color: colors.muted, ...typography.caption },

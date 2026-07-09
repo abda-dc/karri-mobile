@@ -32,17 +32,17 @@ export function EmptyState({ action, description, marker = "K", title }: EmptySt
 const styles = StyleSheet.create({
   container: {
     alignItems: "center",
-    backgroundColor: colors.surfaceSoft,
-    borderColor: colors.primarySoft,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: radii.xl,
     borderWidth: 1,
     gap: spacing.lg,
-    padding: 28,
+    padding: spacing.xl,
   },
   marker: {
     alignItems: "center",
     backgroundColor: colors.primarySoft,
-    borderColor: colors.border,
+    borderColor: colors.borderStrong,
     borderRadius: radii.pill,
     borderWidth: 1,
     height: 68,
@@ -50,12 +50,13 @@ const styles = StyleSheet.create({
     width: 68,
   },
   markerText: {
-    color: colors.primary,
+    color: colors.primaryDark,
     ...typography.headline,
   },
   copy: {
     alignItems: "center",
     gap: spacing.sm,
+    maxWidth: 400,
   },
   title: {
     color: colors.text,
@@ -65,7 +66,6 @@ const styles = StyleSheet.create({
   },
   description: {
     color: colors.textSecondary,
-    maxWidth: 380,
     textAlign: "center",
     ...typography.body,
   },
