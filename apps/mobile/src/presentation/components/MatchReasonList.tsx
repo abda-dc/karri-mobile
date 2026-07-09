@@ -6,6 +6,7 @@ import {
 import { colors, radii, spacing, typography } from "../../theme/tokens";
 
 interface MatchReasonListProps {
+  readonly heading?: string;
   readonly maximumVisible?: number;
   readonly reasons: ReadonlyArray<MatchReason>;
 }
@@ -17,13 +18,17 @@ const markers: Readonly<Record<MatchReason["tone"], string>> = {
   [MatchReasonTone.Blocking]: "x",
 };
 
-export function MatchReasonList({ maximumVisible, reasons }: MatchReasonListProps) {
+export function MatchReasonList({
+  heading = "Why this match?",
+  maximumVisible,
+  reasons,
+}: MatchReasonListProps) {
   const visible = maximumVisible ? reasons.slice(0, maximumVisible) : reasons;
   const hiddenCount = reasons.length - visible.length;
 
   return (
     <View style={styles.list}>
-      <Text style={styles.heading}>Why this match</Text>
+      <Text style={styles.heading}>{heading}</Text>
       {visible.map((reason) => (
         <View key={`${reason.factor}:${reason.code}`} style={styles.reason}>
           <View style={[styles.marker, styles[reason.tone]]}>

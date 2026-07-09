@@ -37,9 +37,22 @@ function shortId(value: string): string {
   return value.length > 12 ? `${value.slice(0, 8)}...` : value;
 }
 
+function getExplanationHeading(recommendation: MatchCardProps["recommendation"]): string {
+  if (recommendation === "trip") {
+    return "Why this traveler?";
+  }
+
+  if (recommendation === "shipment") {
+    return "Why this shipment?";
+  }
+
+  return "Why this match?";
+}
+
 export function MatchCard({ match, recommendation }: MatchCardProps) {
   const freshness = freshnessPresentation[match.dataFreshness];
   const recommendedTrip = recommendation === "trip";
+  const explanationHeading = getExplanationHeading(recommendation);
 
   return (
     <Card padding="compact" variant="elevated">
@@ -82,7 +95,11 @@ export function MatchCard({ match, recommendation }: MatchCardProps) {
         <Text style={styles.freshness}>{freshness.detail}</Text>
       </View>
 
-      <MatchReasonList reasons={match.reasons} />
+      <MatchReasonList
+        heading={explanationHeading}
+        maximumVisible={4}
+        reasons={match.reasons}
+      />
 
       <Text style={styles.disclaimer}>
         Ranking supports comparison; it does not guarantee safety or authorize a booking.
