@@ -3,6 +3,7 @@ import { BookingService } from "../../application/services/BookingService";
 import { CustodyService } from "../../application/services/CustodyService";
 import { IdentityVerificationService } from "../../application/services/IdentityVerificationService";
 import { MatchingService } from "../../application/services/MatchingService";
+import { LocalNotificationService } from "../../application/services/LocalNotificationService";
 import { NotificationService } from "../../application/services/NotificationService";
 import { NotificationPreferenceService } from "../../application/services/NotificationPreferenceService";
 import { NotificationRouter } from "../../application/services/NotificationRouter";
@@ -33,7 +34,10 @@ import {
   FirebasePushNotificationGateway,
   FirebasePushTokenRepository,
 } from "../../infrastructure/firebase/push";
-import { ExpoPushTokenRegistrationGateway } from "../../infrastructure/expo/notifications";
+import {
+  ExpoLocalNotificationResponseGateway,
+  ExpoPushTokenRegistrationGateway,
+} from "../../infrastructure/expo/notifications";
 import { reportApplicationError } from "../errors/getFriendlyError";
 
 const eventBus = new EventBus();
@@ -60,6 +64,9 @@ const matchingService = new MatchingService(
   trustService,
   identityVerificationService,
   offlineService,
+);
+const localNotificationService = new LocalNotificationService(
+  new ExpoLocalNotificationResponseGateway(),
 );
 const pushNotificationService = new PushNotificationService(
   new FirebasePushNotificationGateway(),
@@ -94,6 +101,7 @@ export const mobileServices = {
   custody: new CustodyService(custodyRepository, bookingRepository),
   identityVerification: identityVerificationService,
   matching: matchingService,
+  localNotifications: localNotificationService,
   notification: notificationService,
   notificationPreferences: new NotificationPreferenceService(
     notificationPreferenceRepository,
