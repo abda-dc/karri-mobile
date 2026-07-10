@@ -29,6 +29,7 @@ import {
 } from "../../src/presentation/components/MatchFiltersCard";
 import { RecommendedMatchesSection } from "../../src/presentation/components/RecommendedMatchesSection";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
+import { useProfile } from "../../src/presentation/hooks/useProfile";
 import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
 import { colors, radii, spacing, touchTargets, typography } from "../../src/theme/tokens";
@@ -532,6 +533,7 @@ function WeightSelector({
 
 export default function SendScreen() {
   const auth = useAuthSession();
+  const profileState = useProfile(auth.user?.uid ?? null);
   const [form, setForm] = useState(emptyForm);
   const [shipments, setShipments] = useState<ReadonlyArray<Shipment>>([]);
   const [listLoading, setListLoading] = useState(true);
@@ -615,6 +617,12 @@ export default function SendScreen() {
     [matchesByShipment],
   );
   const showingStaleMatches = matchesError !== null && hasSessionMatchData;
+  const hasActiveProfile = profileState.profile?.status === "active";
+  const needsProfile =
+    Boolean(auth.user) &&
+    !profileState.loading &&
+    !profileState.error &&
+    !hasActiveProfile;
 
   useEffect(() => {
     if (auth.loading || listLoading) return;
@@ -850,6 +858,21 @@ export default function SendScreen() {
 
     const { rewardAmount, weightKg } = validated;
 
+    if (profileState.loading) {
+      setFormError("Karri is still checking your profile. Try posting again in a moment.");
+      return;
+    }
+
+    if (profileState.error) {
+      setFormError("Profile status could not be confirmed. Retry profile status before posting this shipment.");
+      return;
+    }
+
+    if (!hasActiveProfile) {
+      setFormError("Complete your Karri profile before posting this shipment.");
+      return;
+    }
+
     setSaving(true);
     setFormError(null);
     setSuccessMessage(null);
@@ -908,6 +931,41 @@ export default function SendScreen() {
           ) : null}
           {!auth.loading && !auth.user && auth.error ? (
             <Banner compact message={auth.error} title="Development setup" variant="development" />
+          ) : null}
+          {auth.user && profileState.loading ? (
+            <LoadingState message="Checking your Karri profile..." />
+          ) : null}
+          {auth.user && profileState.error ? (
+            <Card variant="outlined">
+              <Banner
+                message={profileState.error}
+                title="Profile status could not load"
+                variant="error"
+              />
+              <PrimaryButton
+                accessibilityHint="Tries to load your Karri profile status again."
+                variant="secondary"
+                onPress={() => void profileState.refresh()}
+              >
+                Retry profile
+              </PrimaryButton>
+            </Card>
+          ) : null}
+          {needsProfile ? (
+            <Card variant="outlined">
+              <Banner
+                message="You can complete this shipment form now, but an active profile is required before posting. Profile completion does not verify identity or automatically change your trust score."
+                title="Complete your profile to post"
+                variant="info"
+              />
+              <PrimaryButton
+                accessibilityHint="Opens profile setup so you can complete your Karri profile before posting this shipment."
+                variant="secondary"
+                onPress={() => router.push("/profile-setup")}
+              >
+                Complete profile
+              </PrimaryButton>
+            </Card>
           ) : null}
           <Card variant="elevated">
             <SectionHeader

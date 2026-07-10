@@ -15,6 +15,7 @@ import { StaleDataRetryBanner } from "../../src/components/StaleDataRetryBanner"
 import { StatusChip } from "../../src/components/StatusChip";
 import { TrustBadge } from "../../src/components/TrustBadge";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
+import { useProfile } from "../../src/presentation/hooks/useProfile";
 import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
 import { TrustSummaryCard } from "../../src/presentation/components/TrustSummaryCard";
@@ -75,6 +76,7 @@ function corridorsMatch(shipment: Shipment, trip: Trip): boolean {
 
 export default function AppHomeScreen() {
   const auth = useAuthSession();
+  const profileState = useProfile(auth.user?.uid ?? null);
   const [shipments, setShipments] = useState<ReadonlyArray<Shipment>>([]);
   const [trips, setTrips] = useState<ReadonlyArray<Trip>>([]);
   const [shipmentsLoading, setShipmentsLoading] = useState(true);
@@ -157,6 +159,15 @@ export default function AppHomeScreen() {
   const isLoading = auth.loading || shipmentsLoading || tripsLoading;
   const showingStaleRouteData =
     dataError !== null && (shipments.length > 0 || trips.length > 0);
+  const activeProfile = profileState.profile?.status === "active"
+    ? profileState.profile
+    : null;
+  const profileDisplayName = activeProfile?.displayName.trim() ?? "";
+  const needsProfile =
+    Boolean(auth.user) &&
+    !profileState.loading &&
+    !profileState.error &&
+    profileState.profile?.status !== "active";
 
   async function handleRequestBooking(shipment: Shipment, trip: Trip) {
     if (!auth.user) {
@@ -240,13 +251,55 @@ export default function AppHomeScreen() {
           source={require("../../assets/home-trust-badge-icon.png")}
         />
         <View style={styles.heroCopy}>
-          <Text style={styles.heroTitle}>Move across borders with more clarity.</Text>
+          <Text style={styles.heroTitle}>
+            {profileDisplayName
+              ? `Welcome back, ${profileDisplayName}.`
+              : "Move across borders with more clarity."}
+          </Text>
           <Text style={styles.heroBody}>
-            Share what needs to move, publish where you&apos;re going, and see compatible
-            community routes.
+            {profileDisplayName
+              ? "What would you like to move next? Browse current routes, create a shipment, or share an upcoming trip."
+              : "Share what needs to move, publish where you&apos;re going, and see compatible community routes."}
           </Text>
         </View>
       </Card>
+
+      {auth.user && profileState.loading ? (
+        <LoadingState message="Checking your Karri profile..." />
+      ) : null}
+
+      {auth.user && profileState.error ? (
+        <Card variant="outlined">
+          <Banner
+            message={profileState.error}
+            title="Profile status could not load"
+            variant="error"
+          />
+          <PrimaryButton
+            accessibilityHint="Tries to load your Karri profile status again."
+            variant="secondary"
+            onPress={() => void profileState.refresh()}
+          >
+            Retry profile
+          </PrimaryButton>
+        </Card>
+      ) : null}
+
+      {needsProfile ? (
+        <Card variant="elevated">
+          <Banner
+            message="Complete your profile before posting shipments or trips. Profile completion helps people understand who they are coordinating with, but it does not verify identity or automatically change your trust score."
+            title="Complete your profile to post"
+            variant="info"
+          />
+          <PrimaryButton
+            accessibilityHint="Opens profile setup so you can complete your Karri profile."
+            onPress={() => router.push("/profile-setup")}
+          >
+            Complete profile
+          </PrimaryButton>
+        </Card>
+      ) : null}
 
       <Card style={styles.actionArea} variant="elevated">
         <View style={styles.actionAreaHeader}>
