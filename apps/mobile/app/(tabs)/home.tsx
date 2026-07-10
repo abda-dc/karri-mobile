@@ -321,7 +321,7 @@ export default function AppHomeScreen() {
             buttonLabel="Share trip"
             description="Share an upcoming trip and the spare capacity you are comfortable offering."
             onPress={() => router.push("/(tabs)/travel")}
-            title="I’m Traveling"
+            title="I'm Traveling"
           />
           <HomeActionCard
             badgeLabel="3"
