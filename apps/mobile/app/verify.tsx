@@ -33,38 +33,45 @@ export default function VerifyScreen() {
     <Screen centered contentStyle={styles.content}>
       <SectionHeader
         eyebrow="One more step"
-        subtitle="Create a Karri development session, then choose how you want to participate."
-        title="You&apos;re almost ready"
+        subtitle="Create or restore your temporary Karri account on this device, then choose how you want to participate."
+        title="Secure your Karri activity"
       />
 
       <Card variant="elevated">
         <TrustBadge
-          detail="Your shipment and trip records stay scoped to your Firebase user."
-          label="Account-scoped activity"
+          detail="Shipments, trips, bookings, and trust activity stay scoped to the current Karri account while this device session remains available."
+          label="Private app activity"
         />
         <Banner
           compact
           message={
             mobileServices.auth.isConfigured
-              ? "Karri will use an anonymous Firebase session for this MVP. It is not identity verification or a trust score."
+              ? "This temporary account does not provide verified identity, email login, account recovery, or trust-score verification yet."
               : "Karri is not configured locally, so a development session cannot start yet."
           }
           title="Development Mode"
           variant="development"
         />
 
-        {error ? <Banner message={error} title="Session could not start" variant="error" /> : null}
+        {error ? (
+          <Banner message={error} title="Account setup could not start" variant="error" />
+        ) : null}
 
         <View style={styles.actions}>
-          <PrimaryButton loading={isStarting} onPress={handleContinue}>
-            {isStarting ? "Starting session..." : "Continue"}
+          <PrimaryButton
+            accessibilityHint="Creates or restores your temporary Karri account and then opens profile setup."
+            loading={isStarting}
+            onPress={handleContinue}
+          >
+            {isStarting ? "Setting up account..." : "Create or restore account"}
           </PrimaryButton>
           <PrimaryButton
+            accessibilityHint="Returns to the temporary account introduction screen."
             disabled={isStarting}
             variant="secondary"
             onPress={() => router.push("/login")}
           >
-            Back to email
+            Back to introduction
           </PrimaryButton>
         </View>
       </Card>
