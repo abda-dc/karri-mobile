@@ -33,6 +33,7 @@ import { ActivityFeed } from "./ActivityFeed";
 import { BookingStatusCard } from "./BookingStatusCard";
 import { CustodySummaryCard } from "./CustodySummaryCard";
 import { NextActionCard } from "./NextActionCard";
+import { RecentStatusUpdateCard } from "./RecentStatusUpdateCard";
 import { ShipmentStatusCard } from "./ShipmentStatusCard";
 import { ShipmentTimelineCard } from "./ShipmentTimelineCard";
 import { TrustSummaryCard } from "./TrustSummaryCard";
@@ -251,6 +252,12 @@ export function BookingDetailCard({
         pendingStatus={pendingTransition}
       />
       <ShipmentStatusCard bookingStatus={booking.status} shipment={shipment} trip={trip} />
+      <RecentStatusUpdateCard
+        booking={booking}
+        currentUserId={currentUserId}
+        notifications={notifications}
+        shipmentEvents={shipmentTimeline}
+      />
       <NextActionCard booking={booking} currentUserId={currentUserId} />
 
       <TrustSummaryCard
