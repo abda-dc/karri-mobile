@@ -21,7 +21,9 @@ export function EmptyState({ action, description, marker = "K", title }: EmptySt
         <Text style={styles.markerText}>{marker}</Text>
       </View>
       <View style={styles.copy}>
-        <Text style={styles.title}>{title}</Text>
+        <Text accessibilityRole="header" style={styles.title}>
+          {title}
+        </Text>
         <Text style={styles.description}>{description}</Text>
       </View>
       {action ? <View style={styles.action}>{action}</View> : null}

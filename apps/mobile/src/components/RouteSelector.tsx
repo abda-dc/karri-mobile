@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   airportRouteOptions,
   type AirportRouteOption,
@@ -91,11 +91,15 @@ export function RouteSelector({ label, onChange, value }: RouteSelectorProps) {
                 accessibilityState={{ selected }}
                 key={option.code}
                 onPress={() => {
-                  onChange({
+                  const nextSelection = {
                     city: option.city,
                     country: option.country,
                     subdivision: "",
-                  });
+                  };
+                  onChange(nextSelection);
+                  AccessibilityInfo.announceForAccessibility(
+                    `${label} selected: ${getAirportLabel(option)}, ${getAirportSubtitle(option)}`,
+                  );
                   setOpen(false);
                 }}
                 style={({ pressed }) => [

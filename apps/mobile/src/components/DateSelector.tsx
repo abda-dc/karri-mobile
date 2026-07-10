@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  AccessibilityInfo,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -227,6 +228,9 @@ export function DateSelector({
                     key={isoDate}
                     onPress={() => {
                       onChange(isoDate);
+                      AccessibilityInfo.announceForAccessibility(
+                        `${label} selected: ${formatReadableDate(isoDate)}`,
+                      );
                       setExpanded(false);
                     }}
                     style={({ pressed }) => [
