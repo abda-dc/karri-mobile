@@ -9,6 +9,7 @@ import { LoadingState } from "../../src/components/LoadingState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
+import { StaleDataRetryBanner } from "../../src/components/StaleDataRetryBanner";
 import { StatusChip } from "../../src/components/StatusChip";
 import type { Booking } from "../../src/domain/booking/Booking";
 import {
@@ -198,23 +199,17 @@ export default function ProfileScreen() {
       ) : null}
 
       {error ? (
-        <>
-          <Banner
-            message={
-              showingStaleProfileActivity
-                ? `${error} Showing last loaded profile activity from this session.`
-                : error
-            }
-            title="Profile activity issue"
-            variant={showingStaleProfileActivity ? "warning" : "error"}
-          />
-          <PrimaryButton
-            onPress={() => setActivityRetryKey((current) => current + 1)}
-            variant="secondary"
-          >
-            Retry profile activity
-          </PrimaryButton>
-        </>
+        <StaleDataRetryBanner
+          message={
+            showingStaleProfileActivity
+              ? `${error} Showing last loaded profile activity from this session.`
+              : error
+          }
+          retryLabel="Retry profile activity"
+          title="Profile activity issue"
+          variant={showingStaleProfileActivity ? "warning" : "error"}
+          onRetry={() => setActivityRetryKey((current) => current + 1)}
+        />
       ) : null}
 
       {auth.user ? (

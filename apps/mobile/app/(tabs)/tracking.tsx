@@ -8,6 +8,7 @@ import { LoadingState } from "../../src/components/LoadingState";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
+import { StaleDataRetryBanner } from "../../src/components/StaleDataRetryBanner";
 import { StatusChip } from "../../src/components/StatusChip";
 import type { Booking, BookingRequest } from "../../src/domain/booking/Booking";
 import type { Notification } from "../../src/domain/notification/Notification";
@@ -125,23 +126,17 @@ export default function TrackingScreen() {
       ) : null}
 
       {error ? (
-        <>
-          <Banner
-            message={
-              showingStaleTrackingData
-                ? `${error} Showing last loaded tracking data from this session.`
-                : error
-            }
-            title="Bookings could not load"
-            variant={showingStaleTrackingData ? "warning" : "error"}
-          />
-          <PrimaryButton
-            onPress={() => setActivityRetryKey((current) => current + 1)}
-            variant="secondary"
-          >
-            Retry tracking
-          </PrimaryButton>
-        </>
+        <StaleDataRetryBanner
+          message={
+            showingStaleTrackingData
+              ? `${error} Showing last loaded tracking data from this session.`
+              : error
+          }
+          retryLabel="Retry tracking"
+          title="Bookings could not load"
+          variant={showingStaleTrackingData ? "warning" : "error"}
+          onRetry={() => setActivityRetryKey((current) => current + 1)}
+        />
       ) : null}
       {identity.error ? (
         <Banner compact message={identity.error} title="Identity status unavailable" variant="warning" />

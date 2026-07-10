@@ -17,6 +17,7 @@ import {
 } from "../../src/components/RouteSelector";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
+import { StaleDataRetryBanner } from "../../src/components/StaleDataRetryBanner";
 import { StatusChip } from "../../src/components/StatusChip";
 import { TextField } from "../../src/components/TextField";
 import type { MatchResult } from "../../src/domain/matching/MatchResult";
@@ -558,23 +559,17 @@ export default function TravelScreen() {
             ) : null}
 
             {!listLoading && dataError ? (
-              <>
-                <Banner
-                  message={
-                    showingStaleTrips
-                      ? `${dataError} Showing last loaded data from this session.`
-                      : dataError
-                  }
-                  title="Trips could not load"
-                  variant={showingStaleTrips ? "warning" : "error"}
-                />
-                <PrimaryButton
-                  onPress={() => setListRetryKey((current) => current + 1)}
-                  variant="secondary"
-                >
-                  Retry trips
-                </PrimaryButton>
-              </>
+              <StaleDataRetryBanner
+                message={
+                  showingStaleTrips
+                    ? `${dataError} Showing last loaded data from this session.`
+                    : dataError
+                }
+                retryLabel="Retry trips"
+                title="Trips could not load"
+                variant={showingStaleTrips ? "warning" : "error"}
+                onRetry={() => setListRetryKey((current) => current + 1)}
+              />
             ) : null}
 
             {!listLoading && !dataError && trips.length === 0 ? (
@@ -626,23 +621,17 @@ export default function TravelScreen() {
                 onApply={setMatchFilters}
               />
               {matchesError ? (
-                <>
-                  <Banner
-                    message={
-                      showingStaleMatches
-                        ? `${matchesError} Showing last loaded recommendations from this session.`
-                        : matchesError
-                    }
-                    title="Recommended shipments could not refresh"
-                    variant={showingStaleMatches ? "warning" : "error"}
-                  />
-                  <PrimaryButton
-                    onPress={() => setMatchesRetryKey((current) => current + 1)}
-                    variant="secondary"
-                  >
-                    Retry recommendations
-                  </PrimaryButton>
-                </>
+                <StaleDataRetryBanner
+                  message={
+                    showingStaleMatches
+                      ? `${matchesError} Showing last loaded recommendations from this session.`
+                      : matchesError
+                  }
+                  retryLabel="Retry recommendations"
+                  title="Recommended shipments could not refresh"
+                  variant={showingStaleMatches ? "warning" : "error"}
+                  onRetry={() => setMatchesRetryKey((current) => current + 1)}
+                />
               ) : null}
               {activeTrips.map((trip) => (
                 <RecommendedMatchesSection

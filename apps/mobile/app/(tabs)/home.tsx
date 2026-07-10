@@ -11,6 +11,7 @@ import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { RouteCardHeader } from "../../src/components/RouteCardHeader";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
+import { StaleDataRetryBanner } from "../../src/components/StaleDataRetryBanner";
 import { StatusChip } from "../../src/components/StatusChip";
 import { TrustBadge } from "../../src/components/TrustBadge";
 import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
@@ -316,23 +317,17 @@ export default function AppHomeScreen() {
           ) : null}
 
           {!isLoading && dataError ? (
-            <>
-              <Banner
-                message={
-                  showingStaleRouteData
-                    ? `${dataError} Showing last loaded data from this session.`
-                    : dataError
-                }
-                title="Matches could not load"
-                variant={showingStaleRouteData ? "warning" : "error"}
-              />
-              <PrimaryButton
-                onPress={() => setDataRetryKey((current) => current + 1)}
-                variant="secondary"
-              >
-                Retry loading
-              </PrimaryButton>
-            </>
+            <StaleDataRetryBanner
+              message={
+                showingStaleRouteData
+                  ? `${dataError} Showing last loaded data from this session.`
+                  : dataError
+              }
+              retryLabel="Retry loading"
+              title="Matches could not load"
+              variant={showingStaleRouteData ? "warning" : "error"}
+              onRetry={() => setDataRetryKey((current) => current + 1)}
+            />
           ) : null}
 
           {requestError ? (
