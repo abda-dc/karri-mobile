@@ -36,15 +36,22 @@ export function PushNotificationRegistrationCard({
   return (
     <Card variant="outlined">
       <SectionHeader
-        action={<StatusChip label="Experimental" tone="warning" />}
-        subtitle="Optionally register this app installation for controlled development testing. This does not activate push delivery."
+        action={<StatusChip label="Optional setup" tone="warning" />}
+        subtitle="Local notification routing is active. Registering this device is optional and does not enable remote push delivery."
         title="Device notifications"
       />
 
       <Banner
         compact
+        message="Tapping a valid Karri notification can open the right app screen on this device. Remote push delivery is not enabled yet."
+        title="Local routing active"
+        variant="success"
+      />
+
+      <Banner
+        compact
         message="Karri requests platform permission only after you press the button below. No token is displayed, logged, or written directly to Firestore."
-        title="User initiated only"
+        title="User initiated registration"
         variant="development"
       />
 
@@ -62,12 +69,12 @@ export function PushNotificationRegistrationCard({
 
       {!pushPreferenceEnabled ? (
         <Text style={styles.help}>
-          Enable Push above and save preferences before registering this device.
+          Turn on Push above and save preferences before registering this device.
         </Text>
       ) : null}
       {!available ? (
         <Text style={styles.help}>
-          Requires an Android or iOS development build with a configured EAS project ID.
+          Device registration requires an Android or iOS development build with a configured EAS project ID.
         </Text>
       ) : null}
 
@@ -89,7 +96,7 @@ export function PushNotificationRegistrationCard({
         loading={registration.busy}
         onPress={() => void registration.register()}
       >
-        Enable device notifications
+        Register this device
       </PrimaryButton>
     </Card>
   );

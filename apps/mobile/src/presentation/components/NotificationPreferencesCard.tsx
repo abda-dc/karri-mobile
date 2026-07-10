@@ -42,7 +42,7 @@ const channelLabels: Readonly<Record<NotificationChannel, string>> = {
 
 const channelDescriptions: Readonly<Record<NotificationChannel, string>> = {
   [NotificationChannel.Email]: "Reserved for future email alerts.",
-  [NotificationChannel.Push]: "Prepared for future device notifications in this app.",
+  [NotificationChannel.Push]: "Preference for future device notifications in this app.",
   [NotificationChannel.Sms]: "Reserved for future SMS alerts.",
 };
 
@@ -135,7 +135,7 @@ export function NotificationPreferencesCard({
     <Card variant="outlined">
       <SectionHeader
         action={<StatusChip label="Foundation" tone="info" />}
-        subtitle="Choose what Karri should be allowed to notify you about later. Push delivery is not active yet."
+        subtitle="Choose notification preferences for Karri. Local routing is active; remote push delivery is not enabled yet."
         title="Notification preferences"
       />
 
@@ -189,7 +189,7 @@ export function NotificationPreferencesCard({
           <View style={styles.rowCopy}>
             <Text style={styles.rowTitle}>Quiet hours</Text>
             <Text style={styles.rowDescription}>
-              Keep a local do-not-disturb window ready for future push delivery.
+              Keep a local do-not-disturb window ready for future remote push delivery.
             </Text>
           </View>
           <PrimaryButton

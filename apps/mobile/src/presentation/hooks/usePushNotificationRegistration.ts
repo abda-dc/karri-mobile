@@ -47,12 +47,12 @@ export function usePushNotificationRegistration(
       return;
     }
     if (!userId) {
-      setMessage("Sign in before enabling device notifications.");
+      setMessage("Sign in before registering this device.");
       setOutcome("warning");
       return;
     }
     if (!preferences?.channels[NotificationChannel.Push]) {
-      setMessage("Enable and save the Push preference before registering this device.");
+      setMessage("Turn on and save the Push preference before registering this device.");
       setOutcome("warning");
       return;
     }
@@ -82,7 +82,7 @@ export function usePushNotificationRegistration(
 
       if (result.status === PushRegistrationStatus.Registered) {
         setMessage(
-          "This installation registered successfully. Push delivery remains controlled by the trusted server rollout.",
+          "This installation registered successfully. Remote push delivery is not enabled yet.",
         );
         setOutcome("success");
         return;
@@ -91,7 +91,7 @@ export function usePushNotificationRegistration(
       setMessage(
         result.status === PushRegistrationStatus.Deferred
           ? result.reason
-          : "This installation is not registered for push delivery.",
+          : "This installation is not registered for remote push delivery.",
       );
       setOutcome("warning");
     } catch {
