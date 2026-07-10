@@ -8,6 +8,7 @@ import { NotificationService } from "../../application/services/NotificationServ
 import { NotificationPreferenceService } from "../../application/services/NotificationPreferenceService";
 import { NotificationRouter } from "../../application/services/NotificationRouter";
 import { OfflineService } from "../../application/services/OfflineService";
+import { ProfileService } from "../../application/services/ProfileService";
 import { PushNotificationService } from "../../application/services/PushNotificationService";
 import { PushRegistrationService } from "../../application/services/PushRegistrationService";
 import { ReviewService } from "../../application/services/ReviewService";
@@ -22,6 +23,7 @@ import {
   FirebaseCustodyRepository,
   FirebaseNotificationRepository,
   FirebaseNotificationPreferenceRepository,
+  FirebaseProfileRepository,
   FirebaseReviewRepository,
   FirebaseShipmentRepository,
   FirebaseTripRepository,
@@ -46,6 +48,7 @@ const custodyRepository = new FirebaseCustodyRepository();
 const notificationRepository = new FirebaseNotificationRepository();
 const notificationPreferenceRepository =
   new FirebaseNotificationPreferenceRepository();
+const profileRepository = new FirebaseProfileRepository();
 const reviewRepository = new FirebaseReviewRepository();
 const shipmentRepository = new FirebaseShipmentRepository();
 const tripRepository = new FirebaseTripRepository();
@@ -108,6 +111,7 @@ export const mobileServices = {
   ),
   notificationRouter,
   offline: offlineService,
+  profile: new ProfileService(profileRepository),
   pushNotification: pushNotificationService,
   pushRegistration: pushRegistrationService,
   review: new ReviewService(reviewRepository, bookingRepository, eventBus),
