@@ -535,6 +535,7 @@ export default function SendScreen() {
   const [shipments, setShipments] = useState<ReadonlyArray<Shipment>>([]);
   const [listLoading, setListLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
+  const [listRetryKey, setListRetryKey] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -546,6 +547,7 @@ export default function SendScreen() {
   >(() => new Map());
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [matchesError, setMatchesError] = useState<string | null>(null);
+  const [matchesRetryKey, setMatchesRetryKey] = useState(0);
   const [openDateSelector, setOpenDateSelector] = useState<OpenDateSelector>(null);
   const [weightMode, setWeightMode] = useState<"custom" | "preset">("preset");
   const [customWeightInput, setCustomWeightInput] = useState("");
@@ -585,7 +587,7 @@ export default function SendScreen() {
       setDataError(reportFriendlyError(error, "send.start-shipment-watch"));
       setListLoading(false);
     }
-  }, [auth.loading, auth.user]);
+  }, [auth.loading, auth.user, listRetryKey]);
 
   const activeShipments = useMemo(
     () => shipments.filter((shipment) => shipment.status === "active"),
@@ -606,6 +608,12 @@ export default function SendScreen() {
       form.weightKg,
     ],
   );
+  const showingStaleShipments = dataError !== null && shipments.length > 0;
+  const hasSessionMatchData = useMemo(
+    () => Array.from(matchesByShipment.values()).some((matches) => matches.length > 0),
+    [matchesByShipment],
+  );
+  const showingStaleMatches = matchesError !== null && hasSessionMatchData;
 
   useEffect(() => {
     if (auth.loading || listLoading) return;
@@ -642,7 +650,6 @@ export default function SendScreen() {
       })
       .catch((error) => {
         if (active) {
-          setMatchesByShipment(new Map());
           setMatchesError(reportFriendlyError(error, "send.load-recommended-trips"));
           setMatchesLoading(false);
         }
@@ -651,7 +658,7 @@ export default function SendScreen() {
     return () => {
       active = false;
     };
-  }, [activeShipments, auth.loading, auth.user, listLoading, matchFilters]);
+  }, [activeShipments, auth.loading, auth.user, listLoading, matchFilters, matchesRetryKey]);
 
   function updateField(field: keyof typeof emptyForm, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -1043,7 +1050,23 @@ export default function SendScreen() {
             ) : null}
 
             {!listLoading && dataError ? (
-              <Banner message={dataError} title="Shipments could not load" variant="error" />
+              <>
+                <Banner
+                  message={
+                    showingStaleShipments
+                      ? `${dataError} Showing last loaded data from this session.`
+                      : dataError
+                  }
+                  title="Shipments could not load"
+                  variant={showingStaleShipments ? "warning" : "error"}
+                />
+                <PrimaryButton
+                  onPress={() => setListRetryKey((current) => current + 1)}
+                  variant="secondary"
+                >
+                  Retry shipments
+                </PrimaryButton>
+              </>
             ) : null}
 
             {!listLoading && !dataError && shipments.length === 0 ? (
@@ -1054,7 +1077,7 @@ export default function SendScreen() {
               />
             ) : null}
 
-            {!listLoading && !dataError
+            {!listLoading && (!dataError || showingStaleShipments)
               ? shipments.map((shipment) => (
                   <Card key={shipment.id} variant="elevated">
                     <RouteCardHeader
@@ -1082,7 +1105,7 @@ export default function SendScreen() {
               : null}
           </View> : null}
 
-          {!listLoading && !dataError && activeShipments.length > 0 ? (
+          {!listLoading && (!dataError || showingStaleShipments) && activeShipments.length > 0 ? (
             <View style={styles.discoverySection}>
               <SectionHeader
                 eyebrow="Discovery"
@@ -1094,10 +1117,29 @@ export default function SendScreen() {
                 filters={matchFilters}
                 onApply={setMatchFilters}
               />
+              {matchesError ? (
+                <>
+                  <Banner
+                    message={
+                      showingStaleMatches
+                        ? `${matchesError} Showing last loaded recommendations from this session.`
+                        : matchesError
+                    }
+                    title="Recommended travelers could not refresh"
+                    variant={showingStaleMatches ? "warning" : "error"}
+                  />
+                  <PrimaryButton
+                    onPress={() => setMatchesRetryKey((current) => current + 1)}
+                    variant="secondary"
+                  >
+                    Retry recommendations
+                  </PrimaryButton>
+                </>
+              ) : null}
               {activeShipments.map((shipment) => (
                 <RecommendedMatchesSection
                   key={shipment.id}
-                  error={matchesError}
+                  error={showingStaleMatches ? null : matchesError}
                   filtered={hasActiveMatchFilters(matchFilters)}
                   loading={matchesLoading}
                   matches={matchesByShipment.get(shipment.id) ?? []}

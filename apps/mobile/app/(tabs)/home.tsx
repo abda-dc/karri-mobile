@@ -79,6 +79,7 @@ export default function AppHomeScreen() {
   const [shipmentsLoading, setShipmentsLoading] = useState(true);
   const [tripsLoading, setTripsLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
+  const [dataRetryKey, setDataRetryKey] = useState(0);
   const [optimisticRequests, setOptimisticRequests] = useState<
     ReadonlyMap<string, OptimisticRequestState>
   >(() => new Map());
@@ -140,7 +141,7 @@ export default function AppHomeScreen() {
     }
 
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
-  }, [auth.loading, auth.user]);
+  }, [auth.loading, auth.user, dataRetryKey]);
 
   const matches = useMemo<CorridorMatch[]>(
     () =>
@@ -153,6 +154,8 @@ export default function AppHomeScreen() {
   );
 
   const isLoading = auth.loading || shipmentsLoading || tripsLoading;
+  const showingStaleRouteData =
+    dataError !== null && (shipments.length > 0 || trips.length > 0);
 
   async function handleRequestBooking(shipment: Shipment, trip: Trip) {
     if (!auth.user) {
@@ -299,7 +302,7 @@ export default function AppHomeScreen() {
         <View style={styles.section}>
           <SectionHeader
             action={
-              !isLoading && !dataError ? (
+              !isLoading && (!dataError || showingStaleRouteData) ? (
                 <StatusChip label={`${matches.length} found`} tone="active" />
               ) : undefined
             }
@@ -313,7 +316,23 @@ export default function AppHomeScreen() {
           ) : null}
 
           {!isLoading && dataError ? (
-            <Banner message={dataError} title="Matches could not load" variant="error" />
+            <>
+              <Banner
+                message={
+                  showingStaleRouteData
+                    ? `${dataError} Showing last loaded data from this session.`
+                    : dataError
+                }
+                title="Matches could not load"
+                variant={showingStaleRouteData ? "warning" : "error"}
+              />
+              <PrimaryButton
+                onPress={() => setDataRetryKey((current) => current + 1)}
+                variant="secondary"
+              >
+                Retry loading
+              </PrimaryButton>
+            </>
           ) : null}
 
           {requestError ? (
@@ -336,7 +355,7 @@ export default function AppHomeScreen() {
             />
           ) : null}
 
-          {!isLoading && !dataError
+          {!isLoading && (!dataError || showingStaleRouteData)
             ? matches.map(({ shipment, trip }) => (
                 <Card key={`${shipment.id}:${trip.id}`} variant="elevated">
                   <RouteCardHeader

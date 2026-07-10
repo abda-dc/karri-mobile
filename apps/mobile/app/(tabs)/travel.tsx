@@ -183,6 +183,7 @@ export default function TravelScreen() {
   const [trips, setTrips] = useState<ReadonlyArray<Trip>>([]);
   const [listLoading, setListLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
+  const [listRetryKey, setListRetryKey] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -194,6 +195,7 @@ export default function TravelScreen() {
   >(() => new Map());
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [matchesError, setMatchesError] = useState<string | null>(null);
+  const [matchesRetryKey, setMatchesRetryKey] = useState(0);
   const [openDateSelector, setOpenDateSelector] = useState<OpenDateSelector>(null);
   const [capacityMode, setCapacityMode] = useState<"custom" | "preset">("preset");
   const [customCapacityValue, setCustomCapacityValue] = useState("");
@@ -230,12 +232,18 @@ export default function TravelScreen() {
       setDataError(reportFriendlyError(error, "travel.start-trip-watch"));
       setListLoading(false);
     }
-  }, [auth.loading, auth.user]);
+  }, [auth.loading, auth.user, listRetryKey]);
 
   const activeTrips = useMemo(
     () => trips.filter((trip) => trip.status === "active"),
     [trips],
   );
+  const showingStaleTrips = dataError !== null && trips.length > 0;
+  const hasSessionMatchData = useMemo(
+    () => Array.from(matchesByTrip.values()).some((matches) => matches.length > 0),
+    [matchesByTrip],
+  );
+  const showingStaleMatches = matchesError !== null && hasSessionMatchData;
 
   useEffect(() => {
     if (auth.loading || listLoading) return;
@@ -272,7 +280,6 @@ export default function TravelScreen() {
       })
       .catch((error) => {
         if (active) {
-          setMatchesByTrip(new Map());
           setMatchesError(reportFriendlyError(error, "travel.load-recommended-shipments"));
           setMatchesLoading(false);
         }
@@ -281,7 +288,7 @@ export default function TravelScreen() {
     return () => {
       active = false;
     };
-  }, [activeTrips, auth.loading, auth.user, listLoading, matchFilters]);
+  }, [activeTrips, auth.loading, auth.user, listLoading, matchFilters, matchesRetryKey]);
 
   function updateField(field: keyof typeof emptyForm, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -551,7 +558,23 @@ export default function TravelScreen() {
             ) : null}
 
             {!listLoading && dataError ? (
-              <Banner message={dataError} title="Trips could not load" variant="error" />
+              <>
+                <Banner
+                  message={
+                    showingStaleTrips
+                      ? `${dataError} Showing last loaded data from this session.`
+                      : dataError
+                  }
+                  title="Trips could not load"
+                  variant={showingStaleTrips ? "warning" : "error"}
+                />
+                <PrimaryButton
+                  onPress={() => setListRetryKey((current) => current + 1)}
+                  variant="secondary"
+                >
+                  Retry trips
+                </PrimaryButton>
+              </>
             ) : null}
 
             {!listLoading && !dataError && trips.length === 0 ? (
@@ -562,7 +585,7 @@ export default function TravelScreen() {
               />
             ) : null}
 
-            {!listLoading && !dataError
+            {!listLoading && (!dataError || showingStaleTrips)
               ? trips.map((trip) => (
                   <Card key={trip.id} variant="elevated">
                     <RouteCardHeader
@@ -590,7 +613,7 @@ export default function TravelScreen() {
               : null}
           </View> : null}
 
-          {!listLoading && !dataError && activeTrips.length > 0 ? (
+          {!listLoading && (!dataError || showingStaleTrips) && activeTrips.length > 0 ? (
             <View style={styles.discoverySection}>
               <SectionHeader
                 eyebrow="Discovery"
@@ -602,10 +625,29 @@ export default function TravelScreen() {
                 filters={matchFilters}
                 onApply={setMatchFilters}
               />
+              {matchesError ? (
+                <>
+                  <Banner
+                    message={
+                      showingStaleMatches
+                        ? `${matchesError} Showing last loaded recommendations from this session.`
+                        : matchesError
+                    }
+                    title="Recommended shipments could not refresh"
+                    variant={showingStaleMatches ? "warning" : "error"}
+                  />
+                  <PrimaryButton
+                    onPress={() => setMatchesRetryKey((current) => current + 1)}
+                    variant="secondary"
+                  >
+                    Retry recommendations
+                  </PrimaryButton>
+                </>
+              ) : null}
               {activeTrips.map((trip) => (
                 <RecommendedMatchesSection
                   key={trip.id}
-                  error={matchesError}
+                  error={showingStaleMatches ? null : matchesError}
                   filtered={hasActiveMatchFilters(matchFilters)}
                   loading={matchesLoading}
                   matches={matchesByTrip.get(trip.id) ?? []}
