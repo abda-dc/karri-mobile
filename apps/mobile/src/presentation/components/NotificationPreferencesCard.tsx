@@ -42,7 +42,7 @@ const channelLabels: Readonly<Record<NotificationChannel, string>> = {
 
 const channelDescriptions: Readonly<Record<NotificationChannel, string>> = {
   [NotificationChannel.Email]: "Reserved for future email alerts.",
-  [NotificationChannel.Push]: "Prepared for future device notifications.",
+  [NotificationChannel.Push]: "Prepared for future device notifications in this app.",
   [NotificationChannel.Sms]: "Reserved for future SMS alerts.",
 };
 
@@ -54,6 +54,8 @@ type NotificationPreferencesCardProps = {
   onSave(preferences: NotificationPreferences): Promise<NotificationPreferences>;
   preferences: NotificationPreferences;
 };
+
+type AvailabilityTone = "active" | "info" | "neutral" | "success" | "warning";
 
 export function NotificationPreferencesCard({
   loading = false,
@@ -155,9 +157,12 @@ export function NotificationPreferencesCard({
           return (
             <PreferenceToggleRow
               key={channel}
-              description={available ? channelDescriptions[channel] : `${channelDescriptions[channel]} Not available yet.`}
+              availabilityLabel={available ? "Preference available" : "Coming later"}
+              availabilityTone={available ? "success" : "neutral"}
+              description={channelDescriptions[channel]}
               disabled={!available || loading || saving}
               enabled={enabled}
+              featured={available}
               label={channelLabels[channel]}
               onPress={channel === NotificationChannel.Push ? togglePushChannel : undefined}
             />
@@ -205,19 +210,29 @@ export function NotificationPreferencesCard({
         </View>
 
         {draft.quietHours ? (
-          <View style={styles.quietHoursFields}>
-            <TextField
-              helperText="Use 24-hour HH:mm format."
-              label="Start"
-              value={draft.quietHours.startLocalTime}
-              onChangeText={(value) => updateQuietHoursField("startLocalTime", value)}
-            />
-            <TextField
-              helperText="Use 24-hour HH:mm format."
-              label="End"
-              value={draft.quietHours.endLocalTime}
-              onChangeText={(value) => updateQuietHoursField("endLocalTime", value)}
-            />
+          <View style={styles.quietHoursPanel}>
+            <View style={styles.quietHoursSummary}>
+              <StatusChip label="Local window" tone="info" />
+              <Text style={styles.quietHoursSummaryText}>
+                {draft.quietHours.startLocalTime} to {draft.quietHours.endLocalTime}
+              </Text>
+            </View>
+            <View style={styles.quietHoursFields}>
+              <TextField
+                containerStyle={styles.quietHoursField}
+                helperText="Use 24-hour HH:mm format."
+                label="Start"
+                value={draft.quietHours.startLocalTime}
+                onChangeText={(value) => updateQuietHoursField("startLocalTime", value)}
+              />
+              <TextField
+                containerStyle={styles.quietHoursField}
+                helperText="Use 24-hour HH:mm format."
+                label="End"
+                value={draft.quietHours.endLocalTime}
+                onChangeText={(value) => updateQuietHoursField("endLocalTime", value)}
+              />
+            </View>
             <TextField
               helperText="Example: America/New_York"
               label="Time zone"
@@ -252,17 +267,23 @@ export function NotificationPreferencesCard({
 }
 
 type PreferenceToggleRowProps = {
+  availabilityLabel?: string;
+  availabilityTone?: AvailabilityTone;
   description: string;
   disabled?: boolean;
   enabled: boolean;
+  featured?: boolean;
   label: string;
   onPress?: () => void;
 };
 
 function PreferenceToggleRow({
+  availabilityLabel,
+  availabilityTone = "neutral",
   description,
   disabled = false,
   enabled,
+  featured = false,
   label,
   onPress,
 }: PreferenceToggleRowProps) {
@@ -275,12 +296,18 @@ function PreferenceToggleRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.toggleRow,
+        featured && styles.featuredToggleRow,
         pressed && !disabled && styles.pressed,
         disabled && styles.disabled,
       ]}
     >
       <View style={styles.rowCopy}>
-        <Text style={styles.rowTitle}>{label}</Text>
+        <View style={styles.rowTitleLine}>
+          <Text style={styles.rowTitle}>{label}</Text>
+          {availabilityLabel ? (
+            <StatusChip label={availabilityLabel} tone={availabilityTone} />
+          ) : null}
+        </View>
         <Text style={styles.rowDescription}>{description}</Text>
       </View>
       <View style={[styles.switchTrack, enabled && styles.switchTrackEnabled]}>
@@ -310,8 +337,37 @@ const styles = StyleSheet.create({
     opacity: 0.82,
     transform: [{ scale: 0.995 }],
   },
+  featuredToggleRow: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+  },
+  quietHoursField: {
+    flexBasis: 132,
+    flexGrow: 1,
+  },
   quietHoursFields: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.sm,
+  },
+  quietHoursPanel: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  quietHoursSummary: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    justifyContent: "space-between",
+  },
+  quietHoursSummaryText: {
+    color: colors.text,
+    ...typography.bodyStrong,
   },
   rowCopy: {
     flex: 1,
@@ -331,6 +387,12 @@ const styles = StyleSheet.create({
   rowTitle: {
     color: colors.text,
     ...typography.bodyStrong,
+  },
+  rowTitleLine: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
   },
   switchThumb: {
     backgroundColor: colors.white,
