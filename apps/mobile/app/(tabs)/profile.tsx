@@ -194,7 +194,7 @@ export default function ProfileScreen() {
           action={<PrimaryButton onPress={() => router.push("/login")}>Get started</PrimaryButton>}
           description="View trust history, identity status, and notifications in one place."
           marker="P"
-          title="Sign in to see your Karri profile"
+          title="Start a Karri session to see your profile"
         />
       ) : null}
 
@@ -311,17 +311,17 @@ export default function ProfileScreen() {
 
           <Card variant="elevated">
             <SectionHeader
-              subtitle="Profile editing remains a separate setup flow."
+              subtitle="Profile details support coordination. Identity verification and trust scoring remain separate."
               title="Profile details"
             />
             <Banner
               compact
-              message="Profile setup is separate from the read-only identity verification foundation above."
+              message="Edit the details people use to understand who they are coordinating with. This does not verify identity or automatically change your trust score."
               title="Profile details only"
-              variant="development"
+              variant="info"
             />
             <PrimaryButton variant="secondary" onPress={() => router.push("/profile-setup")}>
-              Review profile setup
+              Edit profile details
             </PrimaryButton>
           </Card>
 

@@ -475,7 +475,7 @@ export default function TravelScreen() {
       <View style={styles.pageStack}>
           {!auth.loading && !auth.user ? (
             <Banner
-              message="Sign in to post your trip and receive shipment matches. You can complete the form first."
+              message="Start a temporary Karri account to publish your trip and receive shipment matches. You can complete the form first."
               title="Continue as a guest"
               variant="info"
             />

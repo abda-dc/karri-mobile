@@ -19,20 +19,25 @@ export default function LoginScreen() {
 
       <Card variant="elevated">
         <SectionHeader
-          subtitle="Karri creates a private temporary account for this device so your shipment, trip, booking, and trust activity stays separate from other users. Email sign-in and account recovery are not enabled in this MVP yet."
+          subtitle="Karri creates a private temporary account for this device so your shipment, trip, booking, and trust activity stays separate from other users. Email login, account recovery, verified identity, and automatic trust-score verification are not enabled in this MVP yet."
           title="Start your Karri account setup"
         />
 
-        <Banner
-          compact
-          message={
-            mobileServices.auth.isConfigured
-              ? "Your temporary account can keep activity available on this device while the current session remains active, but it cannot be recovered by email yet."
-              : "Karri is not configured locally. Add the documented mobile environment values before continuing."
-          }
-          title="Development Mode"
-          variant="development"
-        />
+        {mobileServices.auth.isConfigured ? (
+          <Banner
+            compact
+            message="Your temporary account can keep activity available on this device while the current session remains active, but it does not include email login, account recovery, verified identity, or automatic trust-score verification."
+            title="Temporary account limits"
+            variant="info"
+          />
+        ) : (
+          <Banner
+            compact
+            message="Karri is not configured locally. Add the documented mobile environment values before continuing."
+            title="Development Mode"
+            variant="development"
+          />
+        )}
 
         <View style={styles.actions}>
           <PrimaryButton

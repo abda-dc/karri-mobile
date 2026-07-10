@@ -121,7 +121,7 @@ export default function TrackingScreen() {
           action={<PrimaryButton onPress={() => router.push("/login")}>Get started</PrimaryButton>}
           description="Start a Karri session to view booking progress and custody updates."
           marker="C"
-          title="Sign in to track shipments"
+          title="Start a Karri session to track shipments"
         />
       ) : null}
 

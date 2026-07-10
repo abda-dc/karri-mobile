@@ -924,7 +924,7 @@ export default function SendScreen() {
       <View style={styles.pageStack}>
           {!auth.loading && !auth.user ? (
             <Banner
-              message="Sign in to post your shipment and receive traveler matches. You can complete the form first."
+              message="Start a temporary Karri account to post your shipment and receive traveler matches. You can complete the form first."
               title="Continue as a guest"
               variant="info"
             />

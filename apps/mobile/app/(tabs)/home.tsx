@@ -259,7 +259,7 @@ export default function AppHomeScreen() {
           <Text style={styles.heroBody}>
             {profileDisplayName
               ? "What would you like to move next? Browse current routes, create a shipment, or share an upcoming trip."
-              : "Share what needs to move, publish where you&apos;re going, and see compatible community routes."}
+              : "Share what needs to move, publish where you're going, and see compatible community routes."}
           </Text>
         </View>
       </Card>
@@ -345,7 +345,7 @@ export default function AppHomeScreen() {
           ) : null}
           <EmptyState
             action={<PrimaryButton onPress={() => router.push("/login")}>Get started</PrimaryButton>}
-            description="Sign in to create shipments, share trips, and compare matches."
+            description="Start a temporary Karri account to create shipments, share trips, and compare matches."
             marker="M"
             title="Start finding trusted routes"
           />

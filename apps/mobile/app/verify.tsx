@@ -42,16 +42,21 @@ export default function VerifyScreen() {
           detail="Shipments, trips, bookings, and trust activity stay scoped to the current Karri account while this device session remains available."
           label="Private app activity"
         />
-        <Banner
-          compact
-          message={
-            mobileServices.auth.isConfigured
-              ? "This temporary account does not provide verified identity, email login, account recovery, or trust-score verification yet."
-              : "Karri is not configured locally, so a development session cannot start yet."
-          }
-          title="Development Mode"
-          variant="development"
-        />
+        {mobileServices.auth.isConfigured ? (
+          <Banner
+            compact
+            message="This temporary account does not provide email login, account recovery, verified identity, or automatic trust-score verification yet."
+            title="Temporary account limits"
+            variant="info"
+          />
+        ) : (
+          <Banner
+            compact
+            message="Karri is not configured locally, so account setup cannot start yet."
+            title="Development Mode"
+            variant="development"
+          />
+        )}
 
         {error ? (
           <Banner message={error} title="Account setup could not start" variant="error" />
@@ -69,7 +74,7 @@ export default function VerifyScreen() {
             accessibilityHint="Returns to the temporary account introduction screen."
             disabled={isStarting}
             variant="secondary"
-            onPress={() => router.push("/login")}
+            onPress={() => router.back()}
           >
             Back to introduction
           </PrimaryButton>
