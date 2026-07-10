@@ -27,6 +27,7 @@ export default function TrackingScreen() {
   const [notificationError, setNotificationError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activityRetryKey, setActivityRetryKey] = useState(0);
 
   useEffect(() => {
     if (auth.loading) {
@@ -49,6 +50,7 @@ export default function TrackingScreen() {
         (activity) => {
           setBookings(activity.bookings);
           setBookingRequests(activity.requests);
+          setError(null);
           setLoading(false);
         },
         (watchError) => {
@@ -61,7 +63,7 @@ export default function TrackingScreen() {
       setLoading(false);
       return;
     }
-  }, [auth.loading, auth.user]);
+  }, [activityRetryKey, auth.loading, auth.user]);
 
   useEffect(() => {
     if (auth.loading) return;
@@ -92,6 +94,7 @@ export default function TrackingScreen() {
     () => new Map(bookingRequests.map((request) => [request.id, request])),
     [bookingRequests],
   );
+  const showingStaleTrackingData = error !== null && bookings.length > 0;
 
   return (
     <Screen contentStyle={styles.page} withTabBar>
@@ -121,7 +124,25 @@ export default function TrackingScreen() {
         />
       ) : null}
 
-      {error ? <Banner message={error} title="Bookings could not load" variant="error" /> : null}
+      {error ? (
+        <>
+          <Banner
+            message={
+              showingStaleTrackingData
+                ? `${error} Showing last loaded tracking data from this session.`
+                : error
+            }
+            title="Bookings could not load"
+            variant={showingStaleTrackingData ? "warning" : "error"}
+          />
+          <PrimaryButton
+            onPress={() => setActivityRetryKey((current) => current + 1)}
+            variant="secondary"
+          >
+            Retry tracking
+          </PrimaryButton>
+        </>
+      ) : null}
       {identity.error ? (
         <Banner compact message={identity.error} title="Identity status unavailable" variant="warning" />
       ) : null}
@@ -147,7 +168,7 @@ export default function TrackingScreen() {
         />
       ) : null}
 
-      {!loading && auth.user && !error ? (
+      {!loading && auth.user && (!error || showingStaleTrackingData) ? (
         <View style={styles.list}>
           {bookings.map((booking) => (
             <BookingDetailCard

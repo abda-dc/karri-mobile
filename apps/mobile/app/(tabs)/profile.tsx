@@ -39,6 +39,7 @@ export default function ProfileScreen() {
   const [notifications, setNotifications] = useState<ReadonlyArray<Notification>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activityRetryKey, setActivityRetryKey] = useState(0);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [pendingReadIds, setPendingReadIds] = useState<ReadonlySet<string>>(
@@ -70,6 +71,7 @@ export default function ProfileScreen() {
     let notificationReady = false;
     const markReady = () => {
       if (bookingReady && notificationReady) {
+        setError(null);
         setLoading(false);
       }
     };
@@ -109,7 +111,7 @@ export default function ProfileScreen() {
       setLoading(false);
       return;
     }
-  }, [auth.loading, auth.user]);
+  }, [activityRetryKey, auth.loading, auth.user]);
 
   async function markRead(notificationId: string) {
     if (pendingReadIds.has(notificationId)) {
@@ -164,6 +166,8 @@ export default function ProfileScreen() {
       notification.status === NotificationStatus.Unread &&
       !pendingReadIds.has(notification.id),
   ).length;
+  const hasSessionProfileActivity = bookings.length > 0 || notifications.length > 0;
+  const showingStaleProfileActivity = error !== null && hasSessionProfileActivity;
 
   return (
     <Screen contentStyle={styles.page} withTabBar>
@@ -193,7 +197,25 @@ export default function ProfileScreen() {
         />
       ) : null}
 
-      {error ? <Banner message={error} title="Profile activity issue" variant="error" /> : null}
+      {error ? (
+        <>
+          <Banner
+            message={
+              showingStaleProfileActivity
+                ? `${error} Showing last loaded profile activity from this session.`
+                : error
+            }
+            title="Profile activity issue"
+            variant={showingStaleProfileActivity ? "warning" : "error"}
+          />
+          <PrimaryButton
+            onPress={() => setActivityRetryKey((current) => current + 1)}
+            variant="secondary"
+          >
+            Retry profile activity
+          </PrimaryButton>
+        </>
+      ) : null}
 
       {auth.user ? (
         <>
