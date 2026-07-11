@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { NotificationPreferences } from "../../domain/notification/NotificationPreferences";
 import { reportApplicationError } from "../errors/getFriendlyError";
 import { mobileServices } from "../services/mobileServices";
@@ -17,38 +17,46 @@ export function useNotificationPreferences(
   const [loading, setLoading] = useState(Boolean(userId));
   const [preferences, setPreferences] =
     useState<NotificationPreferences | null>(null);
+  const requestId = useRef(0);
 
-  useEffect(() => {
+  const loadPreferences = useCallback(async () => {
+    const currentRequestId = ++requestId.current;
     if (!userId) {
       setLoading(false);
       setPreferences(null);
       return;
     }
 
-    let active = true;
     setLoading(true);
-    void mobileServices.notificationPreferences
-      .getPreferences(userId)
-      .then((nextPreferences) => {
-        if (active) {
-          setPreferences(nextPreferences);
-          setLoading(false);
-        }
-      })
-      .catch((error) => {
-        reportApplicationError(error, "notification-preferences.load");
-        if (active) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
+    try {
+      const nextPreferences =
+        await mobileServices.notificationPreferences.getPreferences(userId);
+      if (requestId.current !== currentRequestId) {
+        return;
+      }
+      setPreferences(nextPreferences);
+    } catch (error) {
+      if (requestId.current !== currentRequestId) {
+        return;
+      }
+      reportApplicationError(error, "notification-preferences.load");
+    } finally {
+      if (requestId.current === currentRequestId) {
+        setLoading(false);
+      }
+    }
   }, [userId]);
+
+  useEffect(() => {
+    void loadPreferences();
+    return () => {
+      requestId.current += 1;
+    };
+  }, [loadPreferences]);
 
   const updatePreferences = useCallback(
     async (nextPreferences: NotificationPreferences) => {
+      const currentRequestId = ++requestId.current;
       if (!userId) {
         throw new Error("Sign in before saving notification preferences.");
       }
@@ -59,13 +67,19 @@ export function useNotificationPreferences(
           userId,
           nextPreferences,
         );
-        setPreferences(saved);
+        if (requestId.current === currentRequestId) {
+          setPreferences(saved);
+        }
         return saved;
       } catch (error) {
-        reportApplicationError(error, "notification-preferences.save");
+        if (requestId.current === currentRequestId) {
+          reportApplicationError(error, "notification-preferences.save");
+        }
         throw error;
       } finally {
-        setLoading(false);
+        if (requestId.current === currentRequestId) {
+          setLoading(false);
+        }
       }
     },
     [userId],
