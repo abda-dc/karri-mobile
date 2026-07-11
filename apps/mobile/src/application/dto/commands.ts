@@ -4,6 +4,7 @@ import type { TrustInputs } from "../../domain/trust/TrustScore";
 import type { CustodyEventType } from "../../domain/custody/CustodyEvent";
 
 import type { SafetyDeclarationSnapshot } from "../../domain/shipment/Shipment";
+import type { TravelerCustodyAcceptance } from "../../domain/custody/TravelerCustodyAcceptance";
 
 export interface CreateShipmentDto {
   readonly ownerId: string;
@@ -55,6 +56,7 @@ export interface TransitionBookingDto {
   readonly nextStatus: BookingStatus;
   readonly location?: string;
   readonly note?: string;
+  readonly custodyAcceptance?: Omit<TravelerCustodyAcceptance, "acceptedAt">;
 }
 
 export interface RecordCustodyEventDto {

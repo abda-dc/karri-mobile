@@ -8,6 +8,7 @@ import {
 import type { BookingRepository } from "../../domain/booking/BookingRepository";
 import { transitionBooking } from "../../domain/booking/bookingStateMachine";
 import type { EventPublisher } from "../../domain/events/DomainEvent";
+import type { TravelerCustodyAcceptance } from "../../domain/custody/TravelerCustodyAcceptance";
 import {
   createPlatformEvent,
   type BookingAccepted,
@@ -161,6 +162,72 @@ export class BookingService {
     this.assertActorCanTransition(booking, input.actorId, input.nextStatus);
 
     const occurredAt = this.clock.now();
+    let mappedAcceptance: TravelerCustodyAcceptance | null = null;
+
+    if (input.nextStatus === BookingStatus.InTransit) {
+      if (!input.custodyAcceptance) {
+        throw new DomainValidationError("Traveler custody acceptance declaration is required to confirm pickup.");
+      }
+
+      const shipment = await this.shipments.findById(booking.shipmentId);
+      if (!shipment) {
+        throw new DomainValidationError("Associated shipment was not found.");
+      }
+
+      const decl = input.custodyAcceptance;
+      if (decl.bookingId !== booking.id) {
+        throw new DomainValidationError("Declaration booking ID mismatch.");
+      }
+      if (decl.shipmentId !== booking.shipmentId) {
+        throw new DomainValidationError("Declaration shipment ID mismatch.");
+      }
+      if (decl.acceptedByUserId !== booking.travelerId) {
+        throw new DomainValidationError("Declaration acceptedByUserId mismatch.");
+      }
+      if (decl.custodyVersion !== 1) {
+        throw new DomainValidationError("Invalid declaration custody policy version.");
+      }
+      if (decl.packageContentVersion !== shipment.packageContentVersion) {
+        throw new DomainValidationError("Outdated package content version. Senders safety declaration has changed since this booking was accepted.");
+      }
+
+      const expectedSenderDeclVersion = shipment.safetyDeclaration?.declarationVersion ?? "v1";
+      if (decl.senderDeclarationVersion !== expectedSenderDeclVersion) {
+        throw new DomainValidationError("Mismatched sender safety declaration version.");
+      }
+
+      // Check visual inspection checklists
+      const insp = decl.inspection;
+      if (!insp ||
+          insp.packageAvailableForInspection !== true ||
+          insp.packagingSecure !== true ||
+          insp.weightAppearsReasonable !== true ||
+          insp.noVisibleLeak !== true ||
+          insp.noVisibleBatteryDamage !== true ||
+          insp.noSuspiciousWiring !== true ||
+          insp.noUnusualOdorOrContamination !== true ||
+          insp.noVisibleConcealment !== true ||
+          insp.visibleContentsAppearConsistent !== true) {
+        throw new DomainValidationError("All visual inspection checklist items must be successfully verified.");
+      }
+
+      // Check acknowledgements
+      const acks = decl.acknowledgements;
+      if (!acks ||
+          acks.personallyInspected !== true ||
+          acks.contentsAppearConsistent !== true ||
+          acks.noSuspiciousItemsObserved !== true ||
+          acks.safeTransportationAccepted !== true ||
+          acks.reasonableCustodyResponsibilityAccepted !== true) {
+        throw new DomainValidationError("All custody acknowledgements must be accepted.");
+      }
+
+      mappedAcceptance = {
+        ...decl,
+        acceptedAt: occurredAt,
+      } as TravelerCustodyAcceptance;
+    }
+
     const transitioned = transitionBooking(
       booking,
       input.nextStatus,
@@ -182,6 +249,7 @@ export class BookingService {
       transitioned,
       request,
       lifecycleCustodyEvent,
+      mappedAcceptance,
     );
     const event = this.createTransitionEvent(saved.booking, input.actorId, occurredAt);
 

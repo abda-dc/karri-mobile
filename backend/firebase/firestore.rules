@@ -108,6 +108,59 @@ service cloud.firestore {
         && validSafetyDeclaration(newData, contentChanged);
     }
 
+    function validTravelerCustodyAcceptance(decl, bookingId) {
+      let bSnap = get(/databases/$(database)/documents/bookings/$(bookingId)).data;
+      let sSnap = get(/databases/$(database)/documents/shipments/$(bSnap.shipmentId)).data;
+      let sDeclVersion = sSnap.safetyDeclaration == null ? 'v1' : sSnap.safetyDeclaration.declarationVersion;
+
+      return decl.keys().hasOnly([
+          'acceptedByUserId', 'shipmentId', 'bookingId',
+          'custodyVersion', 'custodyPolicyVersion', 'declarationVersion',
+          'packageContentVersion', 'senderDeclarationVersion',
+          'inspection', 'acknowledgements', 'acceptedAt'
+        ])
+        && decl.acceptedByUserId == request.auth.uid
+        && decl.acceptedByUserId == bSnap.travelerId
+        && decl.bookingId == bookingId
+        && decl.shipmentId == bSnap.shipmentId
+        && decl.custodyVersion == 1
+        && decl.custodyPolicyVersion == '2026-07-v1'
+        && decl.declarationVersion == 'v1'
+        && decl.packageContentVersion == sSnap.packageContentVersion
+        && decl.senderDeclarationVersion == sDeclVersion
+        && decl.acceptedAt == request.time
+
+        // Check inspection sub-map properties
+        && decl.inspection is map
+        && decl.inspection.keys().hasOnly([
+          'packageAvailableForInspection', 'packagingSecure', 'weightAppearsReasonable',
+          'noVisibleLeak', 'noVisibleBatteryDamage', 'noSuspiciousWiring',
+          'noUnusualOdorOrContamination', 'noVisibleConcealment', 'visibleContentsAppearConsistent'
+        ])
+        && decl.inspection.packageAvailableForInspection == true
+        && decl.inspection.packagingSecure == true
+        && decl.inspection.weightAppearsReasonable == true
+        && decl.inspection.noVisibleLeak == true
+        && decl.inspection.noVisibleBatteryDamage == true
+        && decl.inspection.noSuspiciousWiring == true
+        && decl.inspection.noUnusualOdorOrContamination == true
+        && decl.inspection.noVisibleConcealment == true
+        && decl.inspection.visibleContentsAppearConsistent == true
+
+        // Check acknowledgements sub-map properties
+        && decl.acknowledgements is map
+        && decl.acknowledgements.keys().hasOnly([
+          'personallyInspected', 'contentsAppearConsistent',
+          'noSuspiciousItemsObserved', 'safeTransportationAccepted',
+          'reasonableCustodyResponsibilityAccepted'
+        ])
+        && decl.acknowledgements.personallyInspected == true
+        && decl.acknowledgements.contentsAppearConsistent == true
+        && decl.acknowledgements.noSuspiciousItemsObserved == true
+        && decl.acknowledgements.safeTransportationAccepted == true
+        && decl.acknowledgements.reasonableCustodyResponsibilityAccepted == true;
+    }
+
     function validTrip(data) {
       return data.keys().hasOnly([
           'ownerId',
@@ -720,6 +773,16 @@ service cloud.firestore {
           || getAfter(
             /databases/$(database)/documents/bookingRequests/$(resource.data.bookingRequestId)
           ).data.status == request.resource.data.status)
+        && (request.resource.data.status != 'in_transit'
+          || (
+            !exists(/databases/$(database)/documents/travelerCustodyAcceptances/$(bookingId))
+            && existsAfter(/databases/$(database)/documents/travelerCustodyAcceptances/$(bookingId))
+            && validTravelerCustodyAcceptance(
+              getAfter(/databases/$(database)/documents/travelerCustodyAcceptances/$(bookingId)).data,
+              bookingId
+            )
+          )
+        )
         && request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
@@ -866,6 +929,19 @@ service cloud.firestore {
             ).data.senderId
             && request.resource.data.direction == 'traveler_reviews_sender')
         );
+      allow update, delete: if false;
+    }
+
+    match /travelerCustodyAcceptances/{bookingId} {
+      allow read: if signedIn() && (
+        request.auth.uid == get(/databases/$(database)/documents/bookings/$(bookingId)).data.senderId
+        || request.auth.uid == get(/databases/$(database)/documents/bookings/$(bookingId)).data.travelerId
+      );
+      allow create: if signedIn()
+        && !exists(/databases/$(database)/documents/travelerCustodyAcceptances/$(bookingId))
+        && get(/databases/$(database)/documents/bookings/$(bookingId)).data.status == 'accepted'
+        && getAfter(/databases/$(database)/documents/bookings/$(bookingId)).data.status == 'in_transit'
+        && validTravelerCustodyAcceptance(request.resource.data, bookingId);
       allow update, delete: if false;
     }
 

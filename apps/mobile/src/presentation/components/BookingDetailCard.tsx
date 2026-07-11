@@ -37,6 +37,7 @@ import { RecentStatusUpdateCard } from "./RecentStatusUpdateCard";
 import { ShipmentStatusCard } from "./ShipmentStatusCard";
 import { ShipmentTimelineCard } from "./ShipmentTimelineCard";
 import { TrustSummaryCard } from "./TrustSummaryCard";
+import { TravelerCustodyModal } from "./TravelerCustodyModal";
 
 interface BookingDetailCardProps {
   readonly booking: Booking;
@@ -71,6 +72,7 @@ export function BookingDetailCard({
   const [custodyNote, setCustodyNote] = useState("");
   const [rating, setRating] = useState("");
   const [comment, setComment] = useState("");
+  const [custodyModalVisible, setCustodyModalVisible] = useState(false);
 
   const isSender = booking.senderId === currentUserId;
   const isTraveler = booking.travelerId === currentUserId;
@@ -326,8 +328,7 @@ export function BookingDetailCard({
         {booking.status === BookingStatus.Accepted && isTraveler ? (
           <PrimaryButton
             disabled={actionInProgress}
-            loading={actionLoading === BookingStatus.InTransit}
-            onPress={() => transition(BookingStatus.InTransit, "Shipment pickup confirmed.")}
+            onPress={() => setCustodyModalVisible(true)}
           >
             Confirm pickup
           </PrimaryButton>
@@ -466,6 +467,34 @@ export function BookingDetailCard({
           variant="success"
         />
       ) : null}
+
+      <TravelerCustodyModal
+        visible={custodyModalVisible}
+        onClose={() => setCustodyModalVisible(false)}
+        booking={booking}
+        shipmentContentVersion={shipment?.packageContentVersion ?? 1}
+        senderDeclarationVersion={shipment?.safetyDeclaration?.declarationVersion ?? "v1"}
+        onConfirmPickup={async (acceptancePayload) => {
+          setPendingTransition(BookingStatus.InTransit);
+          const succeeded = await runAction(
+            BookingStatus.InTransit,
+            () =>
+              mobileServices.booking.transition({
+                bookingId: booking.id,
+                actorId: currentUserId,
+                nextStatus: BookingStatus.InTransit,
+                location,
+                note: custodyNote,
+                custodyAcceptance: acceptancePayload,
+              }),
+            "Shipment custody accepted. Booking is now in transit.",
+          );
+          setPendingTransition(null);
+          if (!succeeded) {
+            throw new Error("Failed to confirm custody transfer on the network.");
+          }
+        }}
+      />
     </View>
   );
 }

@@ -5,6 +5,7 @@ import type {
   NewBookingRequest,
 } from "./Booking";
 import type { NewCustodyEvent } from "../custody/CustodyEvent";
+import type { TravelerCustodyAcceptance } from "../custody/TravelerCustodyAcceptance";
 
 export interface NewBookingRecords {
   readonly request: NewBookingRequest;
@@ -36,5 +37,6 @@ export interface BookingRepository {
     booking: Booking,
     request: BookingRequest | null,
     lifecycleCustodyEvent: NewCustodyEvent | null,
+    custodyAcceptance?: TravelerCustodyAcceptance | null,
   ): Promise<{ readonly booking: Booking; readonly request: BookingRequest | null }>;
 }

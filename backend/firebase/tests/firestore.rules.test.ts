@@ -296,6 +296,201 @@ describe("shipments", () => {
   });
 });
 
+function clientTravelerCustodyAcceptance(overrides: DocumentData = {}) {
+  return {
+    bookingId,
+    shipmentId,
+    acceptedByUserId: travelerUid,
+    custodyVersion: 1,
+    custodyPolicyVersion: "2026-07-v1",
+    declarationVersion: "v1",
+    packageContentVersion: 1,
+    senderDeclarationVersion: "v1",
+    inspection: {
+      packageAvailableForInspection: true,
+      packagingSecure: true,
+      weightAppearsReasonable: true,
+      noVisibleLeak: true,
+      noVisibleBatteryDamage: true,
+      noSuspiciousWiring: true,
+      noUnusualOdorOrContamination: true,
+      noVisibleConcealment: true,
+      visibleContentsAppearConsistent: true,
+    },
+    acknowledgements: {
+      personallyInspected: true,
+      contentsAppearConsistent: true,
+      noSuspiciousItemsObserved: true,
+      safeTransportationAccepted: true,
+      reasonableCustodyResponsibilityAccepted: true,
+    },
+    acceptedAt: serverTimestamp(),
+    ...overrides,
+  };
+}
+
+describe("traveler custody acceptances", () => {
+  beforeEach(async () => {
+    // Seed prerequisite docs
+    await seedDoc(`shipments/${shipmentId}`, shipmentFixture({ packageContentVersion: 1 }));
+    await seedDoc(`trips/${tripId}`, tripFixture());
+    await seedDoc(
+      `bookingRequests/${bookingRequestId}`,
+      bookingRequestFixture({ status: "accepted" }),
+    );
+    await seedDoc(
+      `bookings/${bookingId}`,
+      bookingFixture({
+        status: "accepted",
+        statusHistory: [
+          bookingHistoryEntry("pending", senderUid),
+          bookingHistoryEntry("accepted", travelerUid),
+        ],
+      }),
+    );
+    await seedDoc(
+      `custodyEvents/${bookingId}__traveler_accepted`,
+      custodyEventFixture("traveler_accepted", travelerUid, "accepted"),
+    );
+  });
+
+  it("allows traveler to atomically confirm pickup and submit custody acceptance", async () => {
+    const db = userDb(travelerUid);
+    const batch = writeBatch(db);
+
+    const bookingRef = doc(db, `bookings/${bookingId}`);
+    const acceptanceRef = doc(db, `travelerCustodyAcceptances/${bookingId}`);
+    const eventRef = doc(db, `custodyEvents/${bookingId}__pickup_confirmed`);
+
+    batch.update(bookingRef, {
+      status: "in_transit",
+      statusHistory: [
+        bookingHistoryEntry("pending", senderUid),
+        bookingHistoryEntry("accepted", travelerUid),
+        bookingHistoryEntry("in_transit", travelerUid),
+      ],
+      updatedAt: serverTimestamp(),
+    });
+
+    batch.set(acceptanceRef, clientTravelerCustodyAcceptance());
+
+    batch.set(eventRef, {
+      bookingId,
+      shipmentId,
+      eventType: "pickup_confirmed",
+      performedBy: travelerUid,
+      location: "Addis Ababa",
+      note: null,
+      metadata: { bookingStatus: "in_transit" },
+      timestamp: serverTimestamp(),
+    });
+
+    await assertSucceeds(batch.commit());
+  });
+
+  it("denies independent custody acceptance creation without booking transition", async () => {
+    const db = userDb(travelerUid);
+    const acceptanceRef = doc(db, `travelerCustodyAcceptances/${bookingId}`);
+
+    await assertFails(setDoc(acceptanceRef, clientTravelerCustodyAcceptance()));
+  });
+
+  it("denies custody acceptance if any visual inspection check is false", async () => {
+    const db = userDb(travelerUid);
+    const batch = writeBatch(db);
+
+    const bookingRef = doc(db, `bookings/${bookingId}`);
+    const acceptanceRef = doc(db, `travelerCustodyAcceptances/${bookingId}`);
+    const eventRef = doc(db, `custodyEvents/${bookingId}__pickup_confirmed`);
+
+    batch.update(bookingRef, {
+      status: "in_transit",
+      statusHistory: [
+        bookingHistoryEntry("pending", senderUid),
+        bookingHistoryEntry("accepted", travelerUid),
+        bookingHistoryEntry("in_transit", travelerUid),
+      ],
+      updatedAt: serverTimestamp(),
+    });
+
+    batch.set(
+      acceptanceRef,
+      clientTravelerCustodyAcceptance({
+        inspection: {
+          packageAvailableForInspection: true,
+          packagingSecure: false, // failed inspection
+          weightAppearsReasonable: true,
+          noVisibleLeak: true,
+          noVisibleBatteryDamage: true,
+          noSuspiciousWiring: true,
+          noUnusualOdorOrContamination: true,
+          noVisibleConcealment: true,
+          visibleContentsAppearConsistent: true,
+        },
+      }),
+    );
+
+    batch.set(eventRef, {
+      bookingId,
+      shipmentId,
+      eventType: "pickup_confirmed",
+      performedBy: travelerUid,
+      location: "Addis Ababa",
+      note: null,
+      metadata: { bookingStatus: "in_transit" },
+      timestamp: serverTimestamp(),
+    });
+
+    await assertFails(batch.commit());
+  });
+
+  it("denies access if performed by a forged traveler identity", async () => {
+    const db = userDb(otherUid); // wrong user
+    const batch = writeBatch(db);
+
+    const bookingRef = doc(db, `bookings/${bookingId}`);
+    const acceptanceRef = doc(db, `travelerCustodyAcceptances/${bookingId}`);
+
+    batch.update(bookingRef, {
+      status: "in_transit",
+      statusHistory: [
+        bookingHistoryEntry("pending", senderUid),
+        bookingHistoryEntry("accepted", travelerUid),
+        bookingHistoryEntry("in_transit", travelerUid),
+      ],
+      updatedAt: serverTimestamp(),
+    });
+
+    batch.set(acceptanceRef, clientTravelerCustodyAcceptance());
+
+    await assertFails(batch.commit());
+  });
+
+  it("permits reads only to booking participants and denies update/delete", async () => {
+    // Seed acceptance as admin
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      const acceptanceRef = doc(adminDb, `travelerCustodyAcceptances/${bookingId}`);
+      const baseAcceptance = clientTravelerCustodyAcceptance();
+      baseAcceptance.acceptedAt = fixtureTime as any;
+      await setDoc(acceptanceRef, baseAcceptance);
+    });
+
+    const senderRef = doc(userDb(senderUid), `travelerCustodyAcceptances/${bookingId}`);
+    const travelerRef = doc(userDb(travelerUid), `travelerCustodyAcceptances/${bookingId}`);
+    const otherRef = doc(userDb(otherUid), `travelerCustodyAcceptances/${bookingId}`);
+
+    // Read checks
+    await assertSucceeds(getDoc(senderRef));
+    await assertSucceeds(getDoc(travelerRef));
+    await assertFails(getDoc(otherRef));
+
+    // Update and delete checks
+    await assertFails(updateDoc(travelerRef, { custodyVersion: 2 }));
+    await assertFails(deleteDoc(travelerRef));
+  });
+});
+
 describe("trips", () => {
   it("allows the owner to create, read, and update a trip", async () => {
     const db = userDb(travelerUid);
@@ -434,6 +629,12 @@ describe("booking requests and bookings", () => {
         ],
         updatedAt: serverTimestamp(),
       });
+
+      if (toStatus === "in_transit") {
+        await seedDoc(`shipments/${shipmentId}`, shipmentFixture({ packageContentVersion: 1 }));
+        const acceptanceRef = doc(db, `travelerCustodyAcceptances/${bookingId}`);
+        batch.set(acceptanceRef, clientTravelerCustodyAcceptance());
+      }
 
       await assertSucceeds(batch.commit());
     },

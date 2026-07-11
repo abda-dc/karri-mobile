@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import type { Booking, BookingRequest } from "../../../domain/booking/Booking";
 import type { NewCustodyEvent } from "../../../domain/custody/CustodyEvent";
+import type { TravelerCustodyAcceptance } from "../../../domain/custody/TravelerCustodyAcceptance";
 import type {
   BookingRepository,
   CreatedBookingRecords,
@@ -25,6 +26,7 @@ import {
   toFirestoreBookingRequest,
 } from "../mappers/bookingMapper";
 import { toFirestoreCustodyEvent } from "../mappers/custodyMapper";
+import { toFirestoreTravelerCustodyAcceptance } from "../mappers/travelerCustodyAcceptanceMapper";
 
 export class FirebaseBookingRepository implements BookingRepository {
   async createRequest(records: NewBookingRecords): Promise<CreatedBookingRecords> {
@@ -192,6 +194,7 @@ export class FirebaseBookingRepository implements BookingRepository {
     booking: Booking,
     request: BookingRequest | null,
     lifecycleCustodyEvent: NewCustodyEvent | null,
+    custodyAcceptance?: TravelerCustodyAcceptance | null,
   ): Promise<{ readonly booking: Booking; readonly request: BookingRequest | null }> {
     const { db } = getFirebaseServices();
     const bookingReference = doc(db, "bookings", booking.id);
@@ -220,6 +223,15 @@ export class FirebaseBookingRepository implements BookingRepository {
         {
           ...toFirestoreCustodyEvent(lifecycleCustodyEvent),
           timestamp: serverTimestamp(),
+        },
+      );
+    }
+    if (custodyAcceptance) {
+      batch.set(
+        doc(db, "travelerCustodyAcceptances", booking.id),
+        {
+          ...toFirestoreTravelerCustodyAcceptance(custodyAcceptance),
+          acceptedAt: serverTimestamp(),
         },
       );
     }
