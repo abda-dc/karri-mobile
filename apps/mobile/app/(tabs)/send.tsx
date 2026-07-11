@@ -1,6 +1,8 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, Modal, TextInput, ScrollView } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { defaultSafetyPolicy } from "../../src/domain/configuration/SafetyPolicy";
 import { Badge } from "../../src/components/Badge";
 import { Banner } from "../../src/components/Banner";
 import { Card } from "../../src/components/Card";
@@ -47,6 +49,17 @@ const emptyForm = {
   deliveryWindowEnd: "",
   deliveryWindowStart: "",
   rewardAmount: "",
+  containsBattery: false,
+  batteryType: "none" as "none" | "lithium_ion" | "lithium_metal",
+  containsLiquid: false,
+  containsFoodOrAgri: false,
+  containsMedicine: false,
+  customsDeclarationRequired: false,
+  contentsAccurate: false,
+  noProhibitedItems: false,
+  inspectionPermitted: false,
+  customsResponsibilityAccepted: false,
+  packageContentVersion: 1,
 };
 
 type OpenDateSelector = "deliveryEnd" | "deliveryStart" | null;
@@ -120,6 +133,124 @@ type RecentRoute = {
   destination: RouteSelection;
   origin: RouteSelection;
 };
+
+type CheckboxProps = {
+  label: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  accessibilityLabel?: string;
+};
+
+function Checkbox({ label, checked, onChange, accessibilityLabel }: CheckboxProps) {
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel || label}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked }}
+      onPress={() => onChange(!checked)}
+      style={styles.checkboxContainer}
+    >
+      <View style={[styles.checkboxBox, checked && styles.checkboxBoxChecked]}>
+        {checked ? (
+          <Ionicons name="checkmark" size={14} color={colors.white} />
+        ) : null}
+      </View>
+      <Text style={styles.checkboxLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
+type ProhibitedItemsPolicyModalProps = {
+  visible: boolean;
+  onClose: () => void;
+};
+
+function ProhibitedItemsPolicyModal({ visible, onClose }: ProhibitedItemsPolicyModalProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredCategories = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return defaultSafetyPolicy.prohibitedCategories;
+
+    return defaultSafetyPolicy.prohibitedCategories
+      .map((cat) => {
+        const matchesCat = cat.name.toLowerCase().includes(query) || cat.description.toLowerCase().includes(query);
+        const matchedItems = cat.items.filter((item) => item.toLowerCase().includes(query));
+
+        if (matchesCat || matchedItems.length > 0) {
+          return {
+            ...cat,
+            items: matchedItems.length > 0 ? matchedItems : cat.items,
+          };
+        }
+        return null;
+      })
+      .filter((cat): cat is typeof defaultSafetyPolicy.prohibitedCategories[number] => cat !== null);
+  }, [searchQuery]);
+
+  return (
+    <Modal animationType="slide" onRequestClose={onClose} visible={visible}>
+      <Screen contentStyle={styles.modalContent} withTabBar={false}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Safety Policy</Text>
+          <Pressable accessibilityLabel="Close policy" accessibilityRole="button" onPress={onClose} style={styles.modalCloseButton}>
+            <Ionicons name="close" size={24} color={colors.text} />
+          </Pressable>
+        </View>
+
+        <Text style={styles.modalSubtitle}>
+          Complete Prohibited and Restricted Items Policy. Rules vary by airline, customs, and platform policies.
+        </Text>
+
+        <TextInput
+          placeholder="Search prohibited or restricted items..."
+          placeholderTextColor={colors.muted}
+          style={styles.modalSearchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          accessibilityLabel="Search safety policy"
+        />
+
+        <ScrollView style={styles.modalScroll}>
+          {filteredCategories.length === 0 ? (
+            <View style={styles.modalEmpty}>
+              <Text style={styles.modalEmptyText}>No matching policy rules found.</Text>
+            </View>
+          ) : (
+            filteredCategories.map((cat) => (
+              <View key={cat.id} style={styles.policyCategoryCard}>
+                <Text style={styles.policyCategoryName}>{cat.name}</Text>
+                <Text style={styles.policyCategoryDesc}>{cat.description}</Text>
+
+                <View style={styles.policyItemsList}>
+                  {cat.items.map((item, idx) => (
+                    <View key={idx} style={styles.policyItemRow}>
+                      <Text style={styles.policyBullet}>•</Text>
+                      <Text style={styles.policyItemText}>{item}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                {cat.sources.length > 0 ? (
+                  <View style={styles.sourcesContainer}>
+                    <Text style={styles.sourcesLabel}>Regulatory Context:</Text>
+                    {cat.sources.map((src, sidx) => (
+                      <View key={sidx} style={styles.sourceBadge}>
+                        <Text style={styles.sourceBadgeText}>
+                          {src.authority} ({src.jurisdiction}) - {src.sourceType.replace("_", " ")}: {src.reference}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            ))
+          )}
+        </ScrollView>
+      </Screen>
+    </Modal>
+  );
+}
 
 function PackageCategoryPicker({ onChange, value }: PackageCategoryPickerProps) {
   return (
@@ -260,6 +391,18 @@ function ShipmentReviewPanel({ form, onEdit, onPost, saving }: ShipmentReviewPan
       <View style={styles.reviewDescription}>
         <Text style={styles.reviewLabel}>Package description</Text>
         <Text style={styles.descriptionText}>{form.packageDescription}</Text>
+      </View>
+
+      <View style={styles.reviewDescription}>
+        <Text style={styles.reviewLabel}>Safety & Declaration Settings</Text>
+        <Text style={styles.descriptionText}>
+          • Contains Battery: {form.containsBattery ? `Yes (${form.batteryType === 'lithium_ion' ? 'Lithium-ion' : 'Lithium-metal'})` : "No"}{"\n"}
+          • Contains Liquids/Aerosols: {form.containsLiquid ? "Yes" : "No"}{"\n"}
+          • Contains Food/Agricultural Material: {form.containsFoodOrAgri ? "Yes" : "No"}{"\n"}
+          • Contains Prescription/OTC Medicine: {form.containsMedicine ? "Yes" : "No"}{"\n"}
+          • Customs Declaration Required: {form.customsDeclarationRequired ? "Yes" : "No"}{"\n"}
+          • Safety Declaration Status: Accepted and Signed (Policy version: 2026-07-v1)
+        </Text>
       </View>
 
       <View style={styles.reviewActions}>
@@ -558,6 +701,7 @@ export default function SendScreen() {
   const [reviewingShipment, setReviewingShipment] = useState(false);
   const [shipmentDraft, setShipmentDraft] = useState<typeof emptyForm | null>(null);
   const [recentRoute, setRecentRoute] = useState<RecentRoute | null>(null);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
 
   useEffect(() => {
     if (auth.loading) {
@@ -669,8 +813,28 @@ export default function SendScreen() {
     };
   }, [activeShipments, auth.loading, auth.user, listLoading, matchFilters, matchesRetryKey]);
 
-  function updateField(field: keyof typeof emptyForm, value: string) {
-    setForm((current) => ({ ...current, [field]: value }));
+  function updateField(field: keyof typeof emptyForm, value: any) {
+    const safetyFields: Array<keyof typeof emptyForm> = [
+      "packageCategory", "packageDescription", "weightKg", "containsBattery",
+      "batteryType", "containsLiquid", "containsFoodOrAgri", "containsMedicine",
+      "customsDeclarationRequired"
+    ];
+
+    setForm((current) => {
+      const isSafetyField = safetyFields.includes(field);
+      const isChanged = current[field] !== value;
+
+      return {
+        ...current,
+        [field]: value,
+        ...(isSafetyField && isChanged ? {
+          contentsAccurate: false,
+          noProhibitedItems: false,
+          inspectionPermitted: false,
+          customsResponsibilityAccepted: false,
+        } : {})
+      };
+    });
     setFormError(null);
     setSuccessMessage(null);
     setReviewingShipment(false);
@@ -824,6 +988,21 @@ export default function SendScreen() {
       return null;
     }
 
+    if (form.containsBattery && form.batteryType === "none") {
+      setFormError("Select the battery type for your shipment.");
+      return null;
+    }
+
+    if (
+      !form.contentsAccurate ||
+      !form.noProhibitedItems ||
+      !form.inspectionPermitted ||
+      !form.customsResponsibilityAccepted
+    ) {
+      setFormError("You must confirm the prohibited-items declaration before submitting this shipment.");
+      return null;
+    }
+
     return { rewardAmount, weightKg };
   }
 
@@ -889,6 +1068,26 @@ export default function SendScreen() {
         weightKg,
         deliveryWindow: form.deliveryWindow,
         rewardAmount,
+        containsBattery: form.containsBattery,
+        batteryType: form.batteryType,
+        containsLiquid: form.containsLiquid,
+        containsFoodOrAgri: form.containsFoodOrAgri,
+        containsMedicine: form.containsMedicine,
+        customsDeclarationRequired: form.customsDeclarationRequired,
+        packageContentVersion: form.packageContentVersion,
+        safetyDeclaration: {
+          policyVersion: "2026-07-v1",
+          declarationVersion: "v1",
+          acceptedAt: "", // Server mapped to serverTimestamp
+          acceptedByUserId: auth.user.uid,
+          packageContentVersion: form.packageContentVersion,
+          acknowledgements: {
+            contentsAccurate: form.contentsAccurate as true,
+            noProhibitedItems: form.noProhibitedItems as true,
+            inspectionPermitted: form.inspectionPermitted as true,
+            customsResponsibilityAccepted: form.customsResponsibilityAccepted as true,
+          }
+        }
       });
       setForm(emptyForm);
       setWeightMode("preset");
@@ -904,7 +1103,8 @@ export default function SendScreen() {
   }
 
   return (
-    <Screen contentStyle={styles.page} withTabBar>
+    <>
+      <Screen contentStyle={styles.page} withTabBar>
       <SectionHeader
         eyebrow="Send with Karri"
         subtitle="Share the route, package, timing, and reward a traveler needs to evaluate your request."
@@ -1024,6 +1224,80 @@ export default function SendScreen() {
 
           <Card variant="outlined">
             <SectionHeader
+              subtitle="Help travelers understand transport hazards and customs rules."
+              title="Safety and regulations"
+            />
+            <Checkbox
+              checked={form.containsBattery}
+              label="Contains a battery or electronic component?"
+              onChange={(value) => {
+                updateField("containsBattery", value);
+                if (!value) {
+                  updateField("batteryType", "none");
+                }
+              }}
+            />
+            {form.containsBattery ? (
+              <View style={styles.batteryTypeContainer}>
+                <Text style={styles.batteryFieldLabel}>
+                  Battery type
+                  <Text style={styles.required}> *</Text>
+                </Text>
+                <View style={styles.batteryOptionsRow}>
+                  {([
+                    { label: "Lithium-ion (rechargeable, e.g. phone, laptop)", value: "lithium_ion" },
+                    { label: "Lithium-metal (non-rechargeable, e.g. watch)", value: "lithium_metal" }
+                  ] as const).map((opt) => {
+                    const selected = form.batteryType === opt.value;
+                    return (
+                      <Pressable
+                        accessibilityLabel={`Battery type: ${opt.label}`}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        key={opt.value}
+                        onPress={() => updateField("batteryType", opt.value)}
+                        style={[
+                          styles.batteryOptionButton,
+                          selected && styles.batteryOptionSelected
+                        ]}
+                      >
+                        <Text style={[styles.batteryOptionText, selected && styles.batteryOptionTextSelected]}>
+                          {opt.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+
+            <Checkbox
+              checked={form.containsLiquid}
+              label="Contains liquids, aerosols, or pressurized cosmetics?"
+              onChange={(value) => updateField("containsLiquid", value)}
+            />
+
+            <Checkbox
+              checked={form.containsFoodOrAgri}
+              label="Contains food items, agricultural material, plants, seeds, or animal products?"
+              onChange={(value) => updateField("containsFoodOrAgri", value)}
+            />
+
+            <Checkbox
+              checked={form.containsMedicine}
+              label="Contains prescription or over-the-counter medicine?"
+              onChange={(value) => updateField("containsMedicine", value)}
+            />
+
+            <Checkbox
+              checked={form.customsDeclarationRequired}
+              label="Requires customs declaration at origin or destination?"
+              onChange={(value) => updateField("customsDeclarationRequired", value)}
+            />
+          </Card>
+
+          <Card variant="outlined">
+            <SectionHeader
               subtitle="Set a practical window and a clear reward offer."
               title="Timing and reward"
             />
@@ -1072,6 +1346,59 @@ export default function SendScreen() {
               onRestore={restoreShipmentDraft}
               onSave={saveShipmentDraft}
             />
+          </Card>
+
+          <Card variant="outlined">
+            <SectionHeader
+              subtitle="Read and accept the safety terms before final submission."
+              title="Mandatory safety declaration"
+            />
+
+            <View style={styles.safetyWarningBox}>
+              <Text style={styles.safetyWarningTitle}>Safety Warning</Text>
+              <Text style={styles.safetyWarningText}>
+                Karri Mobile enforces a strict safety policy. You must disclose all contents.
+                Failure to disclose prohibited items may result in cancellation, reporting to authorities,
+                and account suspension.
+              </Text>
+              <Pressable
+                accessibilityLabel="Open prohibited items policy"
+                accessibilityRole="button"
+                onPress={() => setShowPolicyModal(true)}
+                style={styles.policyLinkButton}
+              >
+                <Text style={styles.policyLinkText}>View complete Prohibited Items Policy</Text>
+              </Pressable>
+            </View>
+
+            <Checkbox
+              checked={form.contentsAccurate}
+              label="I confirm that the package contents are complete and accurately described."
+              onChange={(value) => updateField("contentsAccurate", value)}
+              accessibilityLabel="Checkbox 1: Contents are accurate and complete."
+            />
+
+            <Checkbox
+              checked={form.noProhibitedItems}
+              label="I confirm that no prohibited, illegal, dangerous, hidden, or undeclared item is present in this package."
+              onChange={(value) => updateField("noProhibitedItems", value)}
+              accessibilityLabel="Checkbox 2: No prohibited or undeclared items."
+            />
+
+            <Checkbox
+              checked={form.inspectionPermitted}
+              label="I consent to the traveler opening and inspecting the package before accepting custody."
+              onChange={(value) => updateField("inspectionPermitted", value)}
+              accessibilityLabel="Checkbox 3: Consent to traveler package inspection."
+            />
+
+            <Checkbox
+              checked={form.customsResponsibilityAccepted}
+              label="I accept full responsibility for compliance with all customs laws, airline baggage rules, and regional carrier regulations on this route."
+              onChange={(value) => updateField("customsResponsibilityAccepted", value)}
+              accessibilityLabel="Checkbox 4: Accept customs and baggage policy responsibility."
+            />
+
             <TrustIndicator text="Review details before posting." />
             {reviewingShipment ? (
               <ShipmentReviewPanel
@@ -1199,7 +1526,12 @@ export default function SendScreen() {
             </View>
           ) : null}
         </View>
-    </Screen>
+      </Screen>
+      <ProhibitedItemsPolicyModal
+        visible={showPolicyModal}
+        onClose={() => setShowPolicyModal(false)}
+      />
+    </>
   );
 }
 
@@ -1540,9 +1872,196 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     ...typography.caption,
   },
+  checkboxContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: spacing.xs,
+    minHeight: touchTargets.comfortable,
+    gap: spacing.sm,
+  },
+  checkboxBox: {
+    width: 22,
+    height: 22,
+    borderRadius: radii.sm,
+    borderWidth: 2,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxBoxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  checkboxLabel: {
+    flex: 1,
+    color: colors.text,
+    ...typography.body,
+  },
+  batteryTypeContainer: {
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
+    gap: spacing.xs,
+  },
+  batteryFieldLabel: {
+    color: colors.text,
+    ...typography.label,
+  },
+  batteryOptionsRow: {
+    flexDirection: "column",
+    gap: spacing.xs,
+  },
+  batteryOptionButton: {
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+  },
+  batteryOptionSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  batteryOptionText: {
+    color: colors.text,
+    ...typography.body,
+  },
+  batteryOptionTextSelected: {
+    color: colors.primaryDark,
+    fontWeight: "700",
+  },
+  safetyWarningBox: {
+    backgroundColor: colors.errorSoft,
+    borderColor: colors.error,
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.xs,
+  },
+  safetyWarningTitle: {
+    color: colors.error,
+    ...typography.subheading,
+  },
+  safetyWarningText: {
+    color: colors.text,
+    ...typography.caption,
+    lineHeight: 18,
+  },
+  policyLinkButton: {
+    alignSelf: "flex-start",
+    marginTop: spacing.xxs,
+    paddingVertical: spacing.xxs,
+  },
+  policyLinkText: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: "700",
+    textDecorationLine: "underline",
+  },
+  modalContent: {
+    padding: spacing.lg,
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing.xs,
+  },
+  modalTitle: {
+    color: colors.text,
+    ...typography.headline,
+  },
+  modalSubtitle: {
+    color: colors.textSecondary,
+    ...typography.caption,
+    marginBottom: spacing.md,
+  },
+  modalCloseButton: {
+    padding: spacing.xs,
+  },
+  modalSearchInput: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    color: colors.text,
+    ...typography.body,
+    marginBottom: spacing.md,
+  },
+  modalScroll: {
+    flex: 1,
+  },
+  modalEmpty: {
+    padding: spacing.xl,
+    alignItems: "center",
+  },
+  modalEmptyText: {
+    color: colors.muted,
+    ...typography.body,
+  },
+  policyCategoryCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.xs,
+  },
+  policyCategoryName: {
+    color: colors.primaryDark,
+    ...typography.subheading,
+  },
+  policyCategoryDesc: {
+    color: colors.textSecondary,
+    ...typography.caption,
+    marginBottom: spacing.xs,
+  },
+  policyItemsList: {
+    gap: spacing.xxs,
+    marginBottom: spacing.xs,
+  },
+  policyItemRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.xs,
+  },
+  policyBullet: {
+    color: colors.primary,
+    ...typography.body,
+    lineHeight: 20,
+  },
+  policyItemText: {
+    flex: 1,
+    color: colors.text,
+    ...typography.body,
+    lineHeight: 20,
+  },
+  sourcesContainer: {
+    marginTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.xs,
+    gap: spacing.xxs,
+  },
+  sourcesLabel: {
+    color: colors.muted,
+    ...typography.overline,
+  },
+  sourceBadge: {
+    backgroundColor: colors.backgroundStrong,
+    borderRadius: radii.sm,
+    paddingVertical: spacing.xxs,
+    paddingHorizontal: spacing.xs,
+    alignSelf: "flex-start",
+  },
+  sourceBadgeText: {
+    color: colors.textSecondary,
+    ...typography.caption,
+    fontSize: 11,
+  },
 });
-
-
-
-
-

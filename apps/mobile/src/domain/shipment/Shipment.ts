@@ -9,6 +9,20 @@ export const ListingStatus = {
 
 export type ListingStatus = (typeof ListingStatus)[keyof typeof ListingStatus];
 
+export interface SafetyDeclarationSnapshot {
+  readonly policyVersion: string;
+  readonly declarationVersion: string;
+  readonly acceptedAt: string;
+  readonly acceptedByUserId: string;
+  readonly packageContentVersion: number;
+  readonly acknowledgements: {
+    readonly contentsAccurate: true;
+    readonly noProhibitedItems: true;
+    readonly inspectionPermitted: true;
+    readonly customsResponsibilityAccepted: true;
+  };
+}
+
 export interface Shipment extends DomainEntity {
   readonly ownerId: string;
   readonly originCountry: string;
@@ -22,6 +36,16 @@ export interface Shipment extends DomainEntity {
   readonly rewardAmount: number;
   readonly rewardCurrency: string;
   readonly status: ListingStatus;
+
+  // Safety & Declaration fields
+  readonly containsBattery: boolean;
+  readonly batteryType: "lithium_ion" | "lithium_metal" | "none";
+  readonly containsLiquid: boolean;
+  readonly containsFoodOrAgri: boolean;
+  readonly containsMedicine: boolean;
+  readonly customsDeclarationRequired: boolean;
+  readonly packageContentVersion: number;
+  readonly safetyDeclaration: SafetyDeclarationSnapshot | null;
 }
 
 export type NewShipment = Omit<Shipment, "id" | "createdAt" | "updatedAt">;

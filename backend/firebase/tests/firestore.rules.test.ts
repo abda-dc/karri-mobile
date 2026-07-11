@@ -128,11 +128,17 @@ async function setBookingStatusAsAdmin(status: string) {
 }
 
 function clientShipment(overrides: DocumentData = {}) {
-  return shipmentFixture({
+  const base = shipmentFixture();
+  return {
+    ...base,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+    safetyDeclaration: {
+      ...base.safetyDeclaration,
+      acceptedAt: serverTimestamp(),
+    },
     ...overrides,
-  });
+  };
 }
 
 function clientTrip(overrides: DocumentData = {}) {
@@ -197,6 +203,95 @@ describe("shipments", () => {
     await seedDoc(`shipments/${shipmentId}`, shipmentFixture());
     await assertFails(
       deleteDoc(doc(userDb(senderUid), `shipments/${shipmentId}`)),
+    );
+  });
+
+  it("denies creation with missing safety declaration", async () => {
+    const db = userDb(senderUid);
+    const ref = doc(db, `shipments/${shipmentId}-missing-decl`);
+
+    const shipment = clientShipment();
+    delete (shipment as any).safetyDeclaration;
+
+    await assertFails(setDoc(ref, shipment));
+  });
+
+  it("denies creation with any unchecked safety acknowledgement", async () => {
+    const db = userDb(senderUid);
+    const ref = doc(db, `shipments/${shipmentId}-unchecked`);
+
+    const shipment = clientShipment();
+    shipment.safetyDeclaration.acknowledgements.contentsAccurate = false;
+
+    await assertFails(setDoc(ref, shipment));
+  });
+
+  it("denies creation with mismatched acceptedByUserId", async () => {
+    const db = userDb(senderUid);
+    const ref = doc(db, `shipments/${shipmentId}-wrong-user`);
+
+    const shipment = clientShipment();
+    shipment.safetyDeclaration.acceptedByUserId = otherUid;
+
+    await assertFails(setDoc(ref, shipment));
+  });
+
+  it("denies creation with mismatched packageContentVersion", async () => {
+    const db = userDb(senderUid);
+    const ref = doc(db, `shipments/${shipmentId}-wrong-ver`);
+
+    const shipment = clientShipment();
+    shipment.packageContentVersion = 2;
+
+    await assertFails(setDoc(ref, shipment));
+  });
+
+  it("denies safety content change update without version increment or new declaration", async () => {
+    await seedDoc(`shipments/${shipmentId}`, shipmentFixture());
+    const ref = doc(userDb(senderUid), `shipments/${shipmentId}`);
+
+    await assertFails(
+      updateDoc(ref, {
+        packageDescription: "A brand new safety-relevant description",
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it("allows safety content change update with incremented version and fresh declaration", async () => {
+    await seedDoc(`shipments/${shipmentId}`, shipmentFixture());
+    const ref = doc(userDb(senderUid), `shipments/${shipmentId}`);
+
+    const base = shipmentFixture();
+    await assertSucceeds(
+      updateDoc(ref, {
+        packageDescription: "A brand new safety-relevant description",
+        packageContentVersion: 2,
+        safetyDeclaration: {
+          ...base.safetyDeclaration,
+          packageContentVersion: 2,
+          acceptedAt: serverTimestamp(),
+        },
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it("denies version increment if safety content did not change", async () => {
+    await seedDoc(`shipments/${shipmentId}`, shipmentFixture());
+    const ref = doc(userDb(senderUid), `shipments/${shipmentId}`);
+
+    const base = shipmentFixture();
+    await assertFails(
+      updateDoc(ref, {
+        packageContentVersion: 2,
+        safetyDeclaration: {
+          ...base.safetyDeclaration,
+          packageContentVersion: 2,
+          acceptedAt: serverTimestamp(),
+        },
+        updatedAt: serverTimestamp(),
+      }),
     );
   });
 });

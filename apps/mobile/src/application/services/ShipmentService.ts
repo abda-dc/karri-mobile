@@ -8,7 +8,9 @@ import {
   ListingStatus,
   type NewShipment,
   type Shipment,
+  type SafetyDeclarationSnapshot,
 } from "../../domain/shipment/Shipment";
+import { CURRENT_POLICY_VERSION, CURRENT_DECLARATION_VERSION } from "../../domain/configuration/SafetyPolicy";
 import type { ShipmentRepository } from "../../domain/shipment/ShipmentRepository";
 import type { Clock } from "./Clock";
 import { systemClock } from "./Clock";
@@ -26,8 +28,26 @@ export class ShipmentService {
   ) {}
 
   async create(input: CreateShipmentDto): Promise<Shipment> {
+    const ownerId = requireText(input.ownerId, "ownerId", 128);
+    const packageContentVersion = input.packageContentVersion;
+
+    // Validate safety declaration first
+    this.validateSafetyDeclaration(input.safetyDeclaration, ownerId, packageContentVersion);
+
+    // Validate battery configuration
+    const allowedBatteryTypes = ["lithium_ion", "lithium_metal", "none"];
+    if (!allowedBatteryTypes.includes(input.batteryType)) {
+      throw new DomainValidationError("batteryType must be lithium_ion, lithium_metal, or none.");
+    }
+    if (input.containsBattery && input.batteryType === "none") {
+      throw new DomainValidationError("batteryType cannot be none when containsBattery is true.");
+    }
+    if (!input.containsBattery && input.batteryType !== "none") {
+      throw new DomainValidationError("batteryType must be none when containsBattery is false.");
+    }
+
     const shipment: NewShipment = {
-      ownerId: requireText(input.ownerId, "ownerId", 128),
+      ownerId,
       originCountry: requireText(input.originCountry, "originCountry", 80),
       originCity: requireText(input.originCity, "originCity", 120),
       destinationCountry: requireText(input.destinationCountry, "destinationCountry", 80),
@@ -39,7 +59,17 @@ export class ShipmentService {
       rewardAmount: requirePositiveNumber(input.rewardAmount, "rewardAmount", 100000),
       rewardCurrency: this.validateCurrency(input.rewardCurrency ?? "USD"),
       status: ListingStatus.Active,
+
+      containsBattery: input.containsBattery,
+      batteryType: input.batteryType,
+      containsLiquid: input.containsLiquid,
+      containsFoodOrAgri: input.containsFoodOrAgri,
+      containsMedicine: input.containsMedicine,
+      customsDeclarationRequired: input.customsDeclarationRequired,
+      packageContentVersion,
+      safetyDeclaration: input.safetyDeclaration,
     };
+
     const created = await this.shipments.create(shipment);
     const occurredAt = created.createdAt ?? this.clock.now();
 
@@ -87,5 +117,39 @@ export class ShipmentService {
     }
 
     return currency;
+  }
+
+  private validateSafetyDeclaration(
+    declaration: SafetyDeclarationSnapshot,
+    ownerId: string,
+    packageContentVersion: number,
+  ): void {
+    if (!declaration) {
+      throw new DomainValidationError("Safety declaration is required.");
+    }
+    if (declaration.policyVersion !== CURRENT_POLICY_VERSION) {
+      throw new DomainValidationError(`Stale or invalid policy version: ${declaration.policyVersion}`);
+    }
+    if (declaration.declarationVersion !== CURRENT_DECLARATION_VERSION) {
+      throw new DomainValidationError(`Stale or invalid declaration version: ${declaration.declarationVersion}`);
+    }
+    if (declaration.acceptedByUserId !== ownerId) {
+      throw new DomainValidationError("Declaration user ID must match the shipment owner.");
+    }
+    if (declaration.packageContentVersion !== packageContentVersion) {
+      throw new DomainValidationError("Declaration package content version must match the shipment content version.");
+    }
+    const acks = declaration.acknowledgements;
+    if (!acks) {
+      throw new DomainValidationError("Acknowledgements are required.");
+    }
+    if (
+      acks.contentsAccurate !== true ||
+      acks.noProhibitedItems !== true ||
+      acks.inspectionPermitted !== true ||
+      acks.customsResponsibilityAccepted !== true
+    ) {
+      throw new DomainValidationError("All safety acknowledgements must be accepted.");
+    }
   }
 }

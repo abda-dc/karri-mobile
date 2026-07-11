@@ -18,7 +18,40 @@ service cloud.firestore {
       return status in ['draft', 'active', 'closed', 'cancelled'];
     }
 
-    function validShipment(data) {
+    function validSafetyDeclaration(data, isCreateOrRenew) {
+      return data.safetyDeclaration is map
+        && data.safetyDeclaration.keys().hasOnly([
+          'policyVersion', 'declarationVersion', 'acceptedAt', 'acceptedByUserId',
+          'packageContentVersion', 'acknowledgements'
+        ])
+        && data.safetyDeclaration.policyVersion == '2026-07-v1'
+        && data.safetyDeclaration.declarationVersion == 'v1'
+        && (!isCreateOrRenew || data.safetyDeclaration.acceptedAt == request.time)
+        && data.safetyDeclaration.acceptedByUserId == request.auth.uid
+        && data.safetyDeclaration.packageContentVersion == data.packageContentVersion
+        && data.safetyDeclaration.acknowledgements is map
+        && data.safetyDeclaration.acknowledgements.keys().hasOnly([
+          'contentsAccurate', 'noProhibitedItems', 'inspectionPermitted', 'customsResponsibilityAccepted'
+        ])
+        && data.safetyDeclaration.acknowledgements.contentsAccurate == true
+        && data.safetyDeclaration.acknowledgements.noProhibitedItems == true
+        && data.safetyDeclaration.acknowledgements.inspectionPermitted == true
+        && data.safetyDeclaration.acknowledgements.customsResponsibilityAccepted == true;
+    }
+
+    function safetyContentUnchanged(oldData, newData) {
+      return oldData.packageCategory == newData.packageCategory
+        && oldData.packageDescription == newData.packageDescription
+        && oldData.weightKg == newData.weightKg
+        && oldData.containsBattery == newData.containsBattery
+        && oldData.batteryType == newData.batteryType
+        && oldData.containsLiquid == newData.containsLiquid
+        && oldData.containsFoodOrAgri == newData.containsFoodOrAgri
+        && oldData.containsMedicine == newData.containsMedicine
+        && oldData.customsDeclarationRequired == newData.customsDeclarationRequired;
+    }
+
+    function validShipmentBase(data) {
       return data.keys().hasOnly([
           'ownerId',
           'originCountry',
@@ -33,7 +66,15 @@ service cloud.firestore {
           'rewardCurrency',
           'status',
           'createdAt',
-          'updatedAt'
+          'updatedAt',
+          'containsBattery',
+          'batteryType',
+          'containsLiquid',
+          'containsFoodOrAgri',
+          'containsMedicine',
+          'customsDeclarationRequired',
+          'packageContentVersion',
+          'safetyDeclaration'
         ])
         && data.ownerId is string
         && data.originCountry is string && data.originCountry.size() > 0 && data.originCountry.size() <= 80
@@ -46,7 +87,25 @@ service cloud.firestore {
         && data.deliveryWindow is string && data.deliveryWindow.size() > 0 && data.deliveryWindow.size() <= 120
         && isNumber(data.rewardAmount) && data.rewardAmount > 0 && data.rewardAmount <= 100000
         && data.rewardCurrency is string && data.rewardCurrency.size() == 3
-        && validListingStatus(data.status);
+        && validListingStatus(data.status)
+        && data.containsBattery is bool
+        && data.batteryType is string && (data.batteryType == 'lithium_ion' || data.batteryType == 'lithium_metal' || data.batteryType == 'none')
+        && data.containsLiquid is bool
+        && data.containsFoodOrAgri is bool
+        && data.containsMedicine is bool
+        && data.customsDeclarationRequired is bool
+        && data.packageContentVersion is int && data.packageContentVersion >= 1;
+    }
+
+    function validShipmentOnCreate(data) {
+      return validShipmentBase(data)
+        && validSafetyDeclaration(data, true);
+    }
+
+    function validShipmentOnUpdate(oldData, newData) {
+      let contentChanged = !safetyContentUnchanged(oldData, newData);
+      return validShipmentBase(newData)
+        && validSafetyDeclaration(newData, contentChanged);
     }
 
     function validTrip(data) {
@@ -585,12 +644,20 @@ service cloud.firestore {
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
-        && validShipment(request.resource.data);
+        && validShipmentOnCreate(request.resource.data);
       allow update: if owns(resource.data)
         && request.resource.data.ownerId == resource.data.ownerId
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.updatedAt == request.time
-        && validShipment(request.resource.data);
+        && validShipmentOnUpdate(resource.data, request.resource.data)
+        && (
+          (safetyContentUnchanged(resource.data, request.resource.data)
+            && request.resource.data.packageContentVersion == resource.data.packageContentVersion
+            && request.resource.data.safetyDeclaration == resource.data.safetyDeclaration)
+          ||
+          (!safetyContentUnchanged(resource.data, request.resource.data)
+            && request.resource.data.packageContentVersion == resource.data.packageContentVersion + 1)
+        );
       allow delete: if false;
     }
 

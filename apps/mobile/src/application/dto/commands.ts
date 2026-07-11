@@ -3,6 +3,8 @@ import type { ReviewDirection } from "../../domain/review/Review";
 import type { TrustInputs } from "../../domain/trust/TrustScore";
 import type { CustodyEventType } from "../../domain/custody/CustodyEvent";
 
+import type { SafetyDeclarationSnapshot } from "../../domain/shipment/Shipment";
+
 export interface CreateShipmentDto {
   readonly ownerId: string;
   readonly originCountry: string;
@@ -15,6 +17,16 @@ export interface CreateShipmentDto {
   readonly deliveryWindow: string;
   readonly rewardAmount: number;
   readonly rewardCurrency?: string;
+
+  // Safety & Declaration fields
+  readonly containsBattery: boolean;
+  readonly batteryType: "lithium_ion" | "lithium_metal" | "none";
+  readonly containsLiquid: boolean;
+  readonly containsFoodOrAgri: boolean;
+  readonly containsMedicine: boolean;
+  readonly customsDeclarationRequired: boolean;
+  readonly packageContentVersion: number;
+  readonly safetyDeclaration: SafetyDeclarationSnapshot;
 }
 
 export interface CreateTripDto {
