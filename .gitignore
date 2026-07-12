@@ -35,3 +35,9 @@ site/
 keystores/
 *.jks
 *.keystore
+
+# Service Accounts
+*.service-account.json
+service-account.json
+serviceAccount*.json
+firebase-admin*.json

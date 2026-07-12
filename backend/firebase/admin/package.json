@@ -1,0 +1,24 @@
+{
+  "name": "karri-firebase-admin-tooling",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/cli.ts",
+  "type": "module",
+  "scripts": {
+    "auth:claims:get": "tsx src/cli.ts get",
+    "auth:role:set": "tsx src/cli.ts set",
+    "auth:role:remove": "tsx src/cli.ts remove",
+    "auth:tokens:revoke": "tsx src/cli.ts revoke",
+    "auth:bootstrap:super-admin": "tsx src/cli.ts bootstrap",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3",
+    "vitest": "^1.3.1",
+    "@types/node": "^20.11.24"
+  }
+}
