@@ -6,6 +6,48 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function hasRole(role) {
+      return signedIn()
+        && 'role' in request.auth.token
+        && request.auth.token.role == role;
+    }
+
+    function canViewOperations() {
+      return hasRole('operations_admin') || hasRole('super_admin');
+    }
+
+    function canViewSafetyDeclarations() {
+      return hasRole('moderator') || hasRole('safety_admin') || hasRole('super_admin');
+    }
+
+    function canModerateListings() {
+      return hasRole('moderator') || hasRole('safety_admin') || hasRole('super_admin');
+    }
+
+    function canManageSafetyReviews() {
+      return hasRole('safety_admin') || hasRole('super_admin');
+    }
+
+    function canManageMediationCases() {
+      return hasRole('operations_admin') || hasRole('super_admin');
+    }
+
+    function canPlaceAdministrativeHolds() {
+      return hasRole('operations_admin') || hasRole('safety_admin') || hasRole('super_admin');
+    }
+
+    function canRestrictAccounts() {
+      return hasRole('safety_admin') || hasRole('super_admin');
+    }
+
+    function canAssignRoles() {
+      return hasRole('super_admin');
+    }
+
+    function canViewAuditLogs() {
+      return hasRole('super_admin');
+    }
+
     function owns(resourceData) {
       return signedIn() && resourceData.ownerId == request.auth.uid;
     }
@@ -692,7 +734,7 @@ service cloud.firestore {
     }
 
     match /shipments/{shipmentId} {
-      allow read: if signedIn() && (owns(resource.data) || resource.data.status == 'active');
+      allow read: if signedIn() && (owns(resource.data) || resource.data.status == 'active' || canViewSafetyDeclarations());
       allow create: if signedIn()
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.createdAt == request.time
@@ -715,7 +757,7 @@ service cloud.firestore {
     }
 
     match /trips/{tripId} {
-      allow read: if signedIn() && (owns(resource.data) || resource.data.status == 'active');
+      allow read: if signedIn() && (owns(resource.data) || resource.data.status == 'active' || canViewOperations());
       allow create: if signedIn()
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.createdAt == request.time
@@ -730,7 +772,7 @@ service cloud.firestore {
     }
 
     match /bookingRequests/{requestId} {
-      allow read: if isBookingParticipant(resource.data);
+      allow read: if isBookingParticipant(resource.data) || canViewOperations();
       allow create: if signedIn()
         && request.auth.uid == request.resource.data.senderId
         && request.resource.data.status == 'pending'
@@ -751,7 +793,7 @@ service cloud.firestore {
     }
 
     match /bookings/{bookingId} {
-      allow read: if isBookingParticipant(resource.data);
+      allow read: if isBookingParticipant(resource.data) || canViewOperations();
       allow create: if signedIn()
         && request.auth.uid == request.resource.data.senderId
         && request.resource.data.status == 'pending'
@@ -936,6 +978,7 @@ service cloud.firestore {
       allow read: if signedIn() && (
         request.auth.uid == get(/databases/$(database)/documents/bookings/$(bookingId)).data.senderId
         || request.auth.uid == get(/databases/$(database)/documents/bookings/$(bookingId)).data.travelerId
+        || canViewSafetyDeclarations()
       );
       allow create: if signedIn()
         && !exists(/databases/$(database)/documents/travelerCustodyAcceptances/$(bookingId))
@@ -1076,7 +1119,7 @@ service cloud.firestore {
     }
 
     match /identityVerifications/{userId} {
-      allow read: if signedIn() && request.auth.uid == userId;
+      allow read: if signedIn() && (request.auth.uid == userId || canRestrictAccounts());
       allow create: if signedIn()
         && request.auth.uid == userId
         && request.resource.data.userId == request.auth.uid

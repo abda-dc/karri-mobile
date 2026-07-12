@@ -1180,3 +1180,174 @@ describe("custody events", () => {
     await assertFails(deleteDoc(ref));
   });
 });
+
+describe("Milestone 31 - Coarse Admin Roles and Multi-Role Access Control Boundary", () => {
+  const adminUid = "admin-user-123";
+
+  function roleDb(uid: string, claim: any) {
+    const authOpts = typeof claim === "string" ? { role: claim } : claim;
+    return testEnv.authenticatedContext(uid, authOpts).firestore();
+  }
+
+  it("proves moderator, safety_admin, and super_admin can read non-active shipments, while others are denied", async () => {
+    const path = `shipments/${shipmentId}`;
+    await seedDoc(path, shipmentFixture({ status: "draft" }));
+
+    // Allowed roles
+    await assertSucceeds(getDoc(doc(roleDb(adminUid, "moderator"), path)));
+    await assertSucceeds(getDoc(doc(roleDb(adminUid, "safety_admin"), path)));
+    await assertSucceeds(getDoc(doc(roleDb(adminUid, "super_admin"), path)));
+
+    // Denied roles & ordinary user
+    await assertFails(getDoc(doc(roleDb(adminUid, "operations_admin"), path)));
+    await assertFails(getDoc(doc(roleDb(adminUid, "support"), path)));
+    await assertFails(getDoc(doc(roleDb(adminUid, "user"), path)));
+    await assertFails(getDoc(doc(userDb(otherUid), path))); // Ordinary unprivileged user
+  });
+
+  it("proves operations_admin and super_admin can read non-active trips, while others are denied", async () => {
+    const path = `trips/${tripId}`;
+    await seedDoc(path, tripFixture({ status: "draft" }));
+
+    // Allowed roles
+    await assertSucceeds(getDoc(doc(roleDb(adminUid, "operations_admin"), path)));
+    await assertSucceeds(getDoc(doc(roleDb(adminUid, "super_admin"), path)));
+
+    // Denied roles & ordinary user
+    await assertFails(getDoc(doc(roleDb(adminUid, "moderator"), path)));
+    await assertFails(getDoc(doc(roleDb(adminUid, "safety_admin"), path)));
+    await assertFails(getDoc(doc(roleDb(adminUid, "support"), path)));
+    await assertFails(getDoc(doc(userDb(otherUid), path)));
+  });
+
+  it("proves operations_admin and super_admin can read bookings and bookingRequests, while others are denied", async () => {
+    await seedBookingState("pending");
+    const bookingPath = `bookings/${bookingId}`;
+    const requestPath = `bookingRequests/${bookingRequestId}`;
+
+    // Allowed roles
+    await assertSucceeds(getDoc(doc(roleDb(adminUid, "operations_admin"), bookingPath)));
+    await assertSucceeds(getDoc(doc(roleDb(adminUid, "super_admin"), bookingPath)));
+    await assertSucceeds(getDoc(doc(roleDb(adminUid, "operations_admin"), requestPath)));
+    await assertSucceeds(getDoc(doc(roleDb(adminUid, "super_admin"), requestPath)));
+
+    // Denied roles & ordinary non-participant user
+    await assertFails(getDoc(doc(roleDb(adminUid, "moderator"), bookingPath)));
+    await assertFails(getDoc(doc(roleDb(adminUid, "safety_admin"), bookingPath)));
+    await assertFails(getDoc(doc(roleDb(adminUid, "support"), bookingPath)));
+    await assertFails(getDoc(doc(userDb(otherUid), bookingPath)));
+  });
+
+  it("proves moderator, safety_admin, and super_admin can read traveler custody acceptances, while others are denied", async () => {
+    await seedBookingState("accepted");
+    const path = `travelerCustodyAcceptances/${bookingId}`;
+    const testAcceptance = {
+      acceptedByUserId: travelerUid,
+      shipmentId,
+      bookingId,
+      custodyVersion: 1,
+      custodyPolicyVersion: "2026-07-v1",
+      declarationVersion: "v1",
+      packageContentVersion: 1,
+      senderDeclarationVersion: "v1",
+      acceptedAt: new Date(),
+      inspection: {
+        packageAvailableForInspection: true,
+        packagingSecure: true,
+        weightAppearsReasonable: true,
+        noVisibleLeak: true,
+        noVisibleBatteryDamage: true,
+        noSuspiciousWiring: true,
+        noUnusualOdorOrContamination: true,
+        noVisibleConcealment: true,
+        visibleContentsAppearConsistent: true,
+      },
+      acknowledgements: {
+        personallyInspected: true,
+        contentsAppearConsistent: true,
+        noSuspiciousItemsObserved: true,
+        safeTransportationAccepted: true,
+        reasonableCustodyResponsibilityAccepted: true,
+      },
+    };
+    await seedDoc(path, testAcceptance);
+
+    // Allowed roles
+    await assertSucceeds(getDoc(doc(roleDb(adminUid, "moderator"), path)));
+    await assertSucceeds(getDoc(doc(roleDb(adminUid, "safety_admin"), path)));
+    await assertSucceeds(getDoc(doc(roleDb(adminUid, "super_admin"), path)));
+
+    // Denied roles & ordinary non-participant user
+    await assertFails(getDoc(doc(roleDb(adminUid, "operations_admin"), path)));
+    await assertFails(getDoc(doc(roleDb(adminUid, "support"), path)));
+    await assertFails(getDoc(doc(userDb(otherUid), path)));
+  });
+
+  it("proves safety_admin and super_admin can read identityVerifications, while others are denied", async () => {
+    const path = `identityVerifications/${otherUid}`;
+    await seedDoc(path, identityVerificationFixture(otherUid));
+
+    // Allowed roles
+    await assertSucceeds(getDoc(doc(roleDb(adminUid, "safety_admin"), path)));
+    await assertSucceeds(getDoc(doc(roleDb(adminUid, "super_admin"), path)));
+
+    // Denied roles & ordinary user (other than owner)
+    await assertFails(getDoc(doc(roleDb(adminUid, "moderator"), path)));
+    await assertFails(getDoc(doc(roleDb(adminUid, "operations_admin"), path)));
+    await assertFails(getDoc(doc(roleDb(adminUid, "support"), path)));
+    await assertFails(getDoc(doc(userDb(senderUid), path)));
+  });
+
+  it("proves invalid or absent claims receive no administrative access", async () => {
+    const path = `bookings/${bookingId}`;
+    await seedBookingState("pending");
+
+    // Absent claim
+    await assertFails(getDoc(doc(roleDb(adminUid, {}), path)));
+
+    // Unsupported string claim
+    await assertFails(getDoc(doc(roleDb(adminUid, "unsupported_admin_role"), path)));
+
+    // Non-string claim type
+    await assertFails(getDoc(doc(roleDb(adminUid, { role: 123 }), path)));
+  });
+
+  it("proves administrative write operations are denied for all clients", async () => {
+    // Attempting direct custody acceptance deletion
+    const acceptancePath = `travelerCustodyAcceptances/${bookingId}`;
+    const ref = doc(roleDb(adminUid, "super_admin"), acceptancePath);
+    await assertFails(deleteDoc(ref));
+
+    // Attempting direct shipment deletion
+    const shipmentRef = doc(roleDb(adminUid, "super_admin"), `shipments/${shipmentId}`);
+    await assertFails(deleteDoc(shipmentRef));
+  });
+
+  it("proves profile escalation attempt does not grant administrative access and only token claims control authorization", async () => {
+    const maliciousUid = "malicious-user-999";
+    const profilePath = `profiles/${maliciousUid}`;
+    const maliciousProfile = {
+      userId: maliciousUid,
+      trustScore: null,
+      authorizationRole: "super_admin",
+      adminRole: "super_admin",
+      permissions: ["assign_roles", "view_operations"],
+      role: "super_admin",
+    };
+
+    // Client writes their own profile (rules allow profile creation by owner)
+    const unprivilegedDb = testEnv.authenticatedContext(maliciousUid).firestore();
+    await assertSucceeds(setDoc(doc(unprivilegedDb, profilePath), maliciousProfile));
+
+    // Seed a newly protected administrative read resource: a draft shipment owned by senderUid
+    const shipmentPath = `shipments/${shipmentId}`;
+    await seedDoc(shipmentPath, shipmentFixture({ status: "draft" }));
+
+    // 1. Verify read fails when query is run as the malicious user WITHOUT the token claim
+    await assertFails(getDoc(doc(unprivilegedDb, shipmentPath)));
+
+    // 2. Verify read succeeds when query is run as the same user WITH the trusted token claim (role: moderator)
+    const privilegedDb = testEnv.authenticatedContext(maliciousUid, { role: "moderator" }).firestore();
+    await assertSucceeds(getDoc(doc(privilegedDb, shipmentPath)));
+  });
+});
