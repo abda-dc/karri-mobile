@@ -5,6 +5,8 @@ import {
   type CallableResponse,
   type IdentityToolkitClient,
   type PlaceHoldPayload,
+  parseAnonymousSignUpResponse,
+  parseRefreshTokenResponse,
   runPlaceAdministrativeHoldSmoke,
   type SmokeAuthClient,
   type SmokeFirestoreClient,
@@ -22,10 +24,6 @@ function initializeAdmin(): typeof admin {
 
 class FirebaseAdminSmokeAuthClient implements SmokeAuthClient {
   constructor(private readonly auth: admin.auth.Auth) {}
-
-  async createUser(uid: string): Promise<void> {
-    await this.auth.createUser({ uid, disabled: false });
-  }
 
   async getUser(uid: string): Promise<{ uid: string } | null> {
     try {
@@ -49,10 +47,6 @@ class FirebaseAdminSmokeAuthClient implements SmokeAuthClient {
 
   async deleteUser(uid: string): Promise<void> {
     await this.auth.deleteUser(uid);
-  }
-
-  async createCustomToken(uid: string): Promise<string> {
-    return await this.auth.createCustomToken(uid);
   }
 }
 
@@ -129,18 +123,52 @@ class FirestoreSmokeClient implements SmokeFirestoreClient {
 }
 
 class FirebaseIdentityToolkitClient implements IdentityToolkitClient {
-  async exchangeCustomToken(customToken: string, apiKey: string): Promise<string> {
-    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${encodeURIComponent(apiKey)}`, {
+  async signUpAnonymous(apiKey: string) {
+    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(apiKey)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: customToken, returnSecureToken: true }),
+      body: JSON.stringify({ returnSecureToken: true }),
     });
-    const body = await response.json() as { idToken?: string; error?: { message?: string } };
-    if (!response.ok || !body.idToken) {
-      throw new Error(`Identity Toolkit token exchange failed: ${body.error?.message || response.statusText}`);
+    const body = await readJsonBody(response);
+    if (!response.ok) {
+      throw new Error(`Identity Toolkit anonymous sign-up failed: ${extractRestErrorMessage(body, response.statusText)}`);
     }
-    return body.idToken;
+    return parseAnonymousSignUpResponse(body);
   }
+
+  async refreshIdToken(refreshToken: string, apiKey: string) {
+    const response = await fetch(`https://securetoken.googleapis.com/v1/token?key=${encodeURIComponent(apiKey)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      }),
+    });
+    const body = await readJsonBody(response);
+    if (!response.ok) {
+      throw new Error(`Secure Token refresh failed: ${extractRestErrorMessage(body, response.statusText)}`);
+    }
+    return parseRefreshTokenResponse(body);
+  }
+}
+
+async function readJsonBody(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function extractRestErrorMessage(body: unknown, fallback: string): string {
+  if (body && typeof body === "object") {
+    const error = (body as { error?: { message?: unknown } }).error;
+    if (typeof error?.message === "string" && error.message.length > 0) {
+      return error.message;
+    }
+  }
+  return fallback || "request failed";
 }
 
 class DeployedCallableClient implements CallableClient {

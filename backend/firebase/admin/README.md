@@ -79,13 +79,13 @@ npm run auth:bootstrap:super-admin -- --uid "<firebase-uid>" --confirm-super-adm
 ```
 
 ### 6. Development Callable Smoke Test
-The live callable smoke tool is development-only and targets exactly `karri-mobile-dev`. It creates two temporary Auth users, proves a signed-in non-admin is denied, grants a separate temporary user only `operations_admin`, seeds one smoke-prefixed shipment, calls the deployed `placeAdministrativeHold` callable, verifies the resulting hold and `hold.place` audit log, repeats the same request to prove idempotency, then deletes only resources created during that run.
+The live callable smoke tool is development-only and targets exactly `karri-mobile-dev`. It creates two temporary anonymous Auth users through the Firebase Identity Toolkit REST API, proves the initial non-admin ID token is denied, grants the separate temporary admin user only `operations_admin` through the Admin SDK, refreshes that user's in-memory session through Google Secure Token REST so the ID token contains the new claim, seeds one smoke-prefixed shipment, calls the deployed `placeAdministrativeHold` callable, verifies the resulting hold and `hold.place` audit log, repeats the same request to prove idempotency, then deletes only resources created during that run.
 
-Run it only after the reviewed Firebase stack is already deployed to `karri-mobile-dev`. The tool uses Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`; it does not use Firebase CLI login tokens. The Firebase Web API key must come from a local environment variable and is never printed.
+Run it only after the reviewed Firebase stack is already deployed to `karri-mobile-dev`. Local user Application Default Credentials from `gcloud auth application-default login` are sufficient for the Admin SDK operations. The smoke tool does not use Firebase CLI login tokens, service-account JSON keys, custom-token signing, or IAM `signBlob` permission. The Firebase Web API key must come from the local `FIREBASE_WEB_API_KEY` environment variable and is never printed.
 
 The live smoke creates Firebase Auth, Firestore, Cloud Functions, and Cloud Logging operations in the development project. The expected usage is small, but it is not guaranteed to be free. Any configured budget, including a $10 budget, is an alerting threshold rather than a hard spending cap.
 
-The ADC identity or service account must be allowed to create, get, and delete Firebase Auth users; set custom claims; revoke refresh tokens; create, read, and delete the scoped Firestore smoke documents; and invoke the deployed callable. Credentials, API keys, custom tokens, ID tokens, refresh tokens, service-account JSON, and authorization headers must never be committed, pasted into logs, or pasted into chat.
+The ADC identity must be allowed to get and delete Firebase Auth users created by the REST sign-up flow; set custom claims; revoke refresh tokens; create, read, and delete the scoped Firestore smoke documents; and invoke the deployed callable. Temporary client sessions are created through Identity Toolkit REST with `returnSecureToken: true`; ID tokens and refresh tokens remain process-memory only and are never written to disk or logs. Credentials, API keys, ID tokens, refresh tokens, service-account JSON, and authorization headers must never be committed, pasted into logs, or pasted into chat.
 
 PowerShell setup:
 
@@ -93,8 +93,6 @@ PowerShell setup:
 $env:FIREBASE_PROJECT_ID="karri-mobile-dev"
 $env:KARRI_ALLOW_LIVE_SMOKE="karri-mobile-dev"
 $env:FIREBASE_WEB_API_KEY="<development Firebase web API key>"
-# Optional, if not using ADC:
-# $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\service-account.json"
 ```
 
 Run from the repository root:
@@ -111,7 +109,7 @@ Expected result:
 - The identical retry returns the same hold ID with `alreadyExisted: true`.
 - Cleanup reports deleted smoke shipment, hold, audit log, and both temporary Auth users.
 
-If any assertion or cleanup step fails, the command exits nonzero. Do not paste API keys, custom tokens, ID tokens, refresh tokens, service-account JSON, or authorization headers into chat or issue trackers.
+If any assertion or cleanup step fails, the command exits nonzero. Do not paste API keys, ID tokens, refresh tokens, service-account JSON, or authorization headers into chat or issue trackers.
 
 ---
 

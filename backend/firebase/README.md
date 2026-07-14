@@ -79,9 +79,9 @@ Credentials, Firebase tokens, service-account JSON, signing keys, and provider s
 
 After the development stack is deployed, the admin package includes a guarded live smoke tool for `karri-mobile-dev` only. It validates the deployed `placeAdministrativeHold` callable with temporary Auth users and smoke-prefixed Firestore data, then cleans up the shipment, hold, audit log, and users in a `finally` path.
 
-Prerequisites are local ADC or `GOOGLE_APPLICATION_CREDENTIALS`, plus the development Firebase Web API key supplied only through `FIREBASE_WEB_API_KEY`.
+Prerequisites are local user Application Default Credentials from `gcloud auth application-default login`, plus the development Firebase Web API key supplied only through `FIREBASE_WEB_API_KEY`. The live smoke uses Identity Toolkit REST anonymous sign-up for temporary client sessions and Google Secure Token REST to refresh the temporary admin user's claim-bearing ID token. Tokens stay in process memory only and are never logged.
 
-The smoke run creates billable Firebase Auth, Firestore, Cloud Functions, and Cloud Logging operations. Normal usage should be small, but it is not guaranteed free; a $10 budget is only an alert, not a hard spending cap. The ADC identity must be able to create/get/delete Firebase Auth users, set custom claims, revoke refresh tokens, create/read/delete the scoped Firestore smoke documents, and invoke the deployed callable.
+The smoke run creates billable Firebase Auth, Firestore, Cloud Functions, and Cloud Logging operations. Normal usage should be small, but it is not guaranteed free; a $10 budget is only an alert, not a hard spending cap. The ADC identity must be able to get/delete Firebase Auth users created by REST sign-up, set custom claims, revoke refresh tokens, create/read/delete the scoped Firestore smoke documents, and invoke the deployed callable. No service-account JSON key, Firebase CLI token, custom-token signing, or IAM `signBlob` permission is required.
 
 ```powershell
 $env:FIREBASE_PROJECT_ID="karri-mobile-dev"

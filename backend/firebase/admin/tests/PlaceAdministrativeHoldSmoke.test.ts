@@ -3,6 +3,8 @@ import {
   assertLiveSmokeEnvironment,
   assertNoSecretLeak,
   deriveOperationId,
+  parseAnonymousSignUpResponse,
+  parseRefreshTokenResponse,
   runPlaceAdministrativeHoldSmoke,
   SmokeTestAndCleanupError,
   type CallableResponse,
@@ -22,6 +24,7 @@ describe("PlaceAdministrativeHoldSmoke", () => {
   let shipments: Map<string, any>;
   let users: Set<string>;
   let deletedUsers: string[];
+  let signUpCount: number;
   let throwOnAuditLookupAfterDelete: boolean;
   let logSpy: any;
   let errorSpy: any;
@@ -32,6 +35,7 @@ describe("PlaceAdministrativeHoldSmoke", () => {
     shipments = new Map();
     users = new Set();
     deletedUsers = [];
+    signUpCount = 0;
     throwOnAuditLookupAfterDelete = false;
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -40,9 +44,6 @@ describe("PlaceAdministrativeHoldSmoke", () => {
       idFactory: () => "unit-run",
       logger: console,
       auth: {
-        createUser: vi.fn(async (uid: string) => {
-          users.add(uid);
-        }),
         getUser: vi.fn(async (uid: string) => {
           return users.has(uid) ? { uid } : null;
         }),
@@ -52,17 +53,32 @@ describe("PlaceAdministrativeHoldSmoke", () => {
           users.delete(uid);
           deletedUsers.push(uid);
         }),
-        createCustomToken: vi.fn(async (uid: string) => `custom-token-for-${uid}`),
       },
       identityToolkit: {
-        exchangeCustomToken: vi.fn(async (customToken: string) => `id-token-for-${customToken}`),
+        signUpAnonymous: vi.fn(async () => {
+          signUpCount += 1;
+          const uid = signUpCount === 1 ? "identity-toolkit-non-admin-uid" : "identity-toolkit-admin-uid";
+          users.add(uid);
+          return {
+            uid,
+            idToken: signUpCount === 1 ? "id-token-for-non-admin" : "id-token-before-claim-refresh",
+            refreshToken: signUpCount === 1 ? "refresh-token-for-non-admin" : "refresh-token-for-admin",
+          };
+        }),
+        refreshIdToken: vi.fn(async (refreshToken: string) => {
+          return {
+            uid: "identity-toolkit-admin-uid",
+            idToken: `refreshed-id-token-for-${refreshToken}`,
+            refreshToken: `rotated-${refreshToken}`,
+          };
+        }),
       },
       callable: {
         callPlaceAdministrativeHold: vi.fn(async (idToken: string, payload): Promise<CallableResponse> => {
-          if (idToken.includes("-user")) {
+          if (idToken === "id-token-for-non-admin") {
             return { ok: false, status: "PERMISSION_DENIED" };
           }
-          const adminUid = "m32p3-smoke-unit-run-operations-admin";
+          const adminUid = "identity-toolkit-admin-uid";
           const holdId = deriveOperationId(adminUid, "hold.place", "shipment", payload.shipmentId, payload.idempotencyKey);
           const alreadyExisted = holds.has(holdId);
           if (!alreadyExisted) {
@@ -148,13 +164,104 @@ describe("PlaceAdministrativeHoldSmoke", () => {
     expect(() => assertNoSecretLeak("unsafe secret-token output", ["secret-token"])).toThrow("Secret value");
   });
 
+  it("parses anonymous Identity Toolkit sign-up success", () => {
+    expect(parseAnonymousSignUpResponse({
+      localId: "anonymous-user",
+      idToken: "memory-only-id-token",
+      refreshToken: "memory-only-refresh-token",
+    })).toEqual({
+      uid: "anonymous-user",
+      idToken: "memory-only-id-token",
+      refreshToken: "memory-only-refresh-token",
+    });
+  });
+
+  it("rejects malformed anonymous sign-up responses", () => {
+    expect(() => parseAnonymousSignUpResponse({ localId: "anonymous-user" })).toThrow("anonymous sign-up failed");
+    expect(() => parseAnonymousSignUpResponse(null)).toThrow("anonymous sign-up failed");
+  });
+
+  it("runs cleanup after anonymous sign-up fails mid-run", async () => {
+    deps.identityToolkit.signUpAnonymous = vi.fn(async () => {
+      signUpCount += 1;
+      if (signUpCount === 2) {
+        throw new Error("Identity Toolkit anonymous sign-up failed: OPERATION_NOT_ALLOWED");
+      }
+      users.add("identity-toolkit-non-admin-uid");
+      return {
+        uid: "identity-toolkit-non-admin-uid",
+        idToken: "id-token-for-non-admin",
+        refreshToken: "refresh-token-for-non-admin",
+      };
+    });
+
+    await expect(runPlaceAdministrativeHoldSmoke(env, deps)).rejects.toThrow("anonymous sign-up failed");
+    expect(deps.auth.deleteUser).toHaveBeenCalledWith("identity-toolkit-non-admin-uid");
+    expect(deps.auth.deleteUser).not.toHaveBeenCalledWith("identity-toolkit-admin-uid");
+    expect(users.size).toBe(0);
+  });
+
+  it("parses Secure Token refresh success", () => {
+    expect(parseRefreshTokenResponse({
+      user_id: "admin-user",
+      id_token: "refreshed-id-token",
+      refresh_token: "rotated-refresh-token",
+    })).toEqual({
+      uid: "admin-user",
+      idToken: "refreshed-id-token",
+      refreshToken: "rotated-refresh-token",
+    });
+  });
+
+  it("rejects malformed Secure Token refresh responses", () => {
+    expect(() => parseRefreshTokenResponse({ user_id: "admin-user" })).toThrow("Secure Token refresh failed");
+    expect(() => parseRefreshTokenResponse(undefined)).toThrow("Secure Token refresh failed");
+  });
+
+  it("runs cleanup after claim refresh fails", async () => {
+    deps.identityToolkit.refreshIdToken = vi.fn(async () => {
+      throw new Error("Secure Token refresh failed: INVALID_REFRESH_TOKEN");
+    });
+
+    await expect(runPlaceAdministrativeHoldSmoke(env, deps)).rejects.toThrow("Secure Token refresh failed");
+    expect(deps.auth.deleteUser).toHaveBeenCalledWith("identity-toolkit-admin-uid");
+    expect(deps.auth.deleteUser).toHaveBeenCalledWith("identity-toolkit-non-admin-uid");
+    expect(users.size).toBe(0);
+  });
+
+  it("does not log API keys or tokens from sign-up or refresh flows", async () => {
+    await runPlaceAdministrativeHoldSmoke(env, deps);
+
+    const output = [
+      ...logSpy.mock.calls.flat(),
+      ...errorSpy.mock.calls.flat(),
+    ].join("\n");
+    assertNoSecretLeak(output, [
+      "unit-test-api-key",
+      "id-token-for-non-admin",
+      "refresh-token-for-non-admin",
+      "id-token-before-claim-refresh",
+      "refresh-token-for-admin",
+      "refreshed-id-token-for-refresh-token-for-admin",
+      "rotated-refresh-token-for-admin",
+    ]);
+  });
+
   it("runs denial, success, verification, idempotency, and cleanup-on-success", async () => {
     const result = await runPlaceAdministrativeHoldSmoke(env, deps);
 
     expect(result.runId).toBe("m32p3-smoke-unit-run");
-    expect(deps.auth.createUser).toHaveBeenCalledWith("m32p3-smoke-unit-run-user");
-    expect(deps.auth.setCustomClaims).toHaveBeenCalledWith("m32p3-smoke-unit-run-operations-admin", { role: "operations_admin" });
+    expect(deps.identityToolkit.signUpAnonymous).toHaveBeenCalledTimes(2);
+    expect(deps.identityToolkit.signUpAnonymous).toHaveBeenCalledWith("unit-test-api-key");
+    expect(deps.auth.setCustomClaims).toHaveBeenCalledWith("identity-toolkit-admin-uid", { role: "operations_admin" });
+    expect(deps.identityToolkit.refreshIdToken).toHaveBeenCalledWith("refresh-token-for-admin", "unit-test-api-key");
     expect(deps.callable.callPlaceAdministrativeHold).toHaveBeenCalledTimes(3);
+    expect(deps.callable.callPlaceAdministrativeHold).toHaveBeenNthCalledWith(1, "id-token-for-non-admin", expect.any(Object));
+    expect(deps.callable.callPlaceAdministrativeHold).toHaveBeenNthCalledWith(
+      2,
+      "refreshed-id-token-for-refresh-token-for-admin",
+      expect.any(Object)
+    );
     expect(deps.firestore.countAdministrativeHoldsByShipment).toHaveBeenCalledWith("m32p3-smoke-unit-run-shipment");
     expect(deps.firestore.countAuditLogsByOperation).toHaveBeenCalledWith(
       "hold.place",
@@ -169,12 +276,13 @@ describe("PlaceAdministrativeHoldSmoke", () => {
     expect(deps.firestore.getAuditLog).toHaveBeenCalledTimes(3);
     expect(deps.firestore.getAdministrativeHold).toHaveBeenCalledTimes(3);
     expect(deps.firestore.getShipment).toHaveBeenCalledWith("m32p3-smoke-unit-run-shipment");
-    expect(deps.auth.getUser).toHaveBeenCalledWith("m32p3-smoke-unit-run-operations-admin");
-    expect(deps.auth.getUser).toHaveBeenCalledWith("m32p3-smoke-unit-run-user");
+    expect(deps.auth.getUser).toHaveBeenCalledWith("identity-toolkit-admin-uid");
+    expect(deps.auth.getUser).toHaveBeenCalledWith("identity-toolkit-non-admin-uid");
     expect(deletedUsers).toEqual([
-      "m32p3-smoke-unit-run-operations-admin",
-      "m32p3-smoke-unit-run-user",
+      "identity-toolkit-admin-uid",
+      "identity-toolkit-non-admin-uid",
     ]);
+    expect("createCustomToken" in deps.auth).toBe(false);
   });
 
   it("runs cleanup-on-failure and exits through the failure path", async () => {
@@ -183,7 +291,7 @@ describe("PlaceAdministrativeHoldSmoke", () => {
     });
 
     await expect(runPlaceAdministrativeHoldSmoke(env, deps)).rejects.toThrow("Expected PERMISSION_DENIED");
-    expect(deps.auth.deleteUser).toHaveBeenCalledWith("m32p3-smoke-unit-run-user");
+    expect(deps.auth.deleteUser).toHaveBeenCalledWith("identity-toolkit-non-admin-uid");
     expect(deps.firestore.deleteShipment).not.toHaveBeenCalled();
   });
 

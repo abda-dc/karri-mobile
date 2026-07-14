@@ -6,12 +6,10 @@ const SMOKE_PREFIX = "m32p3-smoke-";
 export type SmokeLogger = Pick<Console, "log" | "error">;
 
 export interface SmokeAuthClient {
-  createUser(uid: string): Promise<void>;
   getUser(uid: string): Promise<{ uid: string } | null>;
   setCustomClaims(uid: string, claims: Record<string, unknown> | null): Promise<void>;
   revokeRefreshTokens(uid: string): Promise<void>;
   deleteUser(uid: string): Promise<void>;
-  createCustomToken(uid: string): Promise<string>;
 }
 
 export interface SmokeFirestoreClient {
@@ -27,7 +25,8 @@ export interface SmokeFirestoreClient {
 }
 
 export interface IdentityToolkitClient {
-  exchangeCustomToken(customToken: string, apiKey: string): Promise<string>;
+  signUpAnonymous(apiKey: string): Promise<ClientSession>;
+  refreshIdToken(refreshToken: string, apiKey: string): Promise<ClientSession>;
 }
 
 export interface CallableClient {
@@ -72,6 +71,12 @@ export interface SmokeRunResult {
   holdId: string;
   auditId: string;
   cleanup: CleanupStatus[];
+}
+
+export interface ClientSession {
+  uid: string;
+  idToken: string;
+  refreshToken: string;
 }
 
 export interface CleanupStatus {
@@ -123,6 +128,48 @@ export function assertNoSecretLeak(loggedText: string, secrets: ReadonlyArray<st
   }
 }
 
+export function parseAnonymousSignUpResponse(body: unknown): ClientSession {
+  if (!body || typeof body !== "object") {
+    throw new Error("Identity Toolkit anonymous sign-up failed: malformed response.");
+  }
+  const response = body as Record<string, unknown>;
+  if (typeof response.localId !== "string" || response.localId.length === 0) {
+    throw new Error("Identity Toolkit anonymous sign-up failed: malformed response.");
+  }
+  if (typeof response.idToken !== "string" || response.idToken.length === 0) {
+    throw new Error("Identity Toolkit anonymous sign-up failed: malformed response.");
+  }
+  if (typeof response.refreshToken !== "string" || response.refreshToken.length === 0) {
+    throw new Error("Identity Toolkit anonymous sign-up failed: malformed response.");
+  }
+  return {
+    uid: response.localId,
+    idToken: response.idToken,
+    refreshToken: response.refreshToken,
+  };
+}
+
+export function parseRefreshTokenResponse(body: unknown): ClientSession {
+  if (!body || typeof body !== "object") {
+    throw new Error("Secure Token refresh failed: malformed response.");
+  }
+  const response = body as Record<string, unknown>;
+  if (typeof response.user_id !== "string" || response.user_id.length === 0) {
+    throw new Error("Secure Token refresh failed: malformed response.");
+  }
+  if (typeof response.id_token !== "string" || response.id_token.length === 0) {
+    throw new Error("Secure Token refresh failed: malformed response.");
+  }
+  if (typeof response.refresh_token !== "string" || response.refresh_token.length === 0) {
+    throw new Error("Secure Token refresh failed: malformed response.");
+  }
+  return {
+    uid: response.user_id,
+    idToken: response.id_token,
+    refreshToken: response.refresh_token,
+  };
+}
+
 export function createSmokeId(idFactory: () => string = randomUUID): string {
   return `${SMOKE_PREFIX}${idFactory().replace(/[^a-zA-Z0-9-]/g, "-")}`;
 }
@@ -143,8 +190,6 @@ export async function runPlaceAdministrativeHoldSmoke(
   const cleanup: CleanupStatus[] = [];
   const secretsSeen: string[] = [apiKey];
 
-  const userUid = `${runId}-user`;
-  const adminUid = `${runId}-operations-admin`;
   const shipmentId = `${runId}-shipment`;
   const note = `${runId} authorized callable smoke`;
   const idempotencyKey = `${runId}-hold`;
@@ -155,48 +200,47 @@ export async function runPlaceAdministrativeHoldSmoke(
     idempotencyKey,
   };
 
-  [userUid, adminUid, shipmentId].forEach((id) => createdIds.add(id));
+  [shipmentId].forEach((id) => createdIds.add(id));
   let primaryError: unknown;
   let result: SmokeRunResult | undefined;
 
   try {
     logger.log(`Starting development callable smoke run ${runId}.`);
 
-    await dependencies.auth.createUser(userUid);
-    resources.userUid = userUid;
-    const userCustomToken = await dependencies.auth.createCustomToken(userUid);
-    secretsSeen.push(userCustomToken);
-    const userIdToken = await dependencies.identityToolkit.exchangeCustomToken(userCustomToken, apiKey);
-    secretsSeen.push(userIdToken);
+    const userSession = await dependencies.identityToolkit.signUpAnonymous(apiKey);
+    resources.userUid = userSession.uid;
+    secretsSeen.push(userSession.idToken, userSession.refreshToken);
 
-    const denied = await dependencies.callable.callPlaceAdministrativeHold(userIdToken, payload);
+    const denied = await dependencies.callable.callPlaceAdministrativeHold(userSession.idToken, payload);
     if (denied.ok || denied.status !== "PERMISSION_DENIED") {
       throw new Error(`Expected PERMISSION_DENIED for non-admin user, received ${denied.ok ? "success" : denied.status}.`);
     }
     logger.log("Verified non-admin authenticated user is denied.");
 
-    await dependencies.auth.createUser(adminUid);
-    resources.adminUid = adminUid;
-    await dependencies.auth.setCustomClaims(adminUid, { role: "operations_admin" });
-    await dependencies.auth.revokeRefreshTokens(adminUid);
-    const adminCustomToken = await dependencies.auth.createCustomToken(adminUid);
-    secretsSeen.push(adminCustomToken);
-    const adminIdToken = await dependencies.identityToolkit.exchangeCustomToken(adminCustomToken, apiKey);
-    secretsSeen.push(adminIdToken);
+    const adminSession = await dependencies.identityToolkit.signUpAnonymous(apiKey);
+    resources.adminUid = adminSession.uid;
+    secretsSeen.push(adminSession.idToken, adminSession.refreshToken);
+    await dependencies.auth.setCustomClaims(adminSession.uid, { role: "operations_admin" });
+    await dependencies.auth.revokeRefreshTokens(adminSession.uid);
+    const refreshedAdminSession = await dependencies.identityToolkit.refreshIdToken(adminSession.refreshToken, apiKey);
+    if (refreshedAdminSession.uid !== adminSession.uid) {
+      throw new Error("Secure Token refresh returned a different Auth user.");
+    }
+    secretsSeen.push(refreshedAdminSession.idToken, refreshedAdminSession.refreshToken);
 
-    await dependencies.firestore.setShipment(shipmentId, createShipmentFixture(adminUid));
+    await dependencies.firestore.setShipment(shipmentId, createShipmentFixture(adminSession.uid));
     resources.shipmentId = shipmentId;
     resources.note = note;
     resources.idempotencyKey = idempotencyKey;
     logger.log("Seeded one temporary smoke shipment.");
 
-    const first = await dependencies.callable.callPlaceAdministrativeHold(adminIdToken, payload);
+    const first = await dependencies.callable.callPlaceAdministrativeHold(refreshedAdminSession.idToken, payload);
     assertCallableSuccess(first, "first administrative hold call");
     if (!first.result.success || first.result.alreadyExisted !== false) {
       throw new Error("Expected first administrative hold call to create a new hold.");
     }
     const holdId = first.result.holdId;
-    const auditId = deriveOperationId(adminUid, "hold.place", "shipment", shipmentId, idempotencyKey);
+    const auditId = deriveOperationId(adminSession.uid, "hold.place", "shipment", shipmentId, idempotencyKey);
     resources.holdId = holdId;
     resources.auditId = auditId;
     createdIds.add(holdId);
@@ -206,16 +250,16 @@ export async function runPlaceAdministrativeHoldSmoke(
       shipmentId,
       note,
       idempotencyKey,
-      adminUid,
+      adminUid: adminSession.uid,
     });
     await verifyAudit(dependencies.firestore, auditId, {
       shipmentId,
       idempotencyKey,
-      adminUid,
+      adminUid: adminSession.uid,
     });
     logger.log("Verified administrative hold and audit log documents.");
 
-    const second = await dependencies.callable.callPlaceAdministrativeHold(adminIdToken, payload);
+    const second = await dependencies.callable.callPlaceAdministrativeHold(refreshedAdminSession.idToken, payload);
     assertCallableSuccess(second, "idempotent administrative hold retry");
     if (second.result.holdId !== holdId || second.result.alreadyExisted !== true) {
       throw new Error("Expected idempotent retry to return the same holdId with alreadyExisted true.");
@@ -406,8 +450,8 @@ async function cleanupCreatedResources(
     dependencies.firestore.deleteShipment.bind(dependencies.firestore),
     dependencies.firestore.getShipment.bind(dependencies.firestore)
   );
-  await cleanupUser(results, "operations admin user", resources.adminUid, createdIds, dependencies);
-  await cleanupUser(results, "non-admin user", resources.userUid, createdIds, dependencies);
+  await cleanupUser(results, "operations admin user", resources.adminUid, dependencies);
+  await cleanupUser(results, "non-admin user", resources.userUid, dependencies);
 
   return results;
 }
@@ -519,10 +563,9 @@ async function cleanupUser(
   results: CleanupStatus[],
   label: string,
   uid: string | undefined,
-  createdIds: ReadonlySet<string>,
   dependencies: SmokeDependencies
 ): Promise<void> {
-  if (!isCurrentRunSmokeId(uid, createdIds)) {
+  if (!uid) {
     results.push({ resource: label, status: "skipped", message: "not created in current run" });
     return;
   }
@@ -547,5 +590,8 @@ function errorMessage(error: unknown): string {
 
 function sanitizeErrorMessage(error: any): string {
   const message = typeof error?.message === "string" ? error.message : String(error);
-  return message.replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer [REDACTED]");
+  return message
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer [REDACTED]")
+    .replace(/key=([A-Za-z0-9._-]+)/g, "key=[REDACTED]")
+    .replace(/(idToken|refreshToken|refresh_token|id_token|authorization|apiKey|key)["']?\s*[:=]\s*["']?[A-Za-z0-9._-]+/gi, "$1=[REDACTED]");
 }
