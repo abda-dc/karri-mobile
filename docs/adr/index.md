@@ -12,5 +12,6 @@ ADRs capture decisions that shape Karri Platform v2. “Accepted” records desc
 | [0006](adr-0006-why-chain-of-custody.md) | Preserve an append-only custody history | Accepted |
 | [0007](adr-0007-why-feature-flags.md) | Use feature flags for staged exposure | Accepted |
 | [0008](adr-0008-why-remote-configuration.md) | Use Remote Config for non-secret operational values | Accepted |
+| [0009](adr-0009-hybrid-app-check-callable-transport.md) | Use native App Check with the existing Firebase JavaScript data layer | Accepted |
 
 Superseded decisions should remain in the repository with a new status and a link to the replacing ADR.

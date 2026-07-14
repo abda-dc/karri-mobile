@@ -107,6 +107,7 @@ nav:
           - ADR-0006 - Chain of Custody: adr/adr-0006-why-chain-of-custody.md
           - ADR-0007 - Feature Flags: adr/adr-0007-why-feature-flags.md
           - ADR-0008 - Remote Configuration: adr/adr-0008-why-remote-configuration.md
+          - ADR-0009 - Hybrid App Check Transport: adr/adr-0009-hybrid-app-check-callable-transport.md
   - Engineering:
       - Standards: engineering/engineering-standards.md
       - System Architecture: engineering/system-architecture.md
