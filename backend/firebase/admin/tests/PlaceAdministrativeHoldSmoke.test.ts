@@ -25,6 +25,8 @@ describe("PlaceAdministrativeHoldSmoke", () => {
   let users: Set<string>;
   let deletedUsers: string[];
   let signUpCount: number;
+  let refreshTokenOwners: Map<string, string>;
+  let revokedUsers: Set<string>;
   let throwOnAuditLookupAfterDelete: boolean;
   let logSpy: any;
   let errorSpy: any;
@@ -36,6 +38,8 @@ describe("PlaceAdministrativeHoldSmoke", () => {
     users = new Set();
     deletedUsers = [];
     signUpCount = 0;
+    refreshTokenOwners = new Map();
+    revokedUsers = new Set();
     throwOnAuditLookupAfterDelete = false;
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -48,7 +52,9 @@ describe("PlaceAdministrativeHoldSmoke", () => {
           return users.has(uid) ? { uid } : null;
         }),
         setCustomClaims: vi.fn(),
-        revokeRefreshTokens: vi.fn(),
+        revokeRefreshTokens: vi.fn(async (uid: string) => {
+          revokedUsers.add(uid);
+        }),
         deleteUser: vi.fn(async (uid: string) => {
           users.delete(uid);
           deletedUsers.push(uid);
@@ -58,16 +64,22 @@ describe("PlaceAdministrativeHoldSmoke", () => {
         signUpAnonymous: vi.fn(async () => {
           signUpCount += 1;
           const uid = signUpCount === 1 ? "identity-toolkit-non-admin-uid" : "identity-toolkit-admin-uid";
+          const refreshToken = signUpCount === 1 ? "refresh-token-for-non-admin" : "refresh-token-for-admin";
           users.add(uid);
+          refreshTokenOwners.set(refreshToken, uid);
           return {
             uid,
             idToken: signUpCount === 1 ? "id-token-for-non-admin" : "id-token-before-claim-refresh",
-            refreshToken: signUpCount === 1 ? "refresh-token-for-non-admin" : "refresh-token-for-admin",
+            refreshToken,
           };
         }),
         refreshIdToken: vi.fn(async (refreshToken: string) => {
+          const uid = refreshTokenOwners.get(refreshToken) || "identity-toolkit-admin-uid";
+          if (revokedUsers.has(uid)) {
+            throw new Error("Secure Token refresh failed: TOKEN_EXPIRED");
+          }
           return {
-            uid: "identity-toolkit-admin-uid",
+            uid,
             idToken: `refreshed-id-token-for-${refreshToken}`,
             refreshToken: `rotated-${refreshToken}`,
           };
@@ -227,6 +239,16 @@ describe("PlaceAdministrativeHoldSmoke", () => {
     expect(deps.auth.deleteUser).toHaveBeenCalledWith("identity-toolkit-admin-uid");
     expect(deps.auth.deleteUser).toHaveBeenCalledWith("identity-toolkit-non-admin-uid");
     expect(users.size).toBe(0);
+  });
+
+  it("refreshes the temporary admin claim before revoking its refresh token", async () => {
+    await runPlaceAdministrativeHoldSmoke(env, deps);
+
+    expect(deps.identityToolkit.refreshIdToken).toHaveBeenCalledWith("refresh-token-for-admin", "unit-test-api-key");
+    expect(deps.auth.revokeRefreshTokens).toHaveBeenCalledWith("identity-toolkit-admin-uid");
+    expect((deps.identityToolkit.refreshIdToken as any).mock.invocationCallOrder[0]).toBeLessThan(
+      (deps.auth.revokeRefreshTokens as any).mock.invocationCallOrder[0]
+    );
   });
 
   it("does not log API keys or tokens from sign-up or refresh flows", async () => {

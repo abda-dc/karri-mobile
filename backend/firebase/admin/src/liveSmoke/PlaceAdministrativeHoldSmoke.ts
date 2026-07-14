@@ -221,7 +221,6 @@ export async function runPlaceAdministrativeHoldSmoke(
     resources.adminUid = adminSession.uid;
     secretsSeen.push(adminSession.idToken, adminSession.refreshToken);
     await dependencies.auth.setCustomClaims(adminSession.uid, { role: "operations_admin" });
-    await dependencies.auth.revokeRefreshTokens(adminSession.uid);
     const refreshedAdminSession = await dependencies.identityToolkit.refreshIdToken(adminSession.refreshToken, apiKey);
     if (refreshedAdminSession.uid !== adminSession.uid) {
       throw new Error("Secure Token refresh returned a different Auth user.");
