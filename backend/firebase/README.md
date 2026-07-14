@@ -74,3 +74,20 @@ npm run firebase:deploy:development
 For a partial rollback, run the narrow deploy script for the surface being restored, such as `npm run firebase:deploy:development:firestore:rules` or `npm run firebase:deploy:development:functions`.
 
 Credentials, Firebase tokens, service-account JSON, signing keys, and provider secrets stay outside Git. Use local ADC, approved Firebase CLI auth, or future workload identity in automation.
+
+## Authorized callable smoke test
+
+After the development stack is deployed, the admin package includes a guarded live smoke tool for `karri-mobile-dev` only. It validates the deployed `placeAdministrativeHold` callable with temporary Auth users and smoke-prefixed Firestore data, then cleans up the shipment, hold, audit log, and users in a `finally` path.
+
+Prerequisites are local ADC or `GOOGLE_APPLICATION_CREDENTIALS`, plus the development Firebase Web API key supplied only through `FIREBASE_WEB_API_KEY`.
+
+The smoke run creates billable Firebase Auth, Firestore, Cloud Functions, and Cloud Logging operations. Normal usage should be small, but it is not guaranteed free; a $10 budget is only an alert, not a hard spending cap. The ADC identity must be able to create/get/delete Firebase Auth users, set custom claims, revoke refresh tokens, create/read/delete the scoped Firestore smoke documents, and invoke the deployed callable.
+
+```powershell
+$env:FIREBASE_PROJECT_ID="karri-mobile-dev"
+$env:KARRI_ALLOW_LIVE_SMOKE="karri-mobile-dev"
+$env:FIREBASE_WEB_API_KEY="<development Firebase web API key>"
+npm run firebase:smoke:development:callable
+```
+
+The command hard-fails for any project other than `karri-mobile-dev`, never logs tokens or credentials, and must not be run from CI until an approved live-smoke environment and credential policy exists.

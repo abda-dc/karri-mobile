@@ -78,6 +78,41 @@ One-time procedure to provision the first `super_admin` role. Requires an explic
 npm run auth:bootstrap:super-admin -- --uid "<firebase-uid>" --confirm-super-admin-bootstrap
 ```
 
+### 6. Development Callable Smoke Test
+The live callable smoke tool is development-only and targets exactly `karri-mobile-dev`. It creates two temporary Auth users, proves a signed-in non-admin is denied, grants a separate temporary user only `operations_admin`, seeds one smoke-prefixed shipment, calls the deployed `placeAdministrativeHold` callable, verifies the resulting hold and `hold.place` audit log, repeats the same request to prove idempotency, then deletes only resources created during that run.
+
+Run it only after the reviewed Firebase stack is already deployed to `karri-mobile-dev`. The tool uses Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`; it does not use Firebase CLI login tokens. The Firebase Web API key must come from a local environment variable and is never printed.
+
+The live smoke creates Firebase Auth, Firestore, Cloud Functions, and Cloud Logging operations in the development project. The expected usage is small, but it is not guaranteed to be free. Any configured budget, including a $10 budget, is an alerting threshold rather than a hard spending cap.
+
+The ADC identity or service account must be allowed to create, get, and delete Firebase Auth users; set custom claims; revoke refresh tokens; create, read, and delete the scoped Firestore smoke documents; and invoke the deployed callable. Credentials, API keys, custom tokens, ID tokens, refresh tokens, service-account JSON, and authorization headers must never be committed, pasted into logs, or pasted into chat.
+
+PowerShell setup:
+
+```powershell
+$env:FIREBASE_PROJECT_ID="karri-mobile-dev"
+$env:KARRI_ALLOW_LIVE_SMOKE="karri-mobile-dev"
+$env:FIREBASE_WEB_API_KEY="<development Firebase web API key>"
+# Optional, if not using ADC:
+# $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\service-account.json"
+```
+
+Run from the repository root:
+
+```powershell
+npm run firebase:smoke:development:callable
+```
+
+Expected result:
+
+- The non-admin callable attempt reports a verified denial.
+- The `operations_admin` callable attempt succeeds.
+- The administrative hold and audit log are verified.
+- The identical retry returns the same hold ID with `alreadyExisted: true`.
+- Cleanup reports deleted smoke shipment, hold, audit log, and both temporary Auth users.
+
+If any assertion or cleanup step fails, the command exits nonzero. Do not paste API keys, custom tokens, ID tokens, refresh tokens, service-account JSON, or authorization headers into chat or issue trackers.
+
 ---
 
 ## Post-Execution Token Revocation & No-Op Skip Optimization

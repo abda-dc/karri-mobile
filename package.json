@@ -11,6 +11,7 @@
     "firebase:predeploy:firestore": "npm run firebase:validate:firestore",
     "firebase:predeploy:storage": "npm run firebase:validate:storage",
     "firebase:predeploy:functions": "npm run firebase:validate:functions",
+    "firebase:smoke:development:callable": "npm --prefix backend/firebase/admin run smoke:development:callable",
     "firebase:deploy:development:firestore:rules": "npx firebase-tools deploy --project development --config backend/firebase/firebase.json --only firestore:rules",
     "firebase:deploy:development:firestore:indexes": "npx firebase-tools deploy --project development --config backend/firebase/firebase.json --only firestore:indexes",
     "firebase:deploy:development:storage": "npx firebase-tools deploy --project development --config backend/firebase/firebase.json --only storage",
