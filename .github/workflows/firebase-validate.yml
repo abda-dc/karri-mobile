@@ -7,7 +7,7 @@ on:
       - "backend/firebase/**"
       - "package.json"
       - "package-lock.json"
-      - ".firebaserc"
+      - "backend/firebase/.firebaserc"
       - ".github/workflows/firebase-validate.yml"
   push:
     branches:
@@ -16,7 +16,7 @@ on:
       - "backend/firebase/**"
       - "package.json"
       - "package-lock.json"
-      - ".firebaserc"
+      - "backend/firebase/.firebaserc"
       - ".github/workflows/firebase-validate.yml"
 
 permissions:

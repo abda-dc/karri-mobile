@@ -70,7 +70,7 @@ Required per environment:
 - No service-account keys committed.
 - No private credentials in EXPO_PUBLIC values.
 
-The only checked-in Firebase alias is `development`, mapped to `karri-mobile-dev`. Do not add preview or production aliases until those projects exist.
+The only checked-in Firebase alias is `development`, mapped to `karri-mobile-dev` in `backend/firebase/.firebaserc`. Do not add preview or production aliases until those projects exist.
 
 Development Firebase deploy commands:
 

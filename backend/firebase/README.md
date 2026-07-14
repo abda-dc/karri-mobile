@@ -41,7 +41,7 @@ npm run firebase:validate:storage
 npm run firebase:validate:functions
 ```
 
-Development deploy commands are explicit and narrowly scoped. They always pass `--project development` and therefore resolve only to `karri-mobile-dev` through the checked-in `.firebaserc` alias:
+Development deploy commands are explicit and narrowly scoped. They always pass `--project development` and therefore resolve only to `karri-mobile-dev` through the checked-in `backend/firebase/.firebaserc` alias:
 
 ```powershell
 npm run firebase:deploy:development:firestore:rules
