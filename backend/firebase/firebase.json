@@ -6,10 +6,17 @@
   "storage": {
     "rules": "storage.rules"
   },
+  "functions": {
+    "source": "functions"
+  },
   "emulators": {
     "firestore": {
       "host": "127.0.0.1",
       "port": 8080
+    },
+    "functions": {
+      "host": "127.0.0.1",
+      "port": 5001
     }
   }
 }

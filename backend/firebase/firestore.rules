@@ -1156,6 +1156,21 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /auditLogs/{logId} {
+      allow read: if canViewAuditLogs();
+      allow write: if false;
+    }
+
+    match /shipmentSafetyReviews/{reviewId} {
+      allow read: if canViewSafetyDeclarations();
+      allow write: if false;
+    }
+
+    match /administrativeHolds/{holdId} {
+      allow read: if canPlaceAdministrativeHolds();
+      allow write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

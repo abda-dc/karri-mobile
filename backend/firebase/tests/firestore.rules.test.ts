@@ -1350,4 +1350,78 @@ describe("Milestone 31 - Coarse Admin Roles and Multi-Role Access Control Bounda
     const privilegedDb = testEnv.authenticatedContext(maliciousUid, { role: "moderator" }).firestore();
     await assertSucceeds(getDoc(doc(privilegedDb, shipmentPath)));
   });
+
+  describe("Milestone 31 Patch 5 - Server-Authoritative Administrative Actions Collections Rules", () => {
+    const adminUid = "adminUid";
+
+    it("proves client writes to auditLogs, shipmentSafetyReviews, and administrativeHolds are denied for all roles", async () => {
+      const superAdminDb = roleDb(adminUid, "super_admin");
+
+      // Deny create
+      await assertFails(setDoc(doc(superAdminDb, "auditLogs/log-1"), { action: "hold.place" }));
+      await assertFails(setDoc(doc(superAdminDb, "shipmentSafetyReviews/rev-1"), { decision: "approved" }));
+      await assertFails(setDoc(doc(superAdminDb, "administrativeHolds/hold-1"), { status: "active" }));
+
+      // Deny update
+      await seedDoc("auditLogs/log-1", { action: "hold.place" });
+      await seedDoc("shipmentSafetyReviews/rev-1", { decision: "approved" });
+      await seedDoc("administrativeHolds/hold-1", { status: "active" });
+
+      await assertFails(updateDoc(doc(superAdminDb, "auditLogs/log-1"), { action: "hold.release" }));
+      await assertFails(updateDoc(doc(superAdminDb, "shipmentSafetyReviews/rev-1"), { decision: "rejected" }));
+      await assertFails(updateDoc(doc(superAdminDb, "administrativeHolds/hold-1"), { status: "released" }));
+
+      // Deny delete
+      await assertFails(deleteDoc(doc(superAdminDb, "auditLogs/log-1")));
+      await assertFails(deleteDoc(doc(superAdminDb, "shipmentSafetyReviews/rev-1")));
+      await assertFails(deleteDoc(doc(superAdminDb, "administrativeHolds/hold-1")));
+    });
+
+    it("proves only super_admin can read auditLogs", async () => {
+      const path = "auditLogs/log-1";
+      await seedDoc(path, { action: "hold.place" });
+
+      // Allowed
+      await assertSucceeds(getDoc(doc(roleDb(adminUid, "super_admin"), path)));
+
+      // Denied
+      await assertFails(getDoc(doc(roleDb(adminUid, "operations_admin"), path)));
+      await assertFails(getDoc(doc(roleDb(adminUid, "safety_admin"), path)));
+      await assertFails(getDoc(doc(roleDb(adminUid, "moderator"), path)));
+      await assertFails(getDoc(doc(roleDb(adminUid, "support"), path)));
+      await assertFails(getDoc(doc(userDb(otherUid), path)));
+    });
+
+    it("proves moderator, safety_admin, and super_admin can read shipmentSafetyReviews", async () => {
+      const path = "shipmentSafetyReviews/rev-1";
+      await seedDoc(path, { decision: "approved" });
+
+      // Allowed
+      await assertSucceeds(getDoc(doc(roleDb(adminUid, "moderator"), path)));
+      await assertSucceeds(getDoc(doc(roleDb(adminUid, "safety_admin"), path)));
+      await assertSucceeds(getDoc(doc(roleDb(adminUid, "super_admin"), path)));
+
+      // Denied
+      await assertFails(getDoc(doc(roleDb(adminUid, "operations_admin"), path)));
+      await assertFails(getDoc(doc(roleDb(adminUid, "support"), path)));
+      await assertFails(getDoc(doc(userDb(otherUid), path)));
+    });
+
+    it("proves only operations_admin, safety_admin, and super_admin can read administrativeHolds", async () => {
+      const path = "administrativeHolds/hold-1";
+      await seedDoc(path, { status: "active" });
+
+      // Allowed
+      await assertSucceeds(getDoc(doc(roleDb(adminUid, "operations_admin"), path)));
+      await assertSucceeds(getDoc(doc(roleDb(adminUid, "safety_admin"), path)));
+      await assertSucceeds(getDoc(doc(roleDb(adminUid, "super_admin"), path)));
+
+      // Denied (participants or normal users are also blocked)
+      await assertFails(getDoc(doc(roleDb(adminUid, "moderator"), path)));
+      await assertFails(getDoc(doc(roleDb(adminUid, "support"), path)));
+      await assertFails(getDoc(doc(userDb(otherUid), path)));
+      await assertFails(getDoc(doc(userDb(senderUid), path)));
+      await assertFails(getDoc(doc(userDb(travelerUid), path)));
+    });
+  });
 });
