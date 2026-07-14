@@ -10,6 +10,7 @@
     "auth:role:remove": "tsx src/cli.ts remove",
     "auth:tokens:revoke": "tsx src/cli.ts revoke",
     "auth:bootstrap:super-admin": "tsx src/cli.ts bootstrap",
+    "smoke:development:operational-readiness": "tsx src/liveSmoke/runPlaceAdministrativeHoldSmoke.ts",
     "smoke:development:callable": "tsx src/liveSmoke/runPlaceAdministrativeHoldSmoke.ts",
     "test": "vitest run"
   },

@@ -16,11 +16,14 @@ export interface SmokeFirestoreClient {
   setShipment(shipmentId: string, data: Record<string, unknown>): Promise<void>;
   getShipment(shipmentId: string): Promise<Record<string, unknown> | null>;
   getAdministrativeHold(holdId: string): Promise<Record<string, unknown> | null>;
+  getShipmentSafetyReview(reviewId: string): Promise<Record<string, unknown> | null>;
   getAuditLog(auditId: string): Promise<Record<string, unknown> | null>;
   countAdministrativeHoldsByShipment(shipmentId: string): Promise<number>;
+  countShipmentSafetyReviewsByShipment(shipmentId: string): Promise<number>;
   countAuditLogsByOperation(action: string, targetType: string, targetId: string, idempotencyKey: string): Promise<number>;
   deleteShipment(shipmentId: string): Promise<void>;
   deleteAdministrativeHold(holdId: string): Promise<void>;
+  deleteShipmentSafetyReview(reviewId: string): Promise<void>;
   deleteAuditLog(auditId: string): Promise<void>;
 }
 
@@ -31,6 +34,8 @@ export interface IdentityToolkitClient {
 
 export interface CallableClient {
   callPlaceAdministrativeHold(idToken: string, payload: PlaceHoldPayload): Promise<CallableResponse>;
+  callReleaseAdministrativeHold(idToken: string, payload: ReleaseHoldPayload): Promise<CallableResponse>;
+  callSubmitSafetyReview(idToken: string, payload: SubmitSafetyReviewPayload): Promise<CallableResponse>;
 }
 
 export interface SmokeDependencies {
@@ -55,9 +60,27 @@ export interface PlaceHoldPayload {
   idempotencyKey: string;
 }
 
+export interface ReleaseHoldPayload {
+  holdId: string;
+  reasonCode: "review_completed";
+  note: string;
+  idempotencyKey: string;
+}
+
+export interface SubmitSafetyReviewPayload {
+  shipmentId: string;
+  decision: "approved";
+  reasonCode: "verified_safe";
+  note: string;
+  declarationVersionReviewed: "v1";
+  packageContentVersionReviewed: 1;
+  idempotencyKey: string;
+}
+
 export interface CallableSuccess {
   success: boolean;
-  holdId: string;
+  holdId?: string;
+  reviewId?: string;
   alreadyExisted: boolean;
 }
 
@@ -67,9 +90,12 @@ export type CallableResponse =
 
 export interface SmokeRunResult {
   runId: string;
-  shipmentId: string;
-  holdId: string;
-  auditId: string;
+  releaseShipmentId: string;
+  releaseHoldId: string;
+  releaseAuditId: string;
+  safetyShipmentId: string;
+  safetyReviewId: string;
+  safetyReviewAuditId: string;
   cleanup: CleanupStatus[];
 }
 
@@ -87,12 +113,35 @@ export interface CleanupStatus {
 
 interface CreatedResources {
   userUid?: string;
-  adminUid?: string;
-  shipmentId?: string;
-  note?: string;
-  idempotencyKey?: string;
-  holdId?: string;
-  auditId?: string;
+  operationsAdminUid?: string;
+  safetyAdminUid?: string;
+  releaseShipmentId?: string;
+  releaseShipmentNote?: string;
+  placeIdempotencyKey?: string;
+  releaseIdempotencyKey?: string;
+  releaseHoldId?: string;
+  placeAuditId?: string;
+  releaseAuditId?: string;
+  safetyShipmentId?: string;
+  safetyShipmentNote?: string;
+  safetyReviewId?: string;
+  safetyReviewAuditId?: string;
+  safetyReviewIdempotencyKey?: string;
+}
+
+interface PrivilegedSession {
+  uid: string;
+  idToken: string;
+  refreshToken: string;
+}
+
+interface AuditCleanupSpec {
+  id: string | undefined;
+  label: string;
+  action: string;
+  targetType: string;
+  targetId: string | undefined;
+  idempotencyKey: string | undefined;
 }
 
 export class SmokeTestAndCleanupError extends Error {
@@ -175,7 +224,7 @@ export function createSmokeId(idFactory: () => string = randomUUID): string {
 }
 
 export function isCurrentRunSmokeId(value: string | undefined, createdIds: ReadonlySet<string>): value is string {
-  return typeof value === "string" && value.startsWith(SMOKE_PREFIX) && createdIds.has(value);
+  return typeof value === "string" && createdIds.has(value);
 }
 
 export async function runPlaceAdministrativeHoldSmoke(
@@ -190,93 +239,232 @@ export async function runPlaceAdministrativeHoldSmoke(
   const cleanup: CleanupStatus[] = [];
   const secretsSeen: string[] = [apiKey];
 
-  const shipmentId = `${runId}-shipment`;
-  const note = `${runId} authorized callable smoke`;
-  const idempotencyKey = `${runId}-hold`;
-  const payload: PlaceHoldPayload = {
-    shipmentId,
+  const releaseShipmentId = `${runId}-release-shipment`;
+  const safetyShipmentId = `${runId}-safety-shipment`;
+  const releaseShipmentNote = `${runId} release callable smoke`;
+  const safetyShipmentNote = `${runId} safety callable smoke`;
+  const placeIdempotencyKey = `${runId}-place-hold`;
+  const releaseIdempotencyKey = `${runId}-release-hold`;
+  const safetyReviewIdempotencyKey = `${runId}-safety-review`;
+  const placePayload: PlaceHoldPayload = {
+    shipmentId: releaseShipmentId,
     reasonCode: "suspected_policy_violation",
-    note,
-    idempotencyKey,
+    note: releaseShipmentNote,
+    idempotencyKey: placeIdempotencyKey,
+  };
+  const safetyPayload: SubmitSafetyReviewPayload = {
+    shipmentId: safetyShipmentId,
+    decision: "approved",
+    reasonCode: "verified_safe",
+    note: safetyShipmentNote,
+    declarationVersionReviewed: "v1",
+    packageContentVersionReviewed: 1,
+    idempotencyKey: safetyReviewIdempotencyKey,
   };
 
-  [shipmentId].forEach((id) => createdIds.add(id));
+  [releaseShipmentId, safetyShipmentId].forEach((id) => createdIds.add(id));
   let primaryError: unknown;
   let result: SmokeRunResult | undefined;
 
   try {
-    logger.log(`Starting development callable smoke run ${runId}.`);
+    logger.log(`Starting development callable operational smoke run ${runId}.`);
 
     const userSession = await dependencies.identityToolkit.signUpAnonymous(apiKey);
     resources.userUid = userSession.uid;
     secretsSeen.push(userSession.idToken, userSession.refreshToken);
 
-    const denied = await dependencies.callable.callPlaceAdministrativeHold(userSession.idToken, payload);
-    if (denied.ok || denied.status !== "PERMISSION_DENIED") {
-      throw new Error(`Expected PERMISSION_DENIED for non-admin user, received ${denied.ok ? "success" : denied.status}.`);
-    }
-    logger.log("Verified non-admin authenticated user is denied.");
+    const operationsSession = await createPrivilegedSession(
+      "operations_admin",
+      apiKey,
+      dependencies,
+      secretsSeen,
+      (uid) => {
+        resources.operationsAdminUid = uid;
+      }
+    );
 
-    const adminSession = await dependencies.identityToolkit.signUpAnonymous(apiKey);
-    resources.adminUid = adminSession.uid;
-    secretsSeen.push(adminSession.idToken, adminSession.refreshToken);
-    await dependencies.auth.setCustomClaims(adminSession.uid, { role: "operations_admin" });
-    const refreshedAdminSession = await dependencies.identityToolkit.refreshIdToken(adminSession.refreshToken, apiKey);
-    if (refreshedAdminSession.uid !== adminSession.uid) {
-      throw new Error("Secure Token refresh returned a different Auth user.");
-    }
-    secretsSeen.push(refreshedAdminSession.idToken, refreshedAdminSession.refreshToken);
+    const safetySession = await createPrivilegedSession(
+      "safety_admin",
+      apiKey,
+      dependencies,
+      secretsSeen,
+      (uid) => {
+        resources.safetyAdminUid = uid;
+      }
+    );
 
-    await dependencies.firestore.setShipment(shipmentId, createShipmentFixture(adminSession.uid));
-    resources.shipmentId = shipmentId;
-    resources.note = note;
-    resources.idempotencyKey = idempotencyKey;
-    logger.log("Seeded one temporary smoke shipment.");
+    await dependencies.firestore.setShipment(releaseShipmentId, createShipmentFixture(operationsSession.uid));
+    resources.releaseShipmentId = releaseShipmentId;
+    resources.releaseShipmentNote = releaseShipmentNote;
+    resources.placeIdempotencyKey = placeIdempotencyKey;
+    resources.releaseIdempotencyKey = releaseIdempotencyKey;
+    logger.log("Seeded release smoke shipment.");
 
-    const first = await dependencies.callable.callPlaceAdministrativeHold(refreshedAdminSession.idToken, payload);
-    assertCallableSuccess(first, "first administrative hold call");
-    if (!first.result.success || first.result.alreadyExisted !== false) {
-      throw new Error("Expected first administrative hold call to create a new hold.");
+    const placeFirst = await dependencies.callable.callPlaceAdministrativeHold(operationsSession.idToken, placePayload);
+    assertCallableSuccess(placeFirst, "release prerequisite administrative hold call");
+    if (!placeFirst.result.success || placeFirst.result.alreadyExisted !== false || !placeFirst.result.holdId) {
+      throw new Error("Expected release prerequisite hold call to create a new hold.");
     }
-    const holdId = first.result.holdId;
-    const auditId = deriveOperationId(adminSession.uid, "hold.place", "shipment", shipmentId, idempotencyKey);
-    resources.holdId = holdId;
-    resources.auditId = auditId;
+    const holdId = placeFirst.result.holdId;
+    const placeAuditId = deriveOperationId(operationsSession.uid, "hold.place", "shipment", releaseShipmentId, placeIdempotencyKey);
+    resources.releaseHoldId = holdId;
+    resources.placeAuditId = placeAuditId;
     createdIds.add(holdId);
-    createdIds.add(auditId);
+    createdIds.add(placeAuditId);
 
-    await verifyHold(dependencies.firestore, holdId, {
-      shipmentId,
-      note,
-      idempotencyKey,
-      adminUid: adminSession.uid,
+    await verifyPlacedHold(dependencies.firestore, holdId, {
+      shipmentId: releaseShipmentId,
+      note: releaseShipmentNote,
+      idempotencyKey: placeIdempotencyKey,
+      adminUid: operationsSession.uid,
     });
-    await verifyAudit(dependencies.firestore, auditId, {
-      shipmentId,
-      idempotencyKey,
-      adminUid: adminSession.uid,
+    await verifyAudit(dependencies.firestore, placeAuditId, {
+      action: "hold.place",
+      actorUid: operationsSession.uid,
+      actorRole: "operations_admin",
+      targetType: "shipment",
+      targetId: releaseShipmentId,
+      reasonCode: "suspected_policy_violation",
+      idempotencyKey: placeIdempotencyKey,
     });
-    logger.log("Verified administrative hold and audit log documents.");
 
-    const second = await dependencies.callable.callPlaceAdministrativeHold(refreshedAdminSession.idToken, payload);
-    assertCallableSuccess(second, "idempotent administrative hold retry");
-    if (second.result.holdId !== holdId || second.result.alreadyExisted !== true) {
-      throw new Error("Expected idempotent retry to return the same holdId with alreadyExisted true.");
+    const releasePayload: ReleaseHoldPayload = {
+      holdId,
+      reasonCode: "review_completed",
+      note: `${runId} release approved`,
+      idempotencyKey: releaseIdempotencyKey,
+    };
+
+    const deniedRelease = await dependencies.callable.callReleaseAdministrativeHold(userSession.idToken, releasePayload);
+    assertPermissionDenied(deniedRelease, "releaseAdministrativeHold non-admin request");
+    logger.log("Verified non-admin authenticated user is denied for releaseAdministrativeHold.");
+
+    const releaseFirst = await dependencies.callable.callReleaseAdministrativeHold(operationsSession.idToken, releasePayload);
+    assertCallableSuccess(releaseFirst, "first administrative hold release call");
+    if (!releaseFirst.result.success || releaseFirst.result.alreadyExisted !== false || releaseFirst.result.holdId !== holdId) {
+      throw new Error("Expected first administrative hold release call to release the existing hold.");
     }
+    const releaseAuditId = deriveOperationId(operationsSession.uid, "hold.release", "hold", holdId, releaseIdempotencyKey);
+    resources.releaseAuditId = releaseAuditId;
+    createdIds.add(releaseAuditId);
 
-    const holdCount = await dependencies.firestore.countAdministrativeHoldsByShipment(shipmentId);
-    const auditCount = await dependencies.firestore.countAuditLogsByOperation(
+    await verifyReleasedHold(dependencies.firestore, holdId, {
+      shipmentId: releaseShipmentId,
+      note: releaseShipmentNote,
+      idempotencyKey: placeIdempotencyKey,
+      adminUid: operationsSession.uid,
+    });
+    await verifyAudit(dependencies.firestore, releaseAuditId, {
+      action: "hold.release",
+      actorUid: operationsSession.uid,
+      actorRole: "operations_admin",
+      targetType: "hold",
+      targetId: holdId,
+      reasonCode: "review_completed",
+      idempotencyKey: releaseIdempotencyKey,
+    });
+    logger.log("Verified releaseAdministrativeHold state transition and audit log.");
+
+    const releaseSecond = await dependencies.callable.callReleaseAdministrativeHold(operationsSession.idToken, releasePayload);
+    assertCallableSuccess(releaseSecond, "idempotent administrative hold release retry");
+    if (releaseSecond.result.holdId !== holdId || releaseSecond.result.alreadyExisted !== true) {
+      throw new Error("Expected idempotent release retry to return the same holdId with alreadyExisted true.");
+    }
+    const releaseAuditCount = await dependencies.firestore.countAuditLogsByOperation(
+      "hold.release",
+      "hold",
+      holdId,
+      releaseIdempotencyKey
+    );
+    if (releaseAuditCount !== 1) {
+      throw new Error(`Expected exactly one hold.release audit log, found ${releaseAuditCount}.`);
+    }
+    logger.log("Verified releaseAdministrativeHold retry did not create duplicate audit logs.");
+
+    await dependencies.firestore.setShipment(safetyShipmentId, createShipmentFixture(safetySession.uid));
+    resources.safetyShipmentId = safetyShipmentId;
+    resources.safetyShipmentNote = safetyShipmentNote;
+    resources.safetyReviewIdempotencyKey = safetyReviewIdempotencyKey;
+    logger.log("Seeded safety-review smoke shipment.");
+
+    const deniedSafety = await dependencies.callable.callSubmitSafetyReview(userSession.idToken, safetyPayload);
+    assertPermissionDenied(deniedSafety, "submitSafetyReview non-admin request");
+    logger.log("Verified non-admin authenticated user is denied for submitSafetyReview.");
+
+    const safetyFirst = await dependencies.callable.callSubmitSafetyReview(safetySession.idToken, safetyPayload);
+    assertCallableSuccess(safetyFirst, "first safety review call");
+    if (!safetyFirst.result.success || safetyFirst.result.alreadyExisted !== false || !safetyFirst.result.reviewId) {
+      throw new Error("Expected first safety review call to create a new review.");
+    }
+    const reviewId = safetyFirst.result.reviewId;
+    const safetyReviewAuditId = deriveOperationId(
+      safetySession.uid,
+      "safety_review.submit",
+      "shipment",
+      safetyShipmentId,
+      safetyReviewIdempotencyKey
+    );
+    resources.safetyReviewId = reviewId;
+    resources.safetyReviewAuditId = safetyReviewAuditId;
+    createdIds.add(reviewId);
+    createdIds.add(safetyReviewAuditId);
+
+    await verifySafetyReview(dependencies.firestore, reviewId, {
+      shipmentId: safetyShipmentId,
+      note: safetyShipmentNote,
+      idempotencyKey: safetyReviewIdempotencyKey,
+      adminUid: safetySession.uid,
+    });
+    await verifyAudit(dependencies.firestore, safetyReviewAuditId, {
+      action: "safety_review.submit",
+      actorUid: safetySession.uid,
+      actorRole: "safety_admin",
+      targetType: "shipment",
+      targetId: safetyShipmentId,
+      reasonCode: "verified_safe",
+      idempotencyKey: safetyReviewIdempotencyKey,
+    });
+    await verifyShipmentSafetyDeclarationUnchanged(dependencies.firestore, safetyShipmentId, safetySession.uid);
+    logger.log("Verified submitSafetyReview document, audit log, and immutable shipment declaration.");
+
+    const safetySecond = await dependencies.callable.callSubmitSafetyReview(safetySession.idToken, safetyPayload);
+    assertCallableSuccess(safetySecond, "idempotent safety review retry");
+    if (safetySecond.result.reviewId !== reviewId || safetySecond.result.alreadyExisted !== true) {
+      throw new Error("Expected idempotent safety review retry to return the same reviewId with alreadyExisted true.");
+    }
+    const reviewCount = await dependencies.firestore.countShipmentSafetyReviewsByShipment(safetyShipmentId);
+    const safetyAuditCount = await dependencies.firestore.countAuditLogsByOperation(
+      "safety_review.submit",
+      "shipment",
+      safetyShipmentId,
+      safetyReviewIdempotencyKey
+    );
+    if (reviewCount !== 1 || safetyAuditCount !== 1) {
+      throw new Error(`Expected exactly one safety review and one audit log, found ${reviewCount} reviews and ${safetyAuditCount} audit logs.`);
+    }
+    logger.log("Verified submitSafetyReview retry did not create duplicate documents.");
+
+    const holdCount = await dependencies.firestore.countAdministrativeHoldsByShipment(releaseShipmentId);
+    const placeAuditCount = await dependencies.firestore.countAuditLogsByOperation(
       "hold.place",
       "shipment",
-      shipmentId,
-      idempotencyKey
+      releaseShipmentId,
+      placeIdempotencyKey
     );
-    if (holdCount !== 1 || auditCount !== 1) {
-      throw new Error(`Expected exactly one hold and one audit log, found ${holdCount} holds and ${auditCount} audit logs.`);
+    if (holdCount !== 1 || placeAuditCount !== 1) {
+      throw new Error(`Expected exactly one hold and one hold.place audit log, found ${holdCount} holds and ${placeAuditCount} audit logs.`);
     }
-    logger.log("Verified idempotent retry did not create duplicate documents.");
 
-    result = { runId, shipmentId, holdId, auditId, cleanup };
+    result = {
+      runId,
+      releaseShipmentId,
+      releaseHoldId: holdId,
+      releaseAuditId,
+      safetyShipmentId,
+      safetyReviewId: reviewId,
+      safetyReviewAuditId,
+      cleanup,
+    };
   } catch (error) {
     primaryError = error;
   }
@@ -305,6 +493,29 @@ export async function runPlaceAdministrativeHoldSmoke(
     throw new Error("Live smoke completed without a result.");
   }
   return result;
+}
+
+async function createPrivilegedSession(
+  role: "operations_admin" | "safety_admin",
+  apiKey: string,
+  dependencies: SmokeDependencies,
+  secretsSeen: string[],
+  onUserCreated: (uid: string) => void
+): Promise<PrivilegedSession> {
+  const session = await dependencies.identityToolkit.signUpAnonymous(apiKey);
+  onUserCreated(session.uid);
+  secretsSeen.push(session.idToken, session.refreshToken);
+  await dependencies.auth.setCustomClaims(session.uid, { role });
+  const refreshed = await dependencies.identityToolkit.refreshIdToken(session.refreshToken, apiKey);
+  if (refreshed.uid !== session.uid) {
+    throw new Error("Secure Token refresh returned a different Auth user.");
+  }
+  secretsSeen.push(refreshed.idToken, refreshed.refreshToken);
+  return {
+    uid: session.uid,
+    idToken: refreshed.idToken,
+    refreshToken: refreshed.refreshToken,
+  };
 }
 
 export function createShipmentFixture(ownerId: string): Record<string, unknown> {
@@ -381,7 +592,13 @@ function assertCallableSuccess(response: CallableResponse, label: string): asser
   }
 }
 
-async function verifyHold(
+function assertPermissionDenied(response: CallableResponse, label: string): void {
+  if (response.ok || response.status !== "PERMISSION_DENIED") {
+    throw new Error(`Expected PERMISSION_DENIED for ${label}, received ${response.ok ? "success" : response.status}.`);
+  }
+}
+
+async function verifyPlacedHold(
   firestore: SmokeFirestoreClient,
   holdId: string,
   expected: { shipmentId: string; note: string; idempotencyKey: string; adminUid: string }
@@ -403,25 +620,91 @@ async function verifyHold(
   assertObjectContains(hold, expectedFields, "administrative hold");
 }
 
+async function verifyReleasedHold(
+  firestore: SmokeFirestoreClient,
+  holdId: string,
+  expected: { shipmentId: string; note: string; idempotencyKey: string; adminUid: string }
+): Promise<void> {
+  const hold = await firestore.getAdministrativeHold(holdId);
+  if (!hold) {
+    throw new Error("Expected released administrative hold document to exist.");
+  }
+  const expectedFields: Record<string, unknown> = {
+    shipmentId: expected.shipmentId,
+    status: "released",
+    reasonCode: "suspected_policy_violation",
+    note: expected.note,
+    placedByUid: expected.adminUid,
+    placedByRole: "operations_admin",
+    releasedByUid: expected.adminUid,
+    releasedByRole: "operations_admin",
+    idempotencyKey: expected.idempotencyKey,
+  };
+  assertObjectContains(hold, expectedFields, "released administrative hold");
+}
+
+async function verifySafetyReview(
+  firestore: SmokeFirestoreClient,
+  reviewId: string,
+  expected: { shipmentId: string; note: string; idempotencyKey: string; adminUid: string }
+): Promise<void> {
+  const review = await firestore.getShipmentSafetyReview(reviewId);
+  if (!review) {
+    throw new Error("Expected shipment safety review document to exist.");
+  }
+  const expectedFields: Record<string, unknown> = {
+    shipmentId: expected.shipmentId,
+    actorUid: expected.adminUid,
+    reviewerRole: "safety_admin",
+    decision: "approved",
+    reasonCode: "verified_safe",
+    note: expected.note,
+    declarationVersionReviewed: "v1",
+    packageContentVersionReviewed: 1,
+    idempotencyKey: expected.idempotencyKey,
+  };
+  assertObjectContains(review, expectedFields, "shipment safety review");
+}
+
+async function verifyShipmentSafetyDeclarationUnchanged(
+  firestore: SmokeFirestoreClient,
+  shipmentId: string,
+  ownerId: string
+): Promise<void> {
+  const shipment = await firestore.getShipment(shipmentId);
+  if (!shipment) {
+    throw new Error("Expected smoke shipment to exist.");
+  }
+  const declaration = shipment.safetyDeclaration as Record<string, unknown> | undefined;
+  if (!declaration) {
+    throw new Error("Expected smoke shipment safety declaration to exist.");
+  }
+  assertObjectContains(declaration, {
+    policyVersion: "2026-07-v1",
+    declarationVersion: "v1",
+    acceptedByUserId: ownerId,
+    packageContentVersion: 1,
+  }, "shipment safety declaration");
+}
+
 async function verifyAudit(
   firestore: SmokeFirestoreClient,
   auditId: string,
-  expected: { shipmentId: string; idempotencyKey: string; adminUid: string }
+  expected: {
+    action: string;
+    actorUid: string;
+    actorRole: string;
+    targetType: string;
+    targetId: string;
+    reasonCode: string;
+    idempotencyKey: string;
+  }
 ): Promise<void> {
   const audit = await firestore.getAuditLog(auditId);
   if (!audit) {
-    throw new Error("Expected hold.place audit log document to exist.");
+    throw new Error(`Expected ${expected.action} audit log document to exist.`);
   }
-  const expectedFields: Record<string, unknown> = {
-    action: "hold.place",
-    actorUid: expected.adminUid,
-    actorRole: "operations_admin",
-    targetType: "shipment",
-    targetId: expected.shipmentId,
-    reasonCode: "suspected_policy_violation",
-    idempotencyKey: expected.idempotencyKey,
-  };
-  assertObjectContains(audit, expectedFields, "audit log");
+  assertObjectContains(audit, expected, `${expected.action} audit log`);
 }
 
 function assertObjectContains(actual: Record<string, unknown>, expected: Record<string, unknown>, label: string): void {
@@ -439,17 +722,50 @@ async function cleanupCreatedResources(
 ): Promise<CleanupStatus[]> {
   const results: CleanupStatus[] = [];
 
-  await cleanupAuditLog(results, resources, dependencies);
-  await cleanupAdministrativeHold(results, resources, dependencies);
+  await cleanupAuditLog(results, dependencies, createdIds, {
+    id: resources.safetyReviewAuditId,
+    label: "safety review audit log",
+    action: "safety_review.submit",
+    targetType: "shipment",
+    targetId: resources.safetyShipmentId,
+    idempotencyKey: resources.safetyReviewIdempotencyKey,
+  });
+  await cleanupShipmentSafetyReview(results, resources, createdIds, dependencies);
+  await cleanupAuditLog(results, dependencies, createdIds, {
+    id: resources.releaseAuditId,
+    label: "release audit log",
+    action: "hold.release",
+    targetType: "hold",
+    targetId: resources.releaseHoldId,
+    idempotencyKey: resources.releaseIdempotencyKey,
+  });
+  await cleanupAuditLog(results, dependencies, createdIds, {
+    id: resources.placeAuditId,
+    label: "placement audit log",
+    action: "hold.place",
+    targetType: "shipment",
+    targetId: resources.releaseShipmentId,
+    idempotencyKey: resources.placeIdempotencyKey,
+  });
+  await cleanupAdministrativeHold(results, resources, createdIds, dependencies);
   await cleanupDoc(
     results,
-    "shipment",
-    resources.shipmentId,
+    "safety shipment",
+    resources.safetyShipmentId,
     createdIds,
     dependencies.firestore.deleteShipment.bind(dependencies.firestore),
     dependencies.firestore.getShipment.bind(dependencies.firestore)
   );
-  await cleanupUser(results, "operations admin user", resources.adminUid, dependencies);
+  await cleanupDoc(
+    results,
+    "release shipment",
+    resources.releaseShipmentId,
+    createdIds,
+    dependencies.firestore.deleteShipment.bind(dependencies.firestore),
+    dependencies.firestore.getShipment.bind(dependencies.firestore)
+  );
+  await cleanupUser(results, "safety admin user", resources.safetyAdminUid, dependencies);
+  await cleanupUser(results, "operations admin user", resources.operationsAdminUid, dependencies);
   await cleanupUser(results, "non-admin user", resources.userUid, dependencies);
 
   return results;
@@ -457,50 +773,90 @@ async function cleanupCreatedResources(
 
 async function cleanupAuditLog(
   results: CleanupStatus[],
-  resources: CreatedResources,
-  dependencies: SmokeDependencies
+  dependencies: SmokeDependencies,
+  createdIds: ReadonlySet<string>,
+  spec: AuditCleanupSpec
 ): Promise<void> {
-  const id = resources.auditId;
-  if (!id || !resources.shipmentId || !resources.idempotencyKey) {
-    results.push({ resource: "audit log", status: "skipped", message: "not created in current run" });
+  const id = spec.id;
+  if (!isCurrentRunSmokeId(id, createdIds) || !spec.targetId || !spec.idempotencyKey) {
+    results.push({ resource: spec.label, status: "skipped", message: "not created in current run" });
     return;
   }
   try {
     const audit = await dependencies.firestore.getAuditLog(id);
     if (!audit) {
-      results.push({ resource: `audit log ${id}`, status: "skipped", message: "already absent" });
+      results.push({ resource: `${spec.label} ${id}`, status: "skipped", message: "already absent" });
       return;
     }
     if (
-      audit.action !== "hold.place" ||
-      audit.targetType !== "shipment" ||
-      audit.targetId !== resources.shipmentId ||
-      audit.idempotencyKey !== resources.idempotencyKey ||
-      !resources.shipmentId.startsWith(SMOKE_PREFIX) ||
-      !resources.idempotencyKey.startsWith(SMOKE_PREFIX)
+      audit.action !== spec.action ||
+      audit.targetType !== spec.targetType ||
+      audit.targetId !== spec.targetId ||
+      audit.idempotencyKey !== spec.idempotencyKey ||
+      (!spec.targetId.startsWith(SMOKE_PREFIX) && !createdIds.has(spec.targetId)) ||
+      !spec.idempotencyKey.startsWith(SMOKE_PREFIX)
     ) {
-      results.push({ resource: `audit log ${id}`, status: "failed", message: "document did not match current smoke run" });
+      results.push({ resource: `${spec.label} ${id}`, status: "failed", message: "document did not match current smoke run" });
       return;
     }
     await dependencies.firestore.deleteAuditLog(id);
     const afterDelete = await dependencies.firestore.getAuditLog(id);
     if (afterDelete) {
-      results.push({ resource: `audit log ${id}`, status: "failed", message: "document still exists after delete" });
+      results.push({ resource: `${spec.label} ${id}`, status: "failed", message: "document still exists after delete" });
       return;
     }
-    results.push({ resource: `audit log ${id}`, status: "deleted" });
+    results.push({ resource: `${spec.label} ${id}`, status: "deleted" });
   } catch (error: any) {
-    results.push({ resource: `audit log ${id}`, status: "failed", message: sanitizeErrorMessage(error) });
+    results.push({ resource: `${spec.label} ${id}`, status: "failed", message: sanitizeErrorMessage(error) });
+  }
+}
+
+async function cleanupShipmentSafetyReview(
+  results: CleanupStatus[],
+  resources: CreatedResources,
+  createdIds: ReadonlySet<string>,
+  dependencies: SmokeDependencies
+): Promise<void> {
+  const id = resources.safetyReviewId;
+  if (!isCurrentRunSmokeId(id, createdIds) || !resources.safetyShipmentId || !resources.safetyReviewIdempotencyKey) {
+    results.push({ resource: "shipment safety review", status: "skipped", message: "not created in current run" });
+    return;
+  }
+  try {
+    const review = await dependencies.firestore.getShipmentSafetyReview(id);
+    if (!review) {
+      results.push({ resource: `shipment safety review ${id}`, status: "skipped", message: "already absent" });
+      return;
+    }
+    if (
+      review.shipmentId !== resources.safetyShipmentId ||
+      review.idempotencyKey !== resources.safetyReviewIdempotencyKey ||
+      !resources.safetyShipmentId.startsWith(SMOKE_PREFIX) ||
+      !resources.safetyReviewIdempotencyKey.startsWith(SMOKE_PREFIX)
+    ) {
+      results.push({ resource: `shipment safety review ${id}`, status: "failed", message: "document did not match current smoke run" });
+      return;
+    }
+    await dependencies.firestore.deleteShipmentSafetyReview(id);
+    const afterDelete = await dependencies.firestore.getShipmentSafetyReview(id);
+    if (afterDelete) {
+      results.push({ resource: `shipment safety review ${id}`, status: "failed", message: "document still exists after delete" });
+      return;
+    }
+    results.push({ resource: `shipment safety review ${id}`, status: "deleted" });
+  } catch (error: any) {
+    results.push({ resource: `shipment safety review ${id}`, status: "failed", message: sanitizeErrorMessage(error) });
   }
 }
 
 async function cleanupAdministrativeHold(
   results: CleanupStatus[],
   resources: CreatedResources,
+  createdIds: ReadonlySet<string>,
   dependencies: SmokeDependencies
 ): Promise<void> {
-  const id = resources.holdId;
-  if (!id || !resources.shipmentId || !resources.idempotencyKey || !resources.note) {
+  const id = resources.releaseHoldId;
+  if (!isCurrentRunSmokeId(id, createdIds) || !resources.releaseShipmentId || !resources.placeIdempotencyKey || !resources.releaseShipmentNote) {
     results.push({ resource: "administrative hold", status: "skipped", message: "not created in current run" });
     return;
   }
@@ -511,12 +867,12 @@ async function cleanupAdministrativeHold(
       return;
     }
     if (
-      hold.shipmentId !== resources.shipmentId ||
-      hold.idempotencyKey !== resources.idempotencyKey ||
-      hold.note !== resources.note ||
-      !resources.shipmentId.startsWith(SMOKE_PREFIX) ||
-      !resources.idempotencyKey.startsWith(SMOKE_PREFIX) ||
-      !resources.note.startsWith(SMOKE_PREFIX)
+      hold.shipmentId !== resources.releaseShipmentId ||
+      hold.idempotencyKey !== resources.placeIdempotencyKey ||
+      hold.note !== resources.releaseShipmentNote ||
+      !resources.releaseShipmentId.startsWith(SMOKE_PREFIX) ||
+      !resources.placeIdempotencyKey.startsWith(SMOKE_PREFIX) ||
+      !resources.releaseShipmentNote.startsWith(SMOKE_PREFIX)
     ) {
       results.push({ resource: `administrative hold ${id}`, status: "failed", message: "document did not match current smoke run" });
       return;

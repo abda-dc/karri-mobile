@@ -5,9 +5,11 @@ import {
   type CallableResponse,
   type IdentityToolkitClient,
   type PlaceHoldPayload,
+  type ReleaseHoldPayload,
   parseAnonymousSignUpResponse,
   parseRefreshTokenResponse,
   runPlaceAdministrativeHoldSmoke,
+  type SubmitSafetyReviewPayload,
   type SmokeAuthClient,
   type SmokeFirestoreClient,
 } from "./PlaceAdministrativeHoldSmoke.js";
@@ -68,12 +70,21 @@ class FirestoreSmokeClient implements SmokeFirestoreClient {
     return await this.getDoc("administrativeHolds", holdId);
   }
 
+  async getShipmentSafetyReview(reviewId: string): Promise<Record<string, unknown> | null> {
+    return await this.getDoc("shipmentSafetyReviews", reviewId);
+  }
+
   async getAuditLog(auditId: string): Promise<Record<string, unknown> | null> {
     return await this.getDoc("auditLogs", auditId);
   }
 
   async countAdministrativeHoldsByShipment(shipmentId: string): Promise<number> {
     const snapshot = await this.db.collection("administrativeHolds").where("shipmentId", "==", shipmentId).get();
+    return snapshot.size;
+  }
+
+  async countShipmentSafetyReviewsByShipment(shipmentId: string): Promise<number> {
+    const snapshot = await this.db.collection("shipmentSafetyReviews").where("shipmentId", "==", shipmentId).get();
     return snapshot.size;
   }
 
@@ -95,6 +106,10 @@ class FirestoreSmokeClient implements SmokeFirestoreClient {
 
   async deleteAdministrativeHold(holdId: string): Promise<void> {
     await this.db.collection("administrativeHolds").doc(holdId).delete();
+  }
+
+  async deleteShipmentSafetyReview(reviewId: string): Promise<void> {
+    await this.db.collection("shipmentSafetyReviews").doc(reviewId).delete();
   }
 
   async deleteAuditLog(auditId: string): Promise<void> {
@@ -173,7 +188,19 @@ function extractRestErrorMessage(body: unknown, fallback: string): string {
 
 class DeployedCallableClient implements CallableClient {
   async callPlaceAdministrativeHold(idToken: string, payload: PlaceHoldPayload): Promise<CallableResponse> {
-    const response = await fetch(`https://us-east1-${DEVELOPMENT_PROJECT_ID}.cloudfunctions.net/placeAdministrativeHold`, {
+    return await this.callCallable("placeAdministrativeHold", idToken, payload);
+  }
+
+  async callReleaseAdministrativeHold(idToken: string, payload: ReleaseHoldPayload): Promise<CallableResponse> {
+    return await this.callCallable("releaseAdministrativeHold", idToken, payload);
+  }
+
+  async callSubmitSafetyReview(idToken: string, payload: SubmitSafetyReviewPayload): Promise<CallableResponse> {
+    return await this.callCallable("submitSafetyReview", idToken, payload);
+  }
+
+  private async callCallable(functionName: string, idToken: string, payload: object): Promise<CallableResponse> {
+    const response = await fetch(`https://us-east1-${DEVELOPMENT_PROJECT_ID}.cloudfunctions.net/${functionName}`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${idToken}`,
@@ -214,8 +241,9 @@ async function main(): Promise<number> {
       identityToolkit: new FirebaseIdentityToolkitClient(),
       callable: new DeployedCallableClient(),
     });
-    console.log(`Live callable smoke succeeded for run ${result.runId}.`);
-    console.log(`Verified shipment ${result.shipmentId}, hold ${result.holdId}, and audit log ${result.auditId}.`);
+    console.log(`Live callable operational smoke succeeded for run ${result.runId}.`);
+    console.log(`Verified release shipment ${result.releaseShipmentId}, hold ${result.releaseHoldId}, and release audit ${result.releaseAuditId}.`);
+    console.log(`Verified safety shipment ${result.safetyShipmentId}, review ${result.safetyReviewId}, and safety audit ${result.safetyReviewAuditId}.`);
     console.log("Cleanup completed.");
     return 0;
   } catch (error: any) {

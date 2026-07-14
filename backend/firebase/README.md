@@ -75,9 +75,9 @@ For a partial rollback, run the narrow deploy script for the surface being resto
 
 Credentials, Firebase tokens, service-account JSON, signing keys, and provider secrets stay outside Git. Use local ADC, approved Firebase CLI auth, or future workload identity in automation.
 
-## Authorized callable smoke test
+## Authorized callable operational smoke test
 
-After the development stack is deployed, the admin package includes a guarded live smoke tool for `karri-mobile-dev` only. It validates the deployed `placeAdministrativeHold` callable with temporary Auth users and smoke-prefixed Firestore data, then cleans up the shipment, hold, audit log, and users in a `finally` path.
+After the development stack is deployed, the admin package includes a guarded live smoke tool for `karri-mobile-dev` only. It validates deployed callable operational readiness for `placeAdministrativeHold`, `releaseAdministrativeHold`, and `submitSafetyReview` with temporary Auth users and smoke-prefixed Firestore data, then cleans up shipments, holds, safety reviews, audit logs, and users in a `finally` path.
 
 Prerequisites are local user Application Default Credentials from `gcloud auth application-default login`, plus the development Firebase Web API key supplied only through `FIREBASE_WEB_API_KEY`. The live smoke uses Identity Toolkit REST anonymous sign-up for temporary client sessions and Google Secure Token REST to refresh the temporary admin user's claim-bearing ID token. Tokens stay in process memory only and are never logged.
 
@@ -87,7 +87,7 @@ The smoke run creates billable Firebase Auth, Firestore, Cloud Functions, and Cl
 $env:FIREBASE_PROJECT_ID="karri-mobile-dev"
 $env:KARRI_ALLOW_LIVE_SMOKE="karri-mobile-dev"
 $env:FIREBASE_WEB_API_KEY="<development Firebase web API key>"
-npm run firebase:smoke:development:callable
+npm run firebase:smoke:development:operational-readiness
 ```
 
-The command hard-fails for any project other than `karri-mobile-dev`, never logs tokens or credentials, and must not be run from CI until an approved live-smoke environment and credential policy exists.
+The command hard-fails for any project other than `karri-mobile-dev`, never logs tokens or credentials, proves protected callable denial and authorized success paths, verifies idempotent retries and audit documents, and must not be run from CI until an approved live-smoke environment and credential policy exists.

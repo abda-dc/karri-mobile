@@ -21,6 +21,7 @@ describe("PlaceAdministrativeHoldSmoke", () => {
   let deps: SmokeDependencies;
   let holds: Map<string, any>;
   let audits: Map<string, any>;
+  let reviews: Map<string, any>;
   let shipments: Map<string, any>;
   let users: Set<string>;
   let deletedUsers: string[];
@@ -34,6 +35,7 @@ describe("PlaceAdministrativeHoldSmoke", () => {
   beforeEach(() => {
     holds = new Map();
     audits = new Map();
+    reviews = new Map();
     shipments = new Map();
     users = new Set();
     deletedUsers = [];
@@ -63,13 +65,21 @@ describe("PlaceAdministrativeHoldSmoke", () => {
       identityToolkit: {
         signUpAnonymous: vi.fn(async () => {
           signUpCount += 1;
-          const uid = signUpCount === 1 ? "identity-toolkit-non-admin-uid" : "identity-toolkit-admin-uid";
-          const refreshToken = signUpCount === 1 ? "refresh-token-for-non-admin" : "refresh-token-for-admin";
+          const uid = signUpCount === 1
+            ? "identity-toolkit-non-admin-uid"
+            : signUpCount === 2
+              ? "identity-toolkit-operations-admin-uid"
+              : "identity-toolkit-safety-admin-uid";
+          const refreshToken = signUpCount === 1
+            ? "refresh-token-for-non-admin"
+            : signUpCount === 2
+              ? "refresh-token-for-operations-admin"
+              : "refresh-token-for-safety-admin";
           users.add(uid);
           refreshTokenOwners.set(refreshToken, uid);
           return {
             uid,
-            idToken: signUpCount === 1 ? "id-token-for-non-admin" : "id-token-before-claim-refresh",
+            idToken: signUpCount === 1 ? "id-token-for-non-admin" : `id-token-before-claim-refresh-${uid}`,
             refreshToken,
           };
         }),
@@ -90,7 +100,7 @@ describe("PlaceAdministrativeHoldSmoke", () => {
           if (idToken === "id-token-for-non-admin") {
             return { ok: false, status: "PERMISSION_DENIED" };
           }
-          const adminUid = "identity-toolkit-admin-uid";
+          const adminUid = "identity-toolkit-operations-admin-uid";
           const holdId = deriveOperationId(adminUid, "hold.place", "shipment", payload.shipmentId, payload.idempotencyKey);
           const alreadyExisted = holds.has(holdId);
           if (!alreadyExisted) {
@@ -104,7 +114,8 @@ describe("PlaceAdministrativeHoldSmoke", () => {
               releasedByUid: null,
               idempotencyKey: payload.idempotencyKey,
             });
-            audits.set(holdId, {
+            const auditId = deriveOperationId(adminUid, "hold.place", "shipment", payload.shipmentId, payload.idempotencyKey);
+            audits.set(auditId, {
               action: "hold.place",
               actorUid: adminUid,
               actorRole: "operations_admin",
@@ -116,6 +127,65 @@ describe("PlaceAdministrativeHoldSmoke", () => {
           }
           return { ok: true, result: { success: true, holdId, alreadyExisted } };
         }),
+        callReleaseAdministrativeHold: vi.fn(async (idToken: string, payload): Promise<CallableResponse> => {
+          if (idToken === "id-token-for-non-admin") {
+            return { ok: false, status: "PERMISSION_DENIED" };
+          }
+          const adminUid = "identity-toolkit-operations-admin-uid";
+          const auditId = deriveOperationId(adminUid, "hold.release", "hold", payload.holdId, payload.idempotencyKey);
+          const hold = holds.get(payload.holdId);
+          if (!hold) {
+            return { ok: false, status: "NOT_FOUND" };
+          }
+          if (audits.has(auditId) || hold.status === "released") {
+            return { ok: true, result: { success: true, holdId: payload.holdId, alreadyExisted: true } };
+          }
+          hold.status = "released";
+          hold.releasedByUid = adminUid;
+          hold.releasedByRole = "operations_admin";
+          audits.set(auditId, {
+            action: "hold.release",
+            actorUid: adminUid,
+            actorRole: "operations_admin",
+            targetType: "hold",
+            targetId: payload.holdId,
+            reasonCode: payload.reasonCode,
+            idempotencyKey: payload.idempotencyKey,
+          });
+          return { ok: true, result: { success: true, holdId: payload.holdId, alreadyExisted: false } };
+        }),
+        callSubmitSafetyReview: vi.fn(async (idToken: string, payload): Promise<CallableResponse> => {
+          if (idToken === "id-token-for-non-admin") {
+            return { ok: false, status: "PERMISSION_DENIED" };
+          }
+          const adminUid = "identity-toolkit-safety-admin-uid";
+          const reviewId = deriveOperationId(adminUid, "safety_review.submit", "shipment", payload.shipmentId, payload.idempotencyKey);
+          const alreadyExisted = reviews.has(reviewId);
+          if (!alreadyExisted) {
+            reviews.set(reviewId, {
+              shipmentId: payload.shipmentId,
+              actorUid: adminUid,
+              reviewerRole: "safety_admin",
+              decision: payload.decision,
+              reasonCode: payload.reasonCode,
+              note: payload.note,
+              declarationVersionReviewed: payload.declarationVersionReviewed,
+              packageContentVersionReviewed: payload.packageContentVersionReviewed,
+              idempotencyKey: payload.idempotencyKey,
+            });
+            const auditId = deriveOperationId(adminUid, "safety_review.submit", "shipment", payload.shipmentId, payload.idempotencyKey);
+            audits.set(auditId, {
+              action: "safety_review.submit",
+              actorUid: adminUid,
+              actorRole: "safety_admin",
+              targetType: "shipment",
+              targetId: payload.shipmentId,
+              reasonCode: payload.reasonCode,
+              idempotencyKey: payload.idempotencyKey,
+            });
+          }
+          return { ok: true, result: { success: true, reviewId, alreadyExisted } };
+        }),
       },
       firestore: {
         setShipment: vi.fn(async (shipmentId: string, data: Record<string, unknown>) => {
@@ -123,6 +193,7 @@ describe("PlaceAdministrativeHoldSmoke", () => {
         }),
         getShipment: vi.fn(async (shipmentId: string) => shipments.get(shipmentId) || null),
         getAdministrativeHold: vi.fn(async (holdId: string) => holds.get(holdId) || null),
+        getShipmentSafetyReview: vi.fn(async (reviewId: string) => reviews.get(reviewId) || null),
         getAuditLog: vi.fn(async (auditId: string) => {
           if (throwOnAuditLookupAfterDelete && !audits.has(auditId)) {
             throw new Error("lookup failed");
@@ -131,6 +202,9 @@ describe("PlaceAdministrativeHoldSmoke", () => {
         }),
         countAdministrativeHoldsByShipment: vi.fn(async (shipmentId: string) => {
           return [...holds.values()].filter((hold) => hold.shipmentId === shipmentId).length;
+        }),
+        countShipmentSafetyReviewsByShipment: vi.fn(async (shipmentId: string) => {
+          return [...reviews.values()].filter((review) => review.shipmentId === shipmentId).length;
         }),
         countAuditLogsByOperation: vi.fn(async (action: string, targetType: string, targetId: string, idempotencyKey: string) => {
           return [...audits.values()].filter((audit) =>
@@ -145,6 +219,9 @@ describe("PlaceAdministrativeHoldSmoke", () => {
         }),
         deleteAdministrativeHold: vi.fn(async (holdId: string) => {
           holds.delete(holdId);
+        }),
+        deleteShipmentSafetyReview: vi.fn(async (reviewId: string) => {
+          reviews.delete(reviewId);
         }),
         deleteAuditLog: vi.fn(async (auditId: string) => {
           audits.delete(auditId);
@@ -213,6 +290,30 @@ describe("PlaceAdministrativeHoldSmoke", () => {
     expect(users.size).toBe(0);
   });
 
+  it("runs cleanup after safety-admin sign-up fails", async () => {
+    deps.identityToolkit.signUpAnonymous = vi.fn(async () => {
+      signUpCount += 1;
+      if (signUpCount === 3) {
+        throw new Error("Identity Toolkit anonymous sign-up failed: SAFETY_SIGNUP_FAILED");
+      }
+      const uid = signUpCount === 1 ? "identity-toolkit-non-admin-uid" : "identity-toolkit-operations-admin-uid";
+      const refreshToken = signUpCount === 1 ? "refresh-token-for-non-admin" : "refresh-token-for-operations-admin";
+      users.add(uid);
+      refreshTokenOwners.set(refreshToken, uid);
+      return {
+        uid,
+        idToken: signUpCount === 1 ? "id-token-for-non-admin" : `id-token-before-claim-refresh-${uid}`,
+        refreshToken,
+      };
+    });
+
+    await expect(runPlaceAdministrativeHoldSmoke(env, deps)).rejects.toThrow("SAFETY_SIGNUP_FAILED");
+    expect(deps.auth.deleteUser).toHaveBeenCalledWith("identity-toolkit-operations-admin-uid");
+    expect(deps.auth.deleteUser).toHaveBeenCalledWith("identity-toolkit-non-admin-uid");
+    expect(deps.firestore.deleteShipment).not.toHaveBeenCalled();
+    expect(users.size).toBe(0);
+  });
+
   it("parses Secure Token refresh success", () => {
     expect(parseRefreshTokenResponse({
       user_id: "admin-user",
@@ -236,7 +337,7 @@ describe("PlaceAdministrativeHoldSmoke", () => {
     });
 
     await expect(runPlaceAdministrativeHoldSmoke(env, deps)).rejects.toThrow("Secure Token refresh failed");
-    expect(deps.auth.deleteUser).toHaveBeenCalledWith("identity-toolkit-admin-uid");
+    expect(deps.auth.deleteUser).toHaveBeenCalledWith("identity-toolkit-operations-admin-uid");
     expect(deps.auth.deleteUser).toHaveBeenCalledWith("identity-toolkit-non-admin-uid");
     expect(users.size).toBe(0);
   });
@@ -244,8 +345,10 @@ describe("PlaceAdministrativeHoldSmoke", () => {
   it("refreshes the temporary admin claim before revoking its refresh token", async () => {
     await runPlaceAdministrativeHoldSmoke(env, deps);
 
-    expect(deps.identityToolkit.refreshIdToken).toHaveBeenCalledWith("refresh-token-for-admin", "unit-test-api-key");
-    expect(deps.auth.revokeRefreshTokens).toHaveBeenCalledWith("identity-toolkit-admin-uid");
+    expect(deps.identityToolkit.refreshIdToken).toHaveBeenCalledWith("refresh-token-for-operations-admin", "unit-test-api-key");
+    expect(deps.identityToolkit.refreshIdToken).toHaveBeenCalledWith("refresh-token-for-safety-admin", "unit-test-api-key");
+    expect(deps.auth.revokeRefreshTokens).toHaveBeenCalledWith("identity-toolkit-operations-admin-uid");
+    expect(deps.auth.revokeRefreshTokens).toHaveBeenCalledWith("identity-toolkit-safety-admin-uid");
     expect((deps.identityToolkit.refreshIdToken as any).mock.invocationCallOrder[0]).toBeLessThan(
       (deps.auth.revokeRefreshTokens as any).mock.invocationCallOrder[0]
     );
@@ -262,49 +365,112 @@ describe("PlaceAdministrativeHoldSmoke", () => {
       "unit-test-api-key",
       "id-token-for-non-admin",
       "refresh-token-for-non-admin",
-      "id-token-before-claim-refresh",
-      "refresh-token-for-admin",
-      "refreshed-id-token-for-refresh-token-for-admin",
-      "rotated-refresh-token-for-admin",
+      "id-token-before-claim-refresh-identity-toolkit-operations-admin-uid",
+      "refresh-token-for-operations-admin",
+      "refreshed-id-token-for-refresh-token-for-operations-admin",
+      "rotated-refresh-token-for-operations-admin",
+      "id-token-before-claim-refresh-identity-toolkit-safety-admin-uid",
+      "refresh-token-for-safety-admin",
+      "refreshed-id-token-for-refresh-token-for-safety-admin",
+      "rotated-refresh-token-for-safety-admin",
     ]);
   });
 
-  it("runs denial, success, verification, idempotency, and cleanup-on-success", async () => {
+  it("runs release and safety denial, success, verification, idempotency, and cleanup-on-success", async () => {
     const result = await runPlaceAdministrativeHoldSmoke(env, deps);
 
     expect(result.runId).toBe("m32p3-smoke-unit-run");
-    expect(deps.identityToolkit.signUpAnonymous).toHaveBeenCalledTimes(2);
+    expect(result.releaseShipmentId).toBe("m32p3-smoke-unit-run-release-shipment");
+    expect(result.safetyShipmentId).toBe("m32p3-smoke-unit-run-safety-shipment");
+    expect(result.releaseHoldId).toBe(deriveOperationId(
+      "identity-toolkit-operations-admin-uid",
+      "hold.place",
+      "shipment",
+      "m32p3-smoke-unit-run-release-shipment",
+      "m32p3-smoke-unit-run-place-hold"
+    ));
+    expect(result.releaseAuditId).toBe(deriveOperationId(
+      "identity-toolkit-operations-admin-uid",
+      "hold.release",
+      "hold",
+      result.releaseHoldId,
+      "m32p3-smoke-unit-run-release-hold"
+    ));
+    expect(result.safetyReviewId).toBe(deriveOperationId(
+      "identity-toolkit-safety-admin-uid",
+      "safety_review.submit",
+      "shipment",
+      "m32p3-smoke-unit-run-safety-shipment",
+      "m32p3-smoke-unit-run-safety-review"
+    ));
+    expect(result.safetyReviewId).not.toBe(deriveOperationId(
+      "identity-toolkit-non-admin-uid",
+      "safety_review.submit",
+      "shipment",
+      "m32p3-smoke-unit-run-safety-shipment",
+      "m32p3-smoke-unit-run-safety-review"
+    ));
+    expect(deps.identityToolkit.signUpAnonymous).toHaveBeenCalledTimes(3);
     expect(deps.identityToolkit.signUpAnonymous).toHaveBeenCalledWith("unit-test-api-key");
-    expect(deps.auth.setCustomClaims).toHaveBeenCalledWith("identity-toolkit-admin-uid", { role: "operations_admin" });
-    expect(deps.identityToolkit.refreshIdToken).toHaveBeenCalledWith("refresh-token-for-admin", "unit-test-api-key");
-    expect(deps.callable.callPlaceAdministrativeHold).toHaveBeenCalledTimes(3);
-    expect(deps.callable.callPlaceAdministrativeHold).toHaveBeenNthCalledWith(1, "id-token-for-non-admin", expect.any(Object));
-    expect(deps.callable.callPlaceAdministrativeHold).toHaveBeenNthCalledWith(
-      2,
-      "refreshed-id-token-for-refresh-token-for-admin",
-      expect.any(Object)
-    );
-    expect(deps.firestore.countAdministrativeHoldsByShipment).toHaveBeenCalledWith("m32p3-smoke-unit-run-shipment");
+    expect(deps.auth.setCustomClaims).toHaveBeenCalledWith("identity-toolkit-operations-admin-uid", { role: "operations_admin" });
+    expect(deps.auth.setCustomClaims).toHaveBeenCalledWith("identity-toolkit-safety-admin-uid", { role: "safety_admin" });
+    expect(deps.identityToolkit.refreshIdToken).toHaveBeenCalledWith("refresh-token-for-operations-admin", "unit-test-api-key");
+    expect(deps.identityToolkit.refreshIdToken).toHaveBeenCalledWith("refresh-token-for-safety-admin", "unit-test-api-key");
+    expect(deps.callable.callPlaceAdministrativeHold).toHaveBeenCalledTimes(1);
+    expect(deps.callable.callReleaseAdministrativeHold).toHaveBeenCalledTimes(3);
+    expect(deps.callable.callSubmitSafetyReview).toHaveBeenCalledTimes(3);
+    expect(deps.callable.callReleaseAdministrativeHold).toHaveBeenNthCalledWith(1, "id-token-for-non-admin", expect.any(Object));
+    expect(deps.callable.callSubmitSafetyReview).toHaveBeenNthCalledWith(1, "id-token-for-non-admin", expect.any(Object));
+    expect(deps.firestore.countAdministrativeHoldsByShipment).toHaveBeenCalledWith("m32p3-smoke-unit-run-release-shipment");
+    expect(deps.firestore.countShipmentSafetyReviewsByShipment).toHaveBeenCalledWith("m32p3-smoke-unit-run-safety-shipment");
     expect(deps.firestore.countAuditLogsByOperation).toHaveBeenCalledWith(
       "hold.place",
       "shipment",
-      "m32p3-smoke-unit-run-shipment",
-      "m32p3-smoke-unit-run-hold"
+      "m32p3-smoke-unit-run-release-shipment",
+      "m32p3-smoke-unit-run-place-hold"
     );
     expect(holds.size).toBe(0);
     expect(audits.size).toBe(0);
+    expect(reviews.size).toBe(0);
     expect(shipments.size).toBe(0);
     expect(users.size).toBe(0);
-    expect(deps.firestore.getAuditLog).toHaveBeenCalledTimes(3);
-    expect(deps.firestore.getAdministrativeHold).toHaveBeenCalledTimes(3);
-    expect(deps.firestore.getShipment).toHaveBeenCalledWith("m32p3-smoke-unit-run-shipment");
-    expect(deps.auth.getUser).toHaveBeenCalledWith("identity-toolkit-admin-uid");
+    expect(deps.firestore.getShipment).toHaveBeenCalledWith("m32p3-smoke-unit-run-release-shipment");
+    expect(deps.firestore.getShipment).toHaveBeenCalledWith("m32p3-smoke-unit-run-safety-shipment");
+    expect(deps.auth.getUser).toHaveBeenCalledWith("identity-toolkit-operations-admin-uid");
+    expect(deps.auth.getUser).toHaveBeenCalledWith("identity-toolkit-safety-admin-uid");
     expect(deps.auth.getUser).toHaveBeenCalledWith("identity-toolkit-non-admin-uid");
     expect(deletedUsers).toEqual([
-      "identity-toolkit-admin-uid",
+      "identity-toolkit-safety-admin-uid",
+      "identity-toolkit-operations-admin-uid",
       "identity-toolkit-non-admin-uid",
     ]);
+    expect(result.cleanup.map((item) => item.resource.replace(/ [a-f0-9]{64}| m32p3-smoke-unit-run-[a-z-]+| identity-toolkit-[a-z-]+-uid/g, ""))).toEqual([
+      "safety review audit log",
+      "shipment safety review",
+      "release audit log",
+      "placement audit log",
+      "administrative hold",
+      "safety shipment",
+      "release shipment",
+      "safety admin user",
+      "operations admin user",
+      "non-admin user",
+    ]);
     expect("createCustomToken" in deps.auth).toBe(false);
+  });
+
+  it("fails cleanup when a smoke-owned review no longer matches ownership checks", async () => {
+    let reviewLookupCount = 0;
+    deps.firestore.getShipmentSafetyReview = vi.fn(async (reviewId: string) => {
+      reviewLookupCount += 1;
+      const review = reviews.get(reviewId);
+      if (reviewLookupCount >= 2 && review) {
+        return { ...review, idempotencyKey: "not-current-run" };
+      }
+      return review || null;
+    });
+
+    await expect(runPlaceAdministrativeHoldSmoke(env, deps)).rejects.toThrow("Live smoke cleanup failed");
   });
 
   it("runs cleanup-on-failure and exits through the failure path", async () => {
@@ -312,9 +478,10 @@ describe("PlaceAdministrativeHoldSmoke", () => {
       return { ok: false, status: "INTERNAL" };
     });
 
-    await expect(runPlaceAdministrativeHoldSmoke(env, deps)).rejects.toThrow("Expected PERMISSION_DENIED");
+    await expect(runPlaceAdministrativeHoldSmoke(env, deps)).rejects.toThrow("release prerequisite administrative hold");
     expect(deps.auth.deleteUser).toHaveBeenCalledWith("identity-toolkit-non-admin-uid");
-    expect(deps.firestore.deleteShipment).not.toHaveBeenCalled();
+    expect(deps.auth.deleteUser).toHaveBeenCalledWith("identity-toolkit-operations-admin-uid");
+    expect(deps.auth.deleteUser).toHaveBeenCalledWith("identity-toolkit-safety-admin-uid");
   });
 
   it("fails the run when cleanup fails", async () => {
@@ -337,7 +504,7 @@ describe("PlaceAdministrativeHoldSmoke", () => {
     await expect(runPlaceAdministrativeHoldSmoke(env, deps)).rejects.toMatchObject({
       name: "SmokeTestAndCleanupError",
       primaryError: expect.objectContaining({
-        message: expect.stringContaining("Expected PERMISSION_DENIED"),
+        message: expect.stringContaining("release prerequisite administrative hold"),
       }),
       cleanupError: expect.objectContaining({
         message: expect.stringContaining("Live smoke cleanup failed"),
