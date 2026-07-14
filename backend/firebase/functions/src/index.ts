@@ -27,6 +27,15 @@ const auditLogService = new AuditLogService(db);
 const shipmentSafetyReviewService = new ShipmentSafetyReviewService(db, auditLogService);
 const administrativeHoldService = new AdministrativeHoldService(db, auditLogService);
 
+const callableRuntimeOptions = {
+  region: "us-east1",
+  minInstances: 0,
+  maxInstances: 10,
+  memory: "256MiB",
+  timeoutSeconds: 60,
+  enforceAppCheck: false,
+} as const;
+
 function mapError(error: any): HttpsError {
   if (error instanceof HttpsError) {
     return error;
@@ -51,7 +60,7 @@ function mapError(error: any): HttpsError {
   return new HttpsError("internal", "An internal error occurred.");
 }
 
-export const submitSafetyReview = onCall(async (request) => {
+export const submitSafetyReview = onCall(callableRuntimeOptions, async (request) => {
   try {
     const actor = assertPermission(request.auth, "manage_safety_reviews");
 
@@ -127,7 +136,7 @@ export const submitSafetyReview = onCall(async (request) => {
   }
 });
 
-export const placeAdministrativeHold = onCall(async (request) => {
+export const placeAdministrativeHold = onCall(callableRuntimeOptions, async (request) => {
   try {
     const actor = assertPermission(request.auth, "place_administrative_holds");
 
@@ -173,7 +182,7 @@ export const placeAdministrativeHold = onCall(async (request) => {
   }
 });
 
-export const releaseAdministrativeHold = onCall(async (request) => {
+export const releaseAdministrativeHold = onCall(callableRuntimeOptions, async (request) => {
   try {
     const actor = assertPermission(request.auth, "place_administrative_holds");
 

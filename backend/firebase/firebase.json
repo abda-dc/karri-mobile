@@ -1,18 +1,31 @@
 {
   "firestore": {
     "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
+    "indexes": "firestore.indexes.json",
+    "predeploy": [
+      "npm --prefix ../.. run firebase:predeploy:firestore"
+    ]
   },
   "storage": {
-    "rules": "storage.rules"
+    "rules": "storage.rules",
+    "predeploy": [
+      "npm --prefix ../.. run firebase:predeploy:storage"
+    ]
   },
   "functions": {
-    "source": "functions"
+    "source": "functions",
+    "predeploy": [
+      "npm --prefix ../.. run firebase:predeploy:functions"
+    ]
   },
   "emulators": {
     "firestore": {
       "host": "127.0.0.1",
       "port": 8080
+    },
+    "storage": {
+      "host": "127.0.0.1",
+      "port": 9199
     },
     "functions": {
       "host": "127.0.0.1",

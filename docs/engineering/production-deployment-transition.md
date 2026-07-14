@@ -53,8 +53,8 @@ Use separate Firebase projects:
 | Environment | Firebase project | Purpose |
 | --- | --- | --- |
 | Development | karri-mobile-dev | Local and developer testing |
-| Beta / Preview | karri-mobile-beta | Internal device validation |
-| Production | karri-mobile-prod | Future public production |
+| Beta / Preview | Not created | Internal device validation |
+| Production | Not created | Future public production |
 
 Required per environment:
 
@@ -66,8 +66,29 @@ Required per environment:
 - Storage rules deployed.
 - Storage access remains denied until evidence upload workflow is approved.
 - Firebase CLI aliases configured locally.
+- Callable Functions deployed only after validation, with explicit region/runtime settings.
 - No service-account keys committed.
 - No private credentials in EXPO_PUBLIC values.
+
+The only checked-in Firebase alias is `development`, mapped to `karri-mobile-dev`. Do not add preview or production aliases until those projects exist.
+
+Development Firebase deploy commands:
+
+    npm run firebase:deploy:development:firestore:rules
+    npm run firebase:deploy:development:firestore:indexes
+    npm run firebase:deploy:development:storage
+    npm run firebase:deploy:development:functions
+    npm run firebase:deploy:development
+
+These commands invoke `npx firebase-tools`, pass `--project development`, and run predeploy validation/build hooks from `backend/firebase/firebase.json`.
+
+Development rollback uses the previous reviewed source revision:
+
+    git switch <previous-reviewed-branch-or-tag>
+    npm run firebase:validate
+    npm run firebase:deploy:development
+
+Use the narrow deploy command when only one Firebase surface needs rollback.
 
 ## Azure production assessment
 
@@ -206,7 +227,9 @@ Milestone 13 should not begin until:
 - Firebase beta project exists and matches app config.
 - Auth provider required by the MVP works.
 - Firestore rules and indexes are deployed to beta.
+- Callable Functions are deployed to the same reviewed Firebase environment, or the client paths that depend on them remain disabled.
 - npm run test:rules passes.
+- npm run test:functions passes.
 - npx expo-doctor passes.
 - npx tsc --noEmit passes.
 - No Azure production cutover is mixed into device validation.
@@ -216,6 +239,7 @@ Milestone 13 should not begin until:
 - Anonymous authentication bridge blocks external validation unless enabled or replaced.
 - App Check is not enforced yet.
 - Storage access is intentionally denied.
+- Callable Functions use `us-east1`, bounded instances, and App Check enforcement disabled temporarily for development.
 - Push delivery is not production-complete.
 - Multi-party booking and custody writes remain client-orchestrated.
 - No payments, disputes, admin console, mobile money, GPS, or carrier integrations are included.
@@ -225,7 +249,9 @@ Milestone 13 should not begin until:
 Run before committing:
 
     cd C:\Users\Kiya\Documents\karri-mobile
+    npm run firebase:validate
     npm run test:rules
+    npm run test:functions
 
     cd apps/mobile
     npx expo-doctor

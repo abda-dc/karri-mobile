@@ -1,6 +1,6 @@
 # Firebase backend configuration
 
-This directory is the version-controlled Firebase backend foundation for Karri Platform v2. It contains Firestore rules, Storage rules, and index definitions. It does not contain service-account keys, deployed Cloud Functions, or a selected Firebase project ID.
+This directory is the version-controlled Firebase backend foundation for Karri Platform v2. It contains Firestore rules, Storage rules, index definitions, and callable Cloud Functions. It does not contain service-account keys, Firebase tokens, or private provider credentials.
 
 ## Current access model
 
@@ -23,20 +23,54 @@ Shipment timeline queries constrain `custodyEvents.shipmentId`; they read the sa
 
 ## Project setup
 
-1. Create separate Firebase projects for development, preview, and production.
+1. Use the checked-in `development` Firebase alias for the current development project only: `karri-mobile-dev`.
 2. Register a Firebase web app for the Expo JavaScript client.
 3. Copy `apps/mobile/.env.example` to `apps/mobile/.env.local` and supply the public project configuration.
 4. Enable Anonymous Authentication only for the documented MVP session bridge. Replace it with an approved production sign-in method before a pilot.
 5. Create Firestore. Create Storage only after the identity-evidence privacy, retention, authorization, scanning, and rule design is approved; current Storage rules deny all access.
-6. Configure Firebase CLI project aliases locally; do not hardcode a personal project ID in source.
+6. Do not add preview or production aliases until those Firebase projects exist and have reviewed ownership.
 
 ## Validation and deployment direction
 
-`firebase.json` references the versioned rules/index files and local Firestore emulator. The repository-root `npm run test:rules` command starts the emulator with a demo-only project ID and runs the allow/deny suite. Typical reviewed deployment commands will be:
+`firebase.json` references the versioned rules/index files, Storage rules, callable Functions, and local emulators. The repository-root validation commands start emulators with the demo-only project ID `demo-karri-mobile`; they do not read the checked-in development alias, operator-selected projects, production credentials, or mobile `.env` files.
 
 ```powershell
-firebase deploy --only firestore:rules,firestore:indexes
-firebase deploy --only storage
+npm run firebase:validate
+npm run firebase:validate:firestore
+npm run firebase:validate:storage
+npm run firebase:validate:functions
 ```
 
-The current rules are an MVP policy boundary while Cloud Functions remain out of scope. Do not deploy them to production without emulator tests, command/idempotency hardening, a data/privacy review, and configured monitoring.
+Development deploy commands are explicit and narrowly scoped. They always pass `--project development` and therefore resolve only to `karri-mobile-dev` through the checked-in `.firebaserc` alias:
+
+```powershell
+npm run firebase:deploy:development:firestore:rules
+npm run firebase:deploy:development:firestore:indexes
+npm run firebase:deploy:development:storage
+npm run firebase:deploy:development:functions
+npm run firebase:deploy:development
+```
+
+Do not run broad `firebase deploy` commands. Use the scripts above so predeploy validation runs and the target project is explicit.
+
+## Callable Functions runtime
+
+The current callable Functions are deployed only when `npm run firebase:deploy:development:functions` or the complete development stack command is run. Each callable is configured for `us-east1`, `minInstances: 0`, `maxInstances: 10`, `memory: 256MiB`, and `timeoutSeconds: 60`.
+
+App Check enforcement is intentionally disabled for this development foundation because the mobile rollout policy is not complete yet. This is temporary: before preview or production projects are introduced, define App Check rollout mode, monitoring, and failure handling.
+
+Callable HTTPS functions do not use automatic retry semantics. Clients must treat returned errors as authoritative and retry only after refreshing relevant state.
+
+## Development rollback
+
+Rollback is a redeploy of the previous reviewed source revision to the same explicit development alias.
+
+```powershell
+git switch <previous-reviewed-branch-or-tag>
+npm run firebase:validate
+npm run firebase:deploy:development
+```
+
+For a partial rollback, run the narrow deploy script for the surface being restored, such as `npm run firebase:deploy:development:firestore:rules` or `npm run firebase:deploy:development:functions`.
+
+Credentials, Firebase tokens, service-account JSON, signing keys, and provider secrets stay outside Git. Use local ADC, approved Firebase CLI auth, or future workload identity in automation.
