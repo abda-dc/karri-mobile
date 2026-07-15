@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, Platform, StyleSheet, Text, View } from "react-native";
 import { Badge } from "../src/components/Badge";
 import { Banner } from "../src/components/Banner";
 import { Card } from "../src/components/Card";
@@ -10,8 +10,17 @@ import { Screen } from "../src/components/Screen";
 import { useAuthSession } from "../src/presentation/hooks/useAuthSession";
 import { mobileServices } from "../src/presentation/services/mobileServices";
 import { colors, radii, spacing, typography } from "../src/theme/tokens";
+import { PublicHomePage } from "../src/public/PublicHomePage";
 
 export default function WelcomeScreen() {
+  if (Platform.OS === "web") {
+    return <PublicHomePage />;
+  }
+
+  return <NativeWelcomeScreen />;
+}
+
+function NativeWelcomeScreen() {
   const auth = useAuthSession();
 
   useEffect(() => {
