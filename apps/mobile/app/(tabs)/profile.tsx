@@ -18,6 +18,7 @@ import {
 } from "../../src/domain/notification/Notification";
 import { NotificationPreferencesCard } from "../../src/presentation/components/NotificationPreferencesCard";
 import { PushNotificationRegistrationCard } from "../../src/presentation/components/PushNotificationRegistrationCard";
+import { TrustCenterCard } from "../../src/presentation/components/TrustCenterCard";
 import { TrustSummaryCard } from "../../src/presentation/components/TrustSummaryCard";
 import { VerificationChecklist } from "../../src/presentation/components/VerificationChecklist";
 import { VerificationStatusCard } from "../../src/presentation/components/VerificationStatusCard";
@@ -197,6 +198,8 @@ export default function ProfileScreen() {
           title="Start a Karri session to see your profile"
         />
       ) : null}
+
+      <TrustCenterCard />
 
       {error ? (
         <StaleDataRetryBanner
@@ -383,6 +386,7 @@ const styles = StyleSheet.create({
     minHeight: 40,
   },
 });
+
 
 
 
