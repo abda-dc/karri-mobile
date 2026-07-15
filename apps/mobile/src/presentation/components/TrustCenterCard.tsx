@@ -32,7 +32,7 @@ export function TrustCenterCard() {
             variant="secondary"
             onPress={() => router.push(link.route)}
           >
-            {`›  ${link.label}`}
+            {`\u203A  ${link.label}`}
           </PrimaryButton>
         ))}
       </View>
