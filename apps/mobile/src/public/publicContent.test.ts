@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { publicPages, publicRouteLabels } from "./publicContent";
 
 const requestedRoutes = [
-  "/about", "/trust-center", "/privacy-policy", "/terms-of-service", "/safety",
+  "/about", "/trust-center", "/privacy-policy", "/delete-account", "/terms-of-service", "/safety",
   "/prohibited-items", "/community-guidelines", "/faq", "/release-notes", "/support",
   "/contact", "/press", "/careers",
 ] as const;
@@ -34,5 +34,18 @@ describe("public website content", () => {
       const ids = page.sections.map((section) => section.id);
       expect(new Set(ids).size).toBe(ids.length);
     }
+  });
+
+  it("publishes complete Google Play account-deletion guidance", () => {
+    const page = publicPages["/delete-account"];
+    const copy = JSON.stringify(page);
+
+    expect(copy).toContain("hello@aptopsagency.com");
+    expect(copy).toContain("account owner");
+    expect(copy).toContain("within 30 days");
+    expect(copy).toContain("fraud");
+    expect(copy).toContain("audit");
+    expect(page.related).toContain("/privacy-policy");
+    expect(page.related).toContain("/support");
   });
 });

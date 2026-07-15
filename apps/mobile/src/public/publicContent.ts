@@ -3,6 +3,7 @@ export type PublicRoute =
   | "/about"
   | "/trust-center"
   | "/privacy-policy"
+  | "/delete-account"
   | "/terms-of-service"
   | "/safety"
   | "/prohibited-items"
@@ -67,7 +68,7 @@ export const publicPages: Record<Exclude<PublicRoute, "/">, PublicPageContent> =
       { id: "community", title: "Community Guidelines", paragraphs: ["See the conduct we expect from every sender, traveler, and community member."] },
       { id: "help", title: "Support and contact", paragraphs: ["Find self-service guidance, ask a question, or report a safety or policy concern."] },
     ],
-    related: ["/privacy-policy", "/terms-of-service", "/safety", "/prohibited-items", "/community-guidelines", "/support", "/contact"],
+    related: ["/privacy-policy", "/delete-account", "/terms-of-service", "/safety", "/prohibited-items", "/community-guidelines", "/support", "/contact"],
   },
   "/privacy-policy": {
     path: "/privacy-policy",
@@ -90,7 +91,52 @@ export const publicPages: Record<Exclude<PublicRoute, "/">, PublicPageContent> =
       { id: "changes", title: "10. Changes to this policy", paragraphs: ["We may update this policy as Karri changes. We will post the revised policy, update the effective date, and provide additional notice when required. Material changes do not silently alter an existing booking agreement."] },
       { id: "contact", title: "11. Contact", paragraphs: [`For privacy questions or requests, email ${SUPPORT_EMAIL}. We may need to verify your request before responding.`] },
     ],
-    related: ["/terms-of-service", "/safety", "/contact"],
+    related: ["/delete-account", "/terms-of-service", "/safety", "/contact"],
+  },
+  "/delete-account": {
+    path: "/delete-account",
+    title: "Delete Your Karri Account",
+    description: "Learn how to request deletion of your Karri account and personal data, what may be retained, and when deletion will be completed.",
+    eyebrow: "Account & privacy",
+    heading: "Delete your Karri account",
+    intro: "You can request permanent deletion of your Karri account and associated personal data without needing to access the Karri app.",
+    updated: "July 15, 2026",
+    sections: [
+      {
+        id: "request",
+        title: "How to request account deletion",
+        paragraphs: ["Email hello@aptopsagency.com from the email address associated with your Karri account. Use “Karri account deletion request” as the subject and state that you want your Karri account permanently deleted."],
+        bullets: ["Include the name and email address associated with the account.", "Do not send your password, one-time code, payment information, or identity documents.", "If you cannot email from the account address, explain why so Support can provide an appropriate ownership-verification step."],
+      },
+      {
+        id: "owner",
+        title: "Requests must come from the account owner",
+        paragraphs: ["To protect accounts and personal information, Karri only processes deletion requests from the account owner. We may ask you to complete reasonable verification before deletion. We will not delete an account based only on a request from another person unless they provide valid legal authority."],
+      },
+      {
+        id: "deleted-data",
+        title: "Data that will be deleted",
+        paragraphs: ["After the request is verified, Karri will delete or de-identify account and personal data that is no longer required for a permitted retention purpose."],
+        bullets: ["Your Karri account and authentication association.", "Profile and contact information connected to the account.", "Shipment, trip, route, match, booking, notification-preference, and review information attributable to you, except records that must be retained as described below.", "Trust or verification metadata associated with the account, where applicable.", "Support information that is not required for an ongoing request, dispute, security matter, or legal obligation."],
+      },
+      {
+        id: "retained-data",
+        title: "Records that may be retained",
+        paragraphs: ["Karri may retain limited records when reasonably necessary for security, fraud and abuse prevention, legal compliance, dispute resolution, enforcement, financial or operational reconciliation, or audit obligations."],
+        bullets: ["Security and access logs needed to investigate misuse or protect the service.", "Fraud, abuse, safety, prohibited-item, or enforcement records.", "Booking, custody, transaction, consent, or audit records that must be preserved by law or for a legitimate dispute.", "A minimal deletion record showing that the request was received and completed.", "Information subject to a valid legal hold or lawful request."],
+      },
+      {
+        id: "timing",
+        title: "Completion time",
+        paragraphs: ["Verified account-deletion requests will be completed within 30 days. We will confirm when the deletion is complete or explain if a lawful exception requires limited information to be retained. Data may remain temporarily in encrypted backups until those backups are overwritten through the normal retention cycle."],
+      },
+      {
+        id: "contact",
+        title: "Need help?",
+        paragraphs: ["Email hello@aptopsagency.com with questions about account deletion or the status of an existing request."],
+      },
+    ],
+    related: ["/privacy-policy", "/support", "/trust-center", "/contact"],
   },
   "/terms-of-service": {
     path: "/terms-of-service",
@@ -214,7 +260,7 @@ export const publicPages: Record<Exclude<PublicRoute, "/">, PublicPageContent> =
       { id: "safety", title: "Urgent safety concerns", paragraphs: ["Karri Support is not an emergency service. If anyone is in immediate danger, contact local emergency services. For an active airport, customs, border, or carrier issue, contact the responsible authority directly, then notify Karri when it is safe to do so."] },
       { id: "reports", title: "Reports and privacy requests", paragraphs: ["Use the same support email to report prohibited conduct, appeal an account decision, or request access, correction, or deletion of eligible personal information. We may ask for reasonable information to verify the account or request."] },
     ],
-    related: ["/faq", "/release-notes", "/contact", "/trust-center"],
+    related: ["/faq", "/release-notes", "/delete-account", "/contact", "/trust-center"],
   },
   "/contact": {
     path: "/contact",
@@ -269,6 +315,7 @@ export const publicRouteLabels: Record<PublicRoute, string> = {
   "/about": "About",
   "/trust-center": "Trust Center",
   "/privacy-policy": "Privacy Policy",
+  "/delete-account": "Delete Account",
   "/terms-of-service": "Terms of Service",
   "/safety": "Safety Policy",
   "/prohibited-items": "Prohibited Items Policy",

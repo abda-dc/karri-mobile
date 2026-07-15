@@ -15,7 +15,7 @@ const primaryNavigation: { href: PublicRoute; label: string }[] = [
 
 const footerGroups: { title: string; links: { href: PublicRoute; label: string }[] }[] = [
   { title: "Explore", links: [{ href: "/about", label: "About" }, { href: "/trust-center", label: "Trust Center" }, { href: "/support", label: "Support" }, { href: "/contact", label: "Contact" }] },
-  { title: "Legal", links: [{ href: "/privacy-policy", label: "Privacy Policy" }, { href: "/terms-of-service", label: "Terms of Service" }, { href: "/safety", label: "Safety Policy" }] },
+  { title: "Legal", links: [{ href: "/privacy-policy", label: "Privacy Policy" }, { href: "/delete-account", label: "Delete Account" }, { href: "/terms-of-service", label: "Terms of Service" }, { href: "/safety", label: "Safety Policy" }] },
   { title: "Company", links: [{ href: "/careers", label: "Careers" }, { href: "/press", label: "Press" }] },
 ];
 
