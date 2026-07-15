@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { useEffect } from "react";
 import { Image, Platform, StyleSheet, Text, View } from "react-native";
 import { Badge } from "../src/components/Badge";
@@ -10,11 +10,10 @@ import { Screen } from "../src/components/Screen";
 import { useAuthSession } from "../src/presentation/hooks/useAuthSession";
 import { mobileServices } from "../src/presentation/services/mobileServices";
 import { colors, radii, spacing, typography } from "../src/theme/tokens";
-import { PublicHomePage } from "../src/public/PublicHomePage";
 
 export default function WelcomeScreen() {
   if (Platform.OS === "web") {
-    return <PublicHomePage />;
+    return <Redirect href="/(tabs)/home" />;
   }
 
   return <NativeWelcomeScreen />;
@@ -165,8 +164,5 @@ const styles = StyleSheet.create({
     width: 1,
   },
 });
-
-
-
 
 
