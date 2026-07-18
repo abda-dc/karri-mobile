@@ -1,0 +1,49 @@
+﻿name: Mobile Validate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/mobile-validate.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/mobile-validate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-validate:
+    name: Validate Expo mobile app
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Expo Doctor
+        run: npx expo-doctor .
+
+      - name: Run unit tests
+        run: npx vitest run src
+
+      - name: Run TypeScript check
+        run: npm run typecheck
