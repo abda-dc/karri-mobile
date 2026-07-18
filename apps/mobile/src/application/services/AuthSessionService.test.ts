@@ -6,6 +6,7 @@ describe("AuthSessionService", () => {
     configured: true,
     signOut: vi.fn(),
     startMvpSession: vi.fn(),
+    signInWithEmail: vi.fn(),
     refreshAuthorization: vi.fn(),
     subscribe: vi.fn(),
   };
@@ -26,6 +27,7 @@ describe("AuthSessionService", () => {
     const mockSession = {
       identity: {
         uid: "user-123",
+        email: null,
         createdAt: "2026-07-12T12:00:00Z",
         isAnonymous: false,
       },
@@ -38,8 +40,27 @@ describe("AuthSessionService", () => {
     expect(result).toEqual(mockSession);
   });
 
+  it("delegates signInWithEmail to gateway", async () => {
+    const mockSession = {
+      identity: {
+        uid: "admin-123",
+        email: "admin@karri.com",
+        createdAt: "2026-07-12T12:00:00Z",
+        isAnonymous: false,
+      },
+      authorization: {
+        role: "super_admin" as const,
+      },
+    };
+    vi.mocked(mockGateway.signInWithEmail).mockResolvedValueOnce(mockSession);
+    const result = await service.signInWithEmail("admin@karri.com", "password123");
+    expect(result).toEqual(mockSession);
+    expect(mockGateway.signInWithEmail).toHaveBeenCalledWith("admin@karri.com", "password123");
+  });
+
   it("delegates refreshAuthorization to gateway", async () => {
     const mockAuthSession = {
+      uid: "admin-123",
       role: "operations_admin" as const,
     };
     vi.mocked(mockGateway.refreshAuthorization).mockResolvedValueOnce(mockAuthSession);

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FirebaseAuthSessionGateway } from "./auth";
 import { getFirebaseServices } from "./client";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 
 vi.mock("./client", () => ({
   getFirebaseServices: vi.fn(),
@@ -11,12 +11,14 @@ vi.mock("./client", () => ({
 vi.mock("firebase/auth", () => ({
   onAuthStateChanged: vi.fn(),
   signInAnonymously: vi.fn(),
+  signInWithEmailAndPassword: vi.fn(),
   signOut: vi.fn(),
 }));
 
 describe("FirebaseAuthSessionGateway", () => {
   const mockUser = {
     uid: "test-user-123",
+    email: "test-user-123@karri.com",
     isAnonymous: false,
     metadata: { creationTime: "2026-07-12T12:00:00Z" },
     getIdTokenResult: vi.fn(),
@@ -154,5 +156,55 @@ describe("FirebaseAuthSessionGateway", () => {
 
     // Stale resolution must not be emitted
     expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("signInWithEmail successfully logs in and returns mapped session", async () => {
+    const mockCredential = {
+      user: mockUser,
+    };
+    vi.mocked(signInWithEmailAndPassword).mockResolvedValueOnce(mockCredential as any);
+    mockUser.getIdTokenResult.mockResolvedValueOnce({
+      claims: { role: "super_admin" },
+    });
+
+    const gateway = new FirebaseAuthSessionGateway();
+    const session = await gateway.signInWithEmail("admin@karri.com", "securePassword123");
+
+    expect(signInWithEmailAndPassword).toHaveBeenCalledWith(expect.anything(), "admin@karri.com", "securePassword123");
+    expect(session.identity.uid).toBe("test-user-123");
+    expect(session.authorization.role).toBe("super_admin");
+  });
+
+  it("signInWithEmail throws a generic error when credentials are invalid", async () => {
+    const firebaseError = new Error("Auth failed");
+    (firebaseError as any).code = "auth/invalid-credential";
+    vi.mocked(signInWithEmailAndPassword).mockRejectedValueOnce(firebaseError);
+
+    const gateway = new FirebaseAuthSessionGateway();
+    await expect(
+      gateway.signInWithEmail("admin@karri.com", "wrongPassword")
+    ).rejects.toThrow("The email or password is incorrect, or this account cannot access the administrator console.");
+  });
+
+  it("signInWithEmail throws a network error when connection fails", async () => {
+    const firebaseError = new Error("Network error");
+    (firebaseError as any).code = "auth/network-request-failed";
+    vi.mocked(signInWithEmailAndPassword).mockRejectedValueOnce(firebaseError);
+
+    const gateway = new FirebaseAuthSessionGateway();
+    await expect(
+      gateway.signInWithEmail("admin@karri.com", "password")
+    ).rejects.toThrow("Karri could not start your session while the connection is unavailable.");
+  });
+
+  it("signInWithEmail throws a throttling error when requests are rate-limited", async () => {
+    const firebaseError = new Error("Rate limit exceeded");
+    (firebaseError as any).code = "auth/too-many-requests";
+    vi.mocked(signInWithEmailAndPassword).mockRejectedValueOnce(firebaseError);
+
+    const gateway = new FirebaseAuthSessionGateway();
+    await expect(
+      gateway.signInWithEmail("admin@karri.com", "password")
+    ).rejects.toThrow("Karri has received too many sign-in attempts.");
   });
 });

@@ -104,6 +104,7 @@ export interface PrivilegedCallableTransportOptions {
   readonly authProvider?: CallableAuthProvider;
   readonly fetchImplementation?: typeof fetch;
   readonly projectId?: string;
+  readonly allowDevelopmentBypass?: boolean;
 }
 
 interface CallableErrorEnvelope {
@@ -155,12 +156,14 @@ export class PrivilegedCallableTransport {
   private readonly authProvider: CallableAuthProvider;
   private readonly fetchImplementation: typeof fetch;
   private readonly projectId: string;
+  private readonly allowDevelopmentBypass: boolean;
 
   constructor(options: PrivilegedCallableTransportOptions) {
     this.appCheckTokenProvider = options.appCheckTokenProvider;
     this.authProvider = options.authProvider ?? firebaseJsAuthProvider();
     this.fetchImplementation = options.fetchImplementation ?? fetch;
     this.projectId = options.projectId ?? process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? "";
+    this.allowDevelopmentBypass = options.allowDevelopmentBypass ?? false;
   }
 
   placeAdministrativeHold(payload: PlaceAdministrativeHoldPayload): Promise<AdministrativeHoldResult> {
@@ -206,7 +209,23 @@ export class PrivilegedCallableTransport {
     });
   }
 
-  private async getCredentials(user: CallableAuthUser, forceRefresh: boolean): Promise<{ authToken: string; appCheckToken: string }> {
+  private async getCredentials(user: CallableAuthUser, forceRefresh: boolean): Promise<{ authToken: string; appCheckToken: string | null }> {
+    const isDev = typeof __DEV__ !== "undefined" && __DEV__ === true;
+    const bypassAppCheck = isDev && this.allowDevelopmentBypass;
+
+    if (bypassAppCheck) {
+      console.warn("[DEVELOPMENT ONLY] App Check validation is bypassed by local environment configuration.");
+      const authToken = await user.getIdToken(forceRefresh);
+      if (!isNonEmptyToken(authToken)) {
+        throw new PrivilegedCallableError({
+          code: "callable/invalid-auth-token",
+          retryable: false,
+          safeMessage: "The current sign-in session did not return a valid credential.",
+        });
+      }
+      return { authToken, appCheckToken: null };
+    }
+
     const [authToken, appCheckResult] = await Promise.all([
       user.getIdToken(forceRefresh),
       this.appCheckTokenProvider.getToken(forceRefresh),
@@ -229,18 +248,22 @@ export class PrivilegedCallableTransport {
   private async send<TResult>(
     functionName: PrivilegedCallableName,
     payload: object,
-    credentials: { authToken: string; appCheckToken: string },
+    credentials: { authToken: string; appCheckToken: string | null },
   ): Promise<TResult> {
     const url = `https://${CALLABLE_REGION}-${this.projectId}.cloudfunctions.net/${functionName}`;
     let response: Response;
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${credentials.authToken}`,
+      "Content-Type": "application/json",
+    };
+    if (credentials.appCheckToken) {
+      headers["X-Firebase-AppCheck"] = credentials.appCheckToken;
+    }
+
     try {
       response = await this.fetchImplementation(url, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${credentials.authToken}`,
-          "Content-Type": "application/json",
-          "X-Firebase-AppCheck": credentials.appCheckToken,
-        },
+        headers,
         body: JSON.stringify({ data: payload }),
       });
     } catch {
@@ -267,7 +290,7 @@ export class PrivilegedCallableTransport {
       const envelope = body as CallableErrorEnvelope;
       const callableCode = typeof envelope.error?.status === "string" ? envelope.error.status : "UNKNOWN";
       const serverMessage = typeof envelope.error?.message === "string" ? envelope.error.message : "The command was rejected.";
-      const knownTokens = [credentials.authToken, credentials.appCheckToken];
+      const knownTokens = [credentials.authToken, credentials.appCheckToken].filter((t): t is string => !!t);
       throw new PrivilegedCallableError({
         code: callableCodeToProviderCode(callableCode),
         callableCode,

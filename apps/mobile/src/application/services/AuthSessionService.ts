@@ -2,6 +2,7 @@ import type { AuthorizationRole } from "../../domain/authorization/roles";
 
 export interface AuthIdentity {
   readonly uid: string;
+  readonly email: string | null;
   readonly createdAt: string | null;
   readonly isAnonymous: boolean;
 }
@@ -19,7 +20,8 @@ export interface AuthSessionGateway {
   readonly configured: boolean;
   signOut(): Promise<void>;
   startMvpSession(): Promise<AuthenticatedSession>;
-  refreshAuthorization(): Promise<AuthorizationSession | null>;
+  signInWithEmail(email: string, password: string): Promise<AuthenticatedSession>;
+  refreshAuthorization(): Promise<{ readonly uid: string; readonly role: AuthorizationRole } | null>;
   subscribe(
     onChange: (session: AuthenticatedSession | null) => void,
     onError: (error: unknown) => void,
@@ -41,7 +43,11 @@ export class AuthSessionService {
     return this.gateway.startMvpSession();
   }
 
-  refreshAuthorization(): Promise<AuthorizationSession | null> {
+  signInWithEmail(email: string, password: string): Promise<AuthenticatedSession> {
+    return this.gateway.signInWithEmail(email, password);
+  }
+
+  refreshAuthorization(): Promise<{ readonly uid: string; readonly role: AuthorizationRole } | null> {
     return this.gateway.refreshAuthorization();
   }
 

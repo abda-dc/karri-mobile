@@ -1,4 +1,4 @@
-import { browserLocalPersistence } from "firebase/auth";
+import { inMemoryPersistence } from "firebase/auth";
 
-// Expo web uses the browser's local persistence implementation.
-export const firebaseAuthPersistence = browserLocalPersistence;
+// safe fallback persistence
+export const firebaseAuthPersistence = inMemoryPersistence;

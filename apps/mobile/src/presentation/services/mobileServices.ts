@@ -41,6 +41,8 @@ import {
   ExpoPushTokenRegistrationGateway,
 } from "../../infrastructure/expo/notifications";
 import { reportApplicationError } from "../errors/getFriendlyError";
+import { PrivilegedCallableTransport } from "../../infrastructure/firebase/privilegedCallableTransport";
+import { UnavailableAppCheckTokenProvider } from "../../infrastructure/firebase/appCheckTokenProvider";
 
 const eventBus = new EventBus();
 const bookingRepository = new FirebaseBookingRepository();
@@ -81,6 +83,15 @@ const pushRegistrationService = new PushRegistrationService(
 const notificationRouter = new NotificationRouter(
   new FirebaseNotificationRoutingSource(),
 );
+const allowBypass =
+  typeof __DEV__ !== "undefined" &&
+  __DEV__ === true &&
+  process.env.EXPO_PUBLIC_ALLOW_LOCAL_APP_CHECK_BYPASS === "true";
+
+const privilegedCallableTransport = new PrivilegedCallableTransport({
+  appCheckTokenProvider: new UnavailableAppCheckTokenProvider(),
+  allowDevelopmentBypass: allowBypass,
+});
 
 firebaseOfflineStatusGateway.setBackgroundErrorReporter((error, operation) => {
   reportApplicationError(error, operation);
@@ -119,4 +130,5 @@ export const mobileServices = {
   shipmentTimeline: new ShipmentTimelineService(custodyRepository),
   trip: tripService,
   trust: trustService,
+  privilegedCallable: privilegedCallableTransport,
 } as const;

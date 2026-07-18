@@ -171,4 +171,96 @@ describe("PrivilegedCallableTransport", () => {
     expect(errorSpy).not.toHaveBeenCalled();
     expect(logSpy).not.toHaveBeenCalled();
   });
+
+  describe("App Check local bypass environment matrix", () => {
+    const originalEnv = process.env.NODE_ENV;
+    const originalBypassFlag = process.env.EXPO_PUBLIC_ALLOW_LOCAL_APP_CHECK_BYPASS;
+    const originalDev = (globalThis as any).__DEV__;
+
+    afterEach(() => {
+      process.env.NODE_ENV = originalEnv;
+      process.env.EXPO_PUBLIC_ALLOW_LOCAL_APP_CHECK_BYPASS = originalBypassFlag;
+      (globalThis as any).__DEV__ = originalDev;
+    });
+
+    it("allows bypassing App Check when in development build AND bypass flag is enabled", async () => {
+      (globalThis as any).__DEV__ = true;
+      process.env.EXPO_PUBLIC_ALLOW_LOCAL_APP_CHECK_BYPASS = "true";
+
+      const fetchImplementation = vi.fn(async () => jsonResponse({ result: { success: true, holdId: "hold-1", alreadyExisted: false } }));
+      const transport = new PrivilegedCallableTransport({
+        appCheckTokenProvider: new UnavailableAppCheckTokenProvider(),
+        authProvider: { getCurrentUser: () => ({ getIdToken: async () => AUTH_TOKEN }) },
+        fetchImplementation: fetchImplementation as typeof fetch,
+        projectId: "karri-test",
+        allowDevelopmentBypass: true,
+      });
+
+      await expect(transport.placeAdministrativeHold(placePayload)).resolves.toEqual({
+        success: true,
+        holdId: "hold-1",
+        alreadyExisted: false,
+      });
+
+      expect(fetchImplementation).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.not.objectContaining({
+            "X-Firebase-AppCheck": expect.any(String),
+          }),
+        })
+      );
+    });
+
+    it("fails closed when in development build but bypass flag is disabled", async () => {
+      (globalThis as any).__DEV__ = true;
+      process.env.EXPO_PUBLIC_ALLOW_LOCAL_APP_CHECK_BYPASS = "false";
+
+      const fetchImplementation = vi.fn();
+      const transport = new PrivilegedCallableTransport({
+        appCheckTokenProvider: new UnavailableAppCheckTokenProvider(),
+        authProvider: { getCurrentUser: () => ({ getIdToken: async () => AUTH_TOKEN }) },
+        fetchImplementation: fetchImplementation as typeof fetch,
+        projectId: "karri-test",
+        allowDevelopmentBypass: false,
+      });
+
+      await expect(transport.placeAdministrativeHold(placePayload)).rejects.toBeInstanceOf(AppCheckTokenProviderError);
+      expect(fetchImplementation).not.toHaveBeenCalled();
+    });
+
+    it("fails closed when in production build even if bypass flag is enabled", async () => {
+      (globalThis as any).__DEV__ = false;
+      process.env.EXPO_PUBLIC_ALLOW_LOCAL_APP_CHECK_BYPASS = "true";
+
+      const fetchImplementation = vi.fn();
+      const transport = new PrivilegedCallableTransport({
+        appCheckTokenProvider: new UnavailableAppCheckTokenProvider(),
+        authProvider: { getCurrentUser: () => ({ getIdToken: async () => AUTH_TOKEN }) },
+        fetchImplementation: fetchImplementation as typeof fetch,
+        projectId: "karri-test",
+        allowDevelopmentBypass: true,
+      });
+
+      await expect(transport.placeAdministrativeHold(placePayload)).rejects.toBeInstanceOf(AppCheckTokenProviderError);
+      expect(fetchImplementation).not.toHaveBeenCalled();
+    });
+
+    it("fails closed when in production build and bypass flag is disabled", async () => {
+      (globalThis as any).__DEV__ = false;
+      process.env.EXPO_PUBLIC_ALLOW_LOCAL_APP_CHECK_BYPASS = "false";
+
+      const fetchImplementation = vi.fn();
+      const transport = new PrivilegedCallableTransport({
+        appCheckTokenProvider: new UnavailableAppCheckTokenProvider(),
+        authProvider: { getCurrentUser: () => ({ getIdToken: async () => AUTH_TOKEN }) },
+        fetchImplementation: fetchImplementation as typeof fetch,
+        projectId: "karri-test",
+        allowDevelopmentBypass: false,
+      });
+
+      await expect(transport.placeAdministrativeHold(placePayload)).rejects.toBeInstanceOf(AppCheckTokenProviderError);
+      expect(fetchImplementation).not.toHaveBeenCalled();
+    });
+  });
 });

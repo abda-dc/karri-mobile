@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AuthIdentity,
   AuthorizationSession,
@@ -23,7 +23,7 @@ export type UseAuthSessionResult = {
   readonly error: string | null;
   readonly authorizationRole: AuthorizationRole;
   hasPermission(permission: Permission): boolean;
-  refreshAuthorization(): Promise<void>;
+  refreshAuthorization(): Promise<{ readonly uid: string; readonly role: AuthorizationRole } | null>;
 };
 
 export function useAuthSession(): UseAuthSessionResult {
@@ -76,34 +76,48 @@ export function useAuthSession(): UseAuthSessionResult {
     [authorizationRole],
   );
 
-  const refreshAuthorization = useCallback(async (): Promise<void> => {
-    if (refreshing) return;
+  const generationRef = useRef(0);
+
+  const refreshAuthorization = useCallback(async (): Promise<{ readonly uid: string; readonly role: AuthorizationRole } | null> => {
     setRefreshing(true);
+    const generation = ++generationRef.current;
+
     try {
       const updatedAuth = await mobileServices.auth.refreshAuthorization();
+      if (generation !== generationRef.current) {
+        return null;
+      }
+
       if (updatedAuth) {
         setState((current) => {
-          if (!current.session) return current;
+          if (!current.session || current.session.identity.uid !== updatedAuth.uid) {
+            return current;
+          }
           return {
             ...current,
             session: {
               identity: current.session.identity,
-              authorization: updatedAuth,
+              authorization: { role: updatedAuth.role },
             },
           };
         });
+        return updatedAuth;
       }
+      return null;
     } catch (error) {
-      // Do not silently overwrite current role on transient network/refresh failure
-      setState((current) => ({
-        ...current,
-        error: reportFriendlyError(error, "auth.refresh-claims"),
-      }));
-      throw error; // Let the caller decide how to treat the failure
+      if (generation === generationRef.current) {
+        setState((current) => ({
+          ...current,
+          error: reportFriendlyError(error, "auth.refresh-claims"),
+        }));
+      }
+      throw error;
     } finally {
-      setRefreshing(false);
+      if (generation === generationRef.current) {
+        setRefreshing(false);
+      }
     }
-  }, [refreshing]);
+  }, []);
 
   return {
     user: state.session?.identity ?? null,
