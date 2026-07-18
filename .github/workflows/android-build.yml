@@ -161,4 +161,3 @@ jobs:
           tracks: ${{ inputs.play_track }}
           status: ${{ inputs.release_status }}
           releaseName: 1.0.0 (${{ env.VERSION_CODE }})
-          changesNotSentForReview: true
