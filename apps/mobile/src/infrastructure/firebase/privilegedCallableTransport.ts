@@ -1,6 +1,6 @@
 import type { User as FirebaseUser } from "firebase/auth";
-import type { AppCheckTokenProvider } from "./appCheckTokenProvider";
-import { AppCheckTokenProviderError } from "./appCheckTokenProvider";
+import type { AppCheckTokenProvider } from "./appCheckTokenProvider.contract";
+import { AppCheckTokenProviderError } from "./appCheckTokenProvider.contract";
 import { getFirebaseServices } from "./client";
 
 const CALLABLE_REGION = "us-east1";

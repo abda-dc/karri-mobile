@@ -1,4 +1,12 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+// Production regression and transport verification suite
+import { vi } from "vitest";
+
+// Mock react-native globally to prevent Rolldown parse crash
+vi.mock("react-native", () => ({
+  Platform: { OS: "ios" },
+}));
+
+import { afterEach, describe, expect, it } from "vitest";
 import { AppCheckTokenProviderError, UnavailableAppCheckTokenProvider } from "./appCheckTokenProvider";
 import {
   PrivilegedCallableError,

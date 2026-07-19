@@ -42,7 +42,7 @@ import {
 } from "../../infrastructure/expo/notifications";
 import { reportApplicationError } from "../errors/getFriendlyError";
 import { PrivilegedCallableTransport } from "../../infrastructure/firebase/privilegedCallableTransport";
-import { UnavailableAppCheckTokenProvider } from "../../infrastructure/firebase/appCheckTokenProvider";
+import { PlatformAppCheckTokenProvider } from "../../infrastructure/firebase/appCheckTokenProvider";
 
 const eventBus = new EventBus();
 const bookingRepository = new FirebaseBookingRepository();
@@ -89,7 +89,7 @@ const allowBypass =
   process.env.EXPO_PUBLIC_ALLOW_LOCAL_APP_CHECK_BYPASS === "true";
 
 const privilegedCallableTransport = new PrivilegedCallableTransport({
-  appCheckTokenProvider: new UnavailableAppCheckTokenProvider(),
+  appCheckTokenProvider: new PlatformAppCheckTokenProvider(),
   allowDevelopmentBypass: allowBypass,
 });
 

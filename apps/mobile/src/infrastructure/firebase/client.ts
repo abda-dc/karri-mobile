@@ -84,9 +84,9 @@ export function getFirebaseServices(): FirebaseServices {
   };
 }
 
-// FCM and App Check remain uninitialized until their product flows, native
-// configuration, consent, and enforcement plans are implemented.
+// App Check is lazily initialized by PlatformAppCheckTokenProvider.
+// FCM/Cloud Messaging remains uninitialized until its product flows and native config are implemented.
 export const futureFirebaseServices = {
-  appCheck: "not-initialized",
+  appCheck: "lazily-initialized-by-token-provider",
   cloudMessaging: "not-initialized",
 } as const;
