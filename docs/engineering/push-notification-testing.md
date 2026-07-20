@@ -2,14 +2,22 @@
 
 ## Scope
 
-This is a development-only test foundation. It does not add a sender, Cloud Function, domain-event trigger, background task, notification listener, automatic navigation, broad-send tool, or production credential.
+This is a development-only test foundation. Local notification-response routing already exists, but registration occurs only through explicit Profile registration. Repository unregistration occurs only when an explicit caller invokes `remove`. N2 does not connect removal to logout, startup, preference disabling, permission revocation, or another lifecycle trigger.
+
+The following items are future/unimplemented and separated from current N2 manual testing:
+- server-side deactivation lifecycle
+- invalid-provider-token cleanup
+- leases
+- retention purging
+- provider-response cleanup
+- remote delivery
 
 Phase 13 can request permission and obtain an Expo token only after an authenticated user:
 
 1. enables and saves the Push preference; and
 2. presses **Enable device notifications** in Profile.
 
-The current token repository remains deferred, so Karri does not persist or display the token. End-to-end sending remains blocked until approved server-side development registration tooling exists.
+The token repository wiring (implemented in N2) persists the token securely using the trusted backend callables (`registerPushToken`/`unregisterPushToken`). The token is never displayed or logged on the client. End-to-end sending remains blocked until approved server-side development registration tooling exists.
 
 ## Minimal payload contract
 
@@ -126,7 +134,7 @@ For invalid payloads, `validateNotificationPushPayload` returns explicit errors 
 - [ ] Verify Android creates `karri_activity_v1` and `karri_announcements_v1` before the OS prompt.
 - [ ] Verify allow, deny, provisional/ephemeral where applicable, and already-denied behavior.
 - [ ] Verify no raw token appears in the UI, console, application logs, Firestore, analytics, or error reporting.
-- [ ] Verify the UI reports server persistence as deferred until the trusted endpoint exists.
+- [ ] Verify that the UI reports server registration is confirmed after successful registration.
 - [ ] Verify toggling the preference alone never requests permission or token registration.
 
 ## Controlled delivery test checklist for a later phase
@@ -157,20 +165,20 @@ No send is authorized by this milestone. Once approved development-only server r
 
 ## Disable and remove test registrations
 
-Current foundation:
+Current N2 foundation:
 
-- Disable the Push preference to prevent future policy eligibility.
-- Revoke notification permission or disable channels in system settings when testing denial behavior.
-- The Expo adapter disables Expo automatic token-update registration after explicit acquisition.
-- Karri's deferred token repository does not retain the token in Firestore or another Karri store.
+- Registration occurs only through explicit Profile registration.
+- Repository unregistration occurs only when an explicit caller invokes `remove`.
+- N2 does not connect removal to logout, startup, preference disabling, permission revocation, or another lifecycle trigger.
 
-After the trusted development registration endpoint exists:
+Future / unimplemented cleanup:
 
-- Call the authenticated unregister endpoint before sign-out.
-- Deactivate the installation server-side and verify it is excluded from lookup.
-- Remove confirmed `DeviceNotRegistered`/invalid tokens.
-- Expire the development registration lease and purge its recoverable token according to retention policy.
-- Rotate/revoke development credentials if token or sender access is exposed.
+- Server-side deactivation lifecycle
+- Invalid-provider-token cleanup
+- Leases
+- Retention purging
+- Provider-response cleanup
+- Remote delivery
 
 ## Stop conditions
 

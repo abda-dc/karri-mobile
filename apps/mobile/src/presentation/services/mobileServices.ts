@@ -76,13 +76,6 @@ const localNotificationService = new LocalNotificationService(
 const pushNotificationService = new PushNotificationService(
   new FirebasePushNotificationGateway(),
 );
-const pushRegistrationService = new PushRegistrationService(
-  new ExpoPushTokenRegistrationGateway(),
-  new FirebasePushTokenRepository(),
-);
-const notificationRouter = new NotificationRouter(
-  new FirebaseNotificationRoutingSource(),
-);
 const allowBypass =
   typeof __DEV__ !== "undefined" &&
   __DEV__ === true &&
@@ -92,6 +85,14 @@ const privilegedCallableTransport = new PrivilegedCallableTransport({
   appCheckTokenProvider: new PlatformAppCheckTokenProvider(),
   allowDevelopmentBypass: allowBypass,
 });
+
+const pushRegistrationService = new PushRegistrationService(
+  new ExpoPushTokenRegistrationGateway(),
+  new FirebasePushTokenRepository(privilegedCallableTransport),
+);
+const notificationRouter = new NotificationRouter(
+  new FirebaseNotificationRoutingSource(),
+);
 
 firebaseOfflineStatusGateway.setBackgroundErrorReporter((error, operation) => {
   reportApplicationError(error, operation);

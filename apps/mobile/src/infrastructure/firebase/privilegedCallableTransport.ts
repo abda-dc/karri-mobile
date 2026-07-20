@@ -17,7 +17,35 @@ const NON_RETRYABLE_CALLABLE_CODES = new Set([
 export type PrivilegedCallableName =
   | "placeAdministrativeHold"
   | "releaseAdministrativeHold"
-  | "submitSafetyReview";
+  | "submitSafetyReview"
+  | "registerPushToken"
+  | "unregisterPushToken";
+
+export interface RegisterPushTokenPayload {
+  readonly deviceId: string;
+  readonly platform: "android" | "ios";
+  readonly provider: "expo";
+  readonly token: string;
+  readonly registeredAt: string;
+}
+
+export interface RegisterPushTokenResult {
+  readonly success: boolean;
+  readonly deviceId: string;
+  readonly status: "registered";
+  readonly alreadyExisted: boolean;
+}
+
+export interface UnregisterPushTokenPayload {
+  readonly deviceId: string;
+}
+
+export interface UnregisterPushTokenResult {
+  readonly success: boolean;
+  readonly deviceId: string;
+  readonly status: "unregistered";
+  readonly alreadyInactive: boolean;
+}
 
 export interface PlaceAdministrativeHoldPayload {
   readonly shipmentId: string;
@@ -79,6 +107,7 @@ export interface PrivilegedCallableErrorOptions {
   readonly httpStatus?: number;
   readonly retryable: boolean;
   readonly safeMessage: string;
+  readonly requiresCredentialRefresh?: boolean;
 }
 
 export class PrivilegedCallableError extends Error {
@@ -87,6 +116,7 @@ export class PrivilegedCallableError extends Error {
   readonly details: unknown;
   readonly httpStatus: number | null;
   readonly retryable: boolean;
+  readonly requiresCredentialRefresh: boolean;
 
   constructor(options: PrivilegedCallableErrorOptions) {
     super(options.safeMessage);
@@ -96,6 +126,7 @@ export class PrivilegedCallableError extends Error {
     this.details = options.details;
     this.httpStatus = options.httpStatus ?? null;
     this.retryable = options.retryable;
+    this.requiresCredentialRefresh = options.requiresCredentialRefresh ?? false;
   }
 }
 
@@ -139,7 +170,7 @@ function redactKnownTokensFromValue(value: unknown, tokens: ReadonlyArray<string
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>).map(([key, item]) => [
-        key,
+        redactKnownTokens(key, tokens),
         redactKnownTokensFromValue(item, tokens),
       ]),
     );
@@ -178,7 +209,19 @@ export class PrivilegedCallableTransport {
     return this.invoke("submitSafetyReview", payload);
   }
 
-  private async invoke<TResult>(functionName: PrivilegedCallableName, payload: object): Promise<TResult> {
+  registerPushToken(payload: RegisterPushTokenPayload): Promise<RegisterPushTokenResult> {
+    return this.invoke("registerPushToken", payload, [payload.token]);
+  }
+
+  unregisterPushToken(payload: UnregisterPushTokenPayload): Promise<UnregisterPushTokenResult> {
+    return this.invoke("unregisterPushToken", payload);
+  }
+
+  private async invoke<TResult>(
+    functionName: PrivilegedCallableName,
+    payload: object,
+    sensitiveTokens: string[] = [],
+  ): Promise<TResult> {
     const user = this.authProvider.getCurrentUser();
     if (!user) {
       throw new PrivilegedCallableError({
@@ -192,9 +235,9 @@ export class PrivilegedCallableTransport {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const credentials = await this.getCredentials(user, forceRefresh);
       try {
-        return await this.send<TResult>(functionName, payload, credentials);
+        return await this.send<TResult>(functionName, payload, credentials, sensitiveTokens);
       } catch (error) {
-        if (attempt === 0 && error instanceof PrivilegedCallableError && error.callableCode && CREDENTIAL_ERROR_CODES.has(error.callableCode)) {
+        if (attempt === 0 && error instanceof PrivilegedCallableError && error.requiresCredentialRefresh) {
           forceRefresh = true;
           continue;
         }
@@ -249,6 +292,7 @@ export class PrivilegedCallableTransport {
     functionName: PrivilegedCallableName,
     payload: object,
     credentials: { authToken: string; appCheckToken: string | null },
+    sensitiveTokens: string[] = [],
   ): Promise<TResult> {
     const url = `https://${CALLABLE_REGION}-${this.projectId}.cloudfunctions.net/${functionName}`;
     let response: Response;
@@ -288,16 +332,19 @@ export class PrivilegedCallableTransport {
 
     if (body && typeof body === "object" && "error" in body) {
       const envelope = body as CallableErrorEnvelope;
-      const callableCode = typeof envelope.error?.status === "string" ? envelope.error.status : "UNKNOWN";
-      const serverMessage = typeof envelope.error?.message === "string" ? envelope.error.message : "The command was rejected.";
-      const knownTokens = [credentials.authToken, credentials.appCheckToken].filter((t): t is string => !!t);
+      const rawStatus = typeof envelope.error?.status === "string" ? envelope.error.status : "UNKNOWN";
+      const knownTokens = [credentials.authToken, credentials.appCheckToken, ...sensitiveTokens].filter((t): t is string => !!t);
+      const safeStatus = knownTokens.some(t => rawStatus.includes(t)) ? "[REDACTED]" : redactKnownTokens(rawStatus, knownTokens);
+      const serverMessageRaw = typeof envelope.error?.message === "string" ? envelope.error.message : "The command was rejected.";
+      const safeMessage = redactKnownTokens(serverMessageRaw, knownTokens);
       throw new PrivilegedCallableError({
-        code: callableCodeToProviderCode(callableCode),
-        callableCode,
+        code: callableCodeToProviderCode(safeStatus),
+        callableCode: safeStatus,
         details: redactKnownTokensFromValue(envelope.error?.details, knownTokens),
         httpStatus: response.status,
-        retryable: !NON_RETRYABLE_CALLABLE_CODES.has(callableCode) && (CREDENTIAL_ERROR_CODES.has(callableCode) || response.status >= 500),
-        safeMessage: redactKnownTokens(serverMessage, knownTokens),
+        retryable: !NON_RETRYABLE_CALLABLE_CODES.has(rawStatus) && (CREDENTIAL_ERROR_CODES.has(rawStatus) || response.status >= 500),
+        safeMessage,
+        requiresCredentialRefresh: CREDENTIAL_ERROR_CODES.has(rawStatus),
       });
     }
 

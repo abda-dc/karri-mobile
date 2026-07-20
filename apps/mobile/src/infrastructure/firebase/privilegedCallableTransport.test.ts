@@ -160,7 +160,12 @@ describe("PrivilegedCallableTransport", () => {
         error: {
           status: "PERMISSION_DENIED",
           message: `Rejected ${AUTH_TOKEN} and ${APP_CHECK_TOKEN}.`,
-          details: { credential: AUTH_TOKEN, nested: [APP_CHECK_TOKEN] },
+          details: {
+            credential: AUTH_TOKEN,
+            nested: [APP_CHECK_TOKEN],
+            [AUTH_TOKEN]: "authKeyVal",
+            nestedKeys: { [APP_CHECK_TOKEN]: "appCheckKeyVal" },
+          },
         },
       }, 403),
     ]);
@@ -269,6 +274,452 @@ describe("PrivilegedCallableTransport", () => {
 
       await expect(transport.placeAdministrativeHold(placePayload)).rejects.toBeInstanceOf(AppCheckTokenProviderError);
       expect(fetchImplementation).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("registerPushToken and unregisterPushToken", () => {
+    const pushToken = "ExpoPushToken[sensitive-token-123]";
+    const registerPayload = {
+      deviceId: "karri-device-123456789012",
+      platform: "ios" as const,
+      provider: "expo" as const,
+      token: pushToken,
+      registeredAt: "2026-07-20T10:00:00.000Z",
+    };
+    const unregisterPayload = {
+      deviceId: "karri-device-123456789012",
+    };
+
+    it("registerPushToken uses the correct regional endpoint, envelope, payload fields, and headers", async () => {
+      const harness = createHarness([
+        jsonResponse({ result: { success: true, deviceId: registerPayload.deviceId, status: "registered", alreadyExisted: false } }),
+      ]);
+
+      await expect(harness.transport.registerPushToken(registerPayload)).resolves.toEqual({
+        success: true,
+        deviceId: registerPayload.deviceId,
+        status: "registered",
+        alreadyExisted: false,
+      });
+
+      expect(harness.fetchImplementation).toHaveBeenCalledWith(
+        "https://us-east1-karri-test.cloudfunctions.net/registerPushToken",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${AUTH_TOKEN}`,
+            "Content-Type": "application/json",
+            "X-Firebase-AppCheck": APP_CHECK_TOKEN,
+          },
+          body: JSON.stringify({ data: registerPayload }),
+        },
+      );
+    });
+
+    it("unregisterPushToken sends only deviceId", async () => {
+      const harness = createHarness([
+        jsonResponse({ result: { success: true, deviceId: unregisterPayload.deviceId, status: "unregistered", alreadyInactive: true } }),
+      ]);
+
+      await expect(harness.transport.unregisterPushToken(unregisterPayload)).resolves.toEqual({
+        success: true,
+        deviceId: unregisterPayload.deviceId,
+        status: "unregistered",
+        alreadyInactive: true,
+      });
+
+      expect(harness.fetchImplementation).toHaveBeenCalledWith(
+        "https://us-east1-karri-test.cloudfunctions.net/unregisterPushToken",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${AUTH_TOKEN}`,
+            "Content-Type": "application/json",
+            "X-Firebase-AppCheck": APP_CHECK_TOKEN,
+          },
+          body: JSON.stringify({ data: unregisterPayload }),
+        },
+      );
+    });
+
+    it("fails closed when user is signed out", async () => {
+      const transport = new PrivilegedCallableTransport({
+        appCheckTokenProvider: { getToken: vi.fn() },
+        authProvider: { getCurrentUser: () => null },
+        fetchImplementation: vi.fn() as typeof fetch,
+        projectId: "karri-test",
+      });
+
+      await expect(transport.registerPushToken(registerPayload)).rejects.toMatchObject({
+        code: "callable/signed-out",
+        retryable: false,
+      });
+    });
+
+    it("fails closed when App Check is unavailable", async () => {
+      const transport = new PrivilegedCallableTransport({
+        appCheckTokenProvider: new UnavailableAppCheckTokenProvider(),
+        authProvider: { getCurrentUser: () => ({ getIdToken: async () => AUTH_TOKEN }) },
+        fetchImplementation: vi.fn() as typeof fetch,
+        projectId: "karri-test",
+      });
+
+      await expect(transport.registerPushToken(registerPayload)).rejects.toBeInstanceOf(AppCheckTokenProviderError);
+    });
+
+    it("forces one credential refresh and retries once after unauthenticated", async () => {
+      const harness = createHarness([
+        jsonResponse({ error: { status: "UNAUTHENTICATED", message: "Expired." } }, 401),
+        jsonResponse({ result: { success: true, deviceId: registerPayload.deviceId, status: "registered", alreadyExisted: false } }),
+      ]);
+
+      await expect(harness.transport.registerPushToken(registerPayload)).resolves.toMatchObject({ status: "registered" });
+      expect(harness.fetchImplementation).toHaveBeenCalledTimes(2);
+      expect(harness.getIdToken.mock.calls.map(([force]) => force)).toEqual([false, true]);
+    });
+
+    it("redacts raw push token appearing as error message substring, nested object value, or nested object key", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+      const harness = createHarness([
+        jsonResponse({
+          error: {
+            status: "INVALID_ARGUMENT",
+            message: `The token ${pushToken} is invalid.`,
+            details: {
+              suppliedToken: pushToken,
+              nestedArray: [pushToken],
+              [pushToken]: "tokenValueAsKey",
+              deepObject: {
+                [pushToken]: { nested: pushToken },
+              },
+            },
+          },
+        }, 400),
+      ]);
+
+      let failure: any;
+      try {
+        await harness.transport.registerPushToken(registerPayload);
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure).toBeInstanceOf(PrivilegedCallableError);
+      expect(failure.message).not.toContain(pushToken);
+      expect(failure.message).toContain("[REDACTED]");
+      expect(failure.details.suppliedToken).toBe("[REDACTED]");
+      expect(failure.details.nestedArray[0]).toBe("[REDACTED]");
+      expect(failure.details["[REDACTED]"]).toBe("tokenValueAsKey");
+      expect(failure.details.deepObject["[REDACTED]"].nested).toBe("[REDACTED]");
+      expect(String(failure)).not.toContain(pushToken);
+      expect(JSON.stringify(failure)).not.toContain(pushToken);
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(logSpy).not.toHaveBeenCalled();
+    });
+    it("redacts raw token appearing in error status", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      const tokenInStatus = `INVALID_ARGUMENT_${pushToken}`;
+      const harness = createHarness([
+        jsonResponse({
+          error: {
+            status: tokenInStatus,
+            message: "Bad request",
+          },
+        }, 400),
+      ]);
+
+      let failure: any;
+      try {
+        await harness.transport.registerPushToken(registerPayload);
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure).toBeInstanceOf(PrivilegedCallableError);
+      expect(failure.callableCode).toBe("[REDACTED]");
+      expect(failure.message).toBe("Bad request");
+      expect(String(failure)).not.toContain(pushToken);
+      expect(JSON.stringify(failure)).not.toContain(pushToken);
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(logSpy).not.toHaveBeenCalled();
+    });
+
+    it("ensures existing administrative callables retain their current error and credential behavior after sensitive-value support", async () => {
+      const harness = createHarness([
+        jsonResponse({
+          error: {
+            status: "PERMISSION_DENIED",
+            message: "Denied admin access.",
+            details: { info: "admin" },
+          },
+        }, 403),
+      ]);
+
+      await expect(harness.transport.placeAdministrativeHold(placePayload)).rejects.toMatchObject({
+        code: "callable/permission-denied",
+        message: "Denied admin access.",
+        details: { info: "admin" },
+      });
+    });
+
+    it("redacts raw token when error.status is exactly auth.header.payload", async () => {
+      const targetToken = "auth.header.payload";
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+      const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => undefined);
+
+      const harness = createHarness([
+        jsonResponse(
+          {
+            error: {
+              status: targetToken,
+              message: `Failed for ${targetToken}`,
+              details: { token: targetToken },
+            },
+          },
+          400,
+        ),
+      ]);
+
+      let failure: any;
+      try {
+        await harness.transport.registerPushToken({
+          ...registerPayload,
+          token: pushToken,
+        });
+      } catch (error) {
+        failure = error;
+      }
+
+      try {
+        expect(failure).toBeInstanceOf(PrivilegedCallableError);
+        expect(failure.message).not.toContain(targetToken);
+        expect(failure.callableCode).not.toContain(targetToken);
+        expect(failure.code).not.toContain(targetToken);
+        expect(JSON.stringify(failure.details)).not.toContain(targetToken);
+        expect(String(failure)).not.toContain(targetToken);
+        expect(JSON.stringify(failure)).not.toContain(targetToken);
+
+        console.error(failure);
+        console.warn(failure);
+        console.log(failure);
+        console.info(failure);
+        console.debug(failure);
+
+        for (const spy of [errorSpy, warnSpy, logSpy, infoSpy, debugSpy]) {
+          expect(spy).toHaveBeenCalledTimes(1);
+          for (const callArgs of spy.mock.calls) {
+            for (const arg of callArgs) {
+              expect(String(arg)).not.toContain(targetToken);
+              expect(JSON.stringify(arg)).not.toContain(targetToken);
+            }
+          }
+        }
+      } finally {
+        errorSpy.mockRestore();
+        warnSpy.mockRestore();
+        logSpy.mockRestore();
+        infoSpy.mockRestore();
+        debugSpy.mockRestore();
+      }
+    });
+
+    it("redacts raw token when error.status is exactly appcheck.header.payload", async () => {
+      const targetToken = "appcheck.header.payload";
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+      const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => undefined);
+
+      const harness = createHarness([
+        jsonResponse(
+          {
+            error: {
+              status: targetToken,
+              message: `Failed for ${targetToken}`,
+              details: { token: targetToken },
+            },
+          },
+          400,
+        ),
+      ]);
+
+      let failure: any;
+      try {
+        await harness.transport.registerPushToken({
+          ...registerPayload,
+          token: pushToken,
+        });
+      } catch (error) {
+        failure = error;
+      }
+
+      try {
+        expect(failure).toBeInstanceOf(PrivilegedCallableError);
+        expect(failure.message).not.toContain(targetToken);
+        expect(failure.callableCode).not.toContain(targetToken);
+        expect(failure.code).not.toContain(targetToken);
+        expect(JSON.stringify(failure.details)).not.toContain(targetToken);
+        expect(String(failure)).not.toContain(targetToken);
+        expect(JSON.stringify(failure)).not.toContain(targetToken);
+
+        console.error(failure);
+        console.warn(failure);
+        console.log(failure);
+        console.info(failure);
+        console.debug(failure);
+
+        for (const spy of [errorSpy, warnSpy, logSpy, infoSpy, debugSpy]) {
+          expect(spy).toHaveBeenCalledTimes(1);
+          for (const callArgs of spy.mock.calls) {
+            for (const arg of callArgs) {
+              expect(String(arg)).not.toContain(targetToken);
+              expect(JSON.stringify(arg)).not.toContain(targetToken);
+            }
+          }
+        }
+      } finally {
+        errorSpy.mockRestore();
+        warnSpy.mockRestore();
+        logSpy.mockRestore();
+        infoSpy.mockRestore();
+        debugSpy.mockRestore();
+      }
+    });
+
+    it("redacts raw token when error.status is exactly ExpoPushToken[val123]", async () => {
+      const targetToken = "ExpoPushToken[val123]";
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+      const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => undefined);
+
+      const harness = createHarness([
+        jsonResponse(
+          {
+            error: {
+              status: targetToken,
+              message: `Failed for ${targetToken}`,
+              details: { token: targetToken },
+            },
+          },
+          400,
+        ),
+      ]);
+
+      let failure: any;
+      try {
+        await harness.transport.registerPushToken({
+          ...registerPayload,
+          token: targetToken,
+        });
+      } catch (error) {
+        failure = error;
+      }
+
+      try {
+        expect(failure).toBeInstanceOf(PrivilegedCallableError);
+        expect(failure.message).not.toContain(targetToken);
+        expect(failure.callableCode).not.toContain(targetToken);
+        expect(failure.code).not.toContain(targetToken);
+        expect(JSON.stringify(failure.details)).not.toContain(targetToken);
+        expect(String(failure)).not.toContain(targetToken);
+        expect(JSON.stringify(failure)).not.toContain(targetToken);
+
+        console.error(failure);
+        console.warn(failure);
+        console.log(failure);
+        console.info(failure);
+        console.debug(failure);
+
+        for (const spy of [errorSpy, warnSpy, logSpy, infoSpy, debugSpy]) {
+          expect(spy).toHaveBeenCalledTimes(1);
+          for (const callArgs of spy.mock.calls) {
+            for (const arg of callArgs) {
+              expect(String(arg)).not.toContain(targetToken);
+              expect(JSON.stringify(arg)).not.toContain(targetToken);
+            }
+          }
+        }
+      } finally {
+        errorSpy.mockRestore();
+        warnSpy.mockRestore();
+        logSpy.mockRestore();
+        infoSpy.mockRestore();
+        debugSpy.mockRestore();
+      }
+    });
+
+    it("preserves harmless message when error.status is ExpoPushToken[val123] and error.message contains no token", async () => {
+      const targetToken = "ExpoPushToken[val123]";
+      const harmlessMessage = "Invalid push registration parameters";
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+      const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => undefined);
+
+      const harness = createHarness([
+        jsonResponse(
+          {
+            error: {
+              status: targetToken,
+              message: harmlessMessage,
+              details: { ok: true },
+            },
+          },
+          400,
+        ),
+      ]);
+
+      let failure: any;
+      try {
+        await harness.transport.registerPushToken({
+          ...registerPayload,
+          token: targetToken,
+        });
+      } catch (error) {
+        failure = error;
+      }
+
+      try {
+        expect(failure).toBeInstanceOf(PrivilegedCallableError);
+        expect(failure.callableCode).toBe("[REDACTED]");
+        expect(failure.code).toBe("callable/[redacted]");
+        expect(failure.message).toBe(harmlessMessage);
+        expect(String(failure)).not.toContain(targetToken);
+        expect(JSON.stringify(failure)).not.toContain(targetToken);
+        expect(JSON.stringify(failure.details)).not.toContain(targetToken);
+
+        console.error(failure);
+        console.warn(failure);
+        console.log(failure);
+        console.info(failure);
+        console.debug(failure);
+
+        for (const spy of [errorSpy, warnSpy, logSpy, infoSpy, debugSpy]) {
+          expect(spy).toHaveBeenCalledTimes(1);
+          for (const callArgs of spy.mock.calls) {
+            for (const arg of callArgs) {
+              expect(String(arg)).not.toContain(targetToken);
+              expect(JSON.stringify(arg)).not.toContain(targetToken);
+            }
+          }
+        }
+      } finally {
+        errorSpy.mockRestore();
+        warnSpy.mockRestore();
+        logSpy.mockRestore();
+        infoSpy.mockRestore();
+        debugSpy.mockRestore();
+      }
     });
   });
 });
