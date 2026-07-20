@@ -1424,4 +1424,38 @@ describe("Milestone 31 - Coarse Admin Roles and Multi-Role Access Control Bounda
       await assertFails(getDoc(doc(userDb(travelerUid), path)));
     });
   });
+
+  describe("Push Token Registrations Client Isolation", () => {
+    it("proves clients cannot read or write to pushTokenRegistrations collection and subcollections for any roles", async () => {
+      // Test with super admin, regular user, and unauthenticated client
+      const superAdminDb = roleDb("admin-1", "super_admin");
+      const userDbInstance = userDb("user-1");
+      const unauthDb = testEnv.unauthenticatedContext().firestore();
+
+      const path = "pushTokenRegistrations/user-1/devices/karri-device-1";
+
+      // Deny reads
+      await assertFails(getDoc(doc(superAdminDb, path)));
+      await assertFails(getDoc(doc(userDbInstance, path)));
+      await assertFails(getDoc(doc(unauthDb, path)));
+
+      // Deny creates/writes
+      const testDoc = {
+        userId: "user-1",
+        deviceId: "karri-device-1",
+        platform: "ios",
+        provider: "expo",
+        token: "ExponentPushToken[12345]",
+        active: true,
+      };
+      await assertFails(setDoc(doc(superAdminDb, path), testDoc));
+      await assertFails(setDoc(doc(userDbInstance, path), testDoc));
+      await assertFails(setDoc(doc(unauthDb, path), testDoc));
+
+      // Deny deletes
+      await assertFails(deleteDoc(doc(superAdminDb, path)));
+      await assertFails(deleteDoc(doc(userDbInstance, path)));
+      await assertFails(deleteDoc(doc(unauthDb, path)));
+    });
+  });
 });

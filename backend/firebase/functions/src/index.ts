@@ -4,6 +4,7 @@ import { assertPermission } from "./guards/PermissionGuard.js";
 import { AuditLogService } from "./services/AuditLogService.js";
 import { ShipmentSafetyReviewService } from "./services/ShipmentSafetyReviewService.js";
 import { AdministrativeHoldService } from "./services/AdministrativeHoldService.js";
+import { PushTokenPersistenceService } from "./services/PushTokenPersistenceService.js";
 import {
   ValidationError,
   PermissionDeniedError,
@@ -26,6 +27,7 @@ const db = admin.firestore();
 const auditLogService = new AuditLogService(db);
 const shipmentSafetyReviewService = new ShipmentSafetyReviewService(db, auditLogService);
 const administrativeHoldService = new AdministrativeHoldService(db, auditLogService);
+const pushTokenPersistenceService = new PushTokenPersistenceService(db);
 
 const callableRuntimeOptions = {
   region: "us-east1",
@@ -222,6 +224,50 @@ export const releaseAdministrativeHold = onCall(callableRuntimeOptions, async (r
       success: result.success,
       holdId: result.holdId,
       alreadyExisted: result.alreadyExisted,
+    };
+  } catch (error) {
+    throw mapError(error);
+  }
+});
+
+export const registerPushToken = onCall(callableRuntimeOptions, async (request) => {
+  try {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "Unauthenticated request.");
+    }
+    const uid = request.auth.uid;
+
+    const result = await db.runTransaction(async (transaction) => {
+      return await pushTokenPersistenceService.registerPushToken(transaction, uid, request.data);
+    });
+
+    return {
+      success: result.success,
+      deviceId: result.deviceId,
+      status: result.status,
+      alreadyExisted: result.alreadyExisted,
+    };
+  } catch (error) {
+    throw mapError(error);
+  }
+});
+
+export const unregisterPushToken = onCall(callableRuntimeOptions, async (request) => {
+  try {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "Unauthenticated request.");
+    }
+    const uid = request.auth.uid;
+
+    const result = await db.runTransaction(async (transaction) => {
+      return await pushTokenPersistenceService.unregisterPushToken(transaction, uid, request.data);
+    });
+
+    return {
+      success: result.success,
+      deviceId: result.deviceId,
+      status: result.status,
+      alreadyInactive: result.alreadyInactive,
     };
   } catch (error) {
     throw mapError(error);

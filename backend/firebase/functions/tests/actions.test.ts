@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import admin from "firebase-admin";
-import { submitSafetyReview, placeAdministrativeHold, releaseAdministrativeHold } from "../src/index.js";
+import { submitSafetyReview, placeAdministrativeHold, releaseAdministrativeHold, registerPushToken, unregisterPushToken } from "../src/index.js";
 import { deriveOperationId } from "../src/utils/crypto.js";
 
 if (admin.apps.length === 0) {
@@ -704,6 +704,556 @@ describe("Administrative Actions Functions Integration", () => {
         },
       } as any);
       expect(res3.success).toBe(true);
+    });
+  });
+
+  describe("Push Token Persistence Actions Integration", () => {
+    beforeEach(async () => {
+      // Clear only the test pushTokenRegistrations records created by this test suite
+      const testUids = ["user-123", "user-abc", "user-xyz"];
+      for (const testUid of testUids) {
+        const devicesSnap = await db
+          .collection("pushTokenRegistrations")
+          .doc(testUid)
+          .collection("devices")
+          .get();
+        for (const deviceDoc of devicesSnap.docs) {
+          await deviceDoc.ref.delete();
+        }
+        await db.collection("pushTokenRegistrations").doc(testUid).delete();
+      }
+    });
+
+    describe("Authentication checks", () => {
+      it("fails when unauthenticated for registerPushToken", async () => {
+        const req = {
+          data: {
+            deviceId: "karri-device-123456789012",
+            platform: "ios",
+            provider: "expo",
+            token: "ExponentPushToken[some-valid-token-value-here]",
+            registeredAt: "2026-07-20T10:00:00.000Z",
+          },
+        };
+        await expect(registerPushToken.run(req as any)).rejects.toThrowError(
+          /Unauthenticated request/
+        );
+      });
+
+      it("fails when unauthenticated for unregisterPushToken", async () => {
+        const req = {
+          data: {
+            deviceId: "karri-device-123456789012",
+          },
+        };
+        await expect(unregisterPushToken.run(req as any)).rejects.toThrowError(
+          /Unauthenticated request/
+        );
+      });
+    });
+
+    describe("Payload validation checks", () => {
+      const auth = { uid: "user-123", token: { role: "user" } };
+
+      it("rejects non-object payload", async () => {
+        const req = { data: "not-an-object", auth };
+        await expect(registerPushToken.run(req as any)).rejects.toThrowError(
+          /must be an object/
+        );
+      });
+
+      it("rejects payload with extra/unknown fields", async () => {
+        const req = {
+          data: {
+            deviceId: "karri-device-123456789012",
+            platform: "ios",
+            provider: "expo",
+            token: "ExponentPushToken[token123]",
+            registeredAt: "2026-07-20T10:00:00.000Z",
+            extraField: "hack",
+          },
+          auth,
+        };
+        await expect(registerPushToken.run(req as any)).rejects.toThrowError(
+          /contains unsupported fields/
+        );
+      });
+
+      it("rejects invalid deviceId formats", async () => {
+        const invalidDeviceIds = [
+          "short-id", // too short (fails pattern)
+          "karri-short", // fails pattern (less than 16 chars in suffix)
+          "karri-invalid_chars_here_1234", // underscore not allowed in pattern
+          "  karri-padded-device-id-12345  ", // not trimmed
+          "", // empty
+        ];
+
+        for (const deviceId of invalidDeviceIds) {
+          const req = {
+            data: {
+              deviceId,
+              platform: "ios",
+              provider: "expo",
+              token: "ExponentPushToken[token123]",
+              registeredAt: "2026-07-20T10:00:00.000Z",
+            },
+            auth,
+          };
+          await expect(registerPushToken.run(req as any)).rejects.toThrowError(
+            /Invalid deviceId/
+          );
+        }
+      });
+
+      it("rejects invalid platforms", async () => {
+        const req = {
+          data: {
+            deviceId: "karri-device-123456789012",
+            platform: "web",
+            provider: "expo",
+            token: "ExponentPushToken[token123]",
+            registeredAt: "2026-07-20T10:00:00.000Z",
+          },
+          auth,
+        };
+        await expect(registerPushToken.run(req as any)).rejects.toThrowError(
+          /Invalid platform/
+        );
+      });
+
+      it("rejects invalid providers", async () => {
+        const req = {
+          data: {
+            deviceId: "karri-device-123456789012",
+            platform: "ios",
+            provider: "fcm",
+            token: "ExponentPushToken[token123]",
+            registeredAt: "2026-07-20T10:00:00.000Z",
+          },
+          auth,
+        };
+        await expect(registerPushToken.run(req as any)).rejects.toThrowError(
+          /Invalid provider/
+        );
+      });
+
+      it("rejects invalid push token formats", async () => {
+        const invalidTokens = [
+          "ExpoPushToken", // missing brackets
+          "ExponentPushToken[tok\u0000en]", // control character
+          "ExponentPushToken[tok en]", // space inside brackets
+          "ExponentPushToken[  ]", // whitespace inside brackets
+          "OtherPushToken[token123]", // wrong prefix
+          "ExpoPushToken[" + "a".repeat(600) + "]", // too long (>512)
+        ];
+
+        for (const token of invalidTokens) {
+          const req = {
+            data: {
+              deviceId: "karri-device-123456789012",
+              platform: "ios",
+              provider: "expo",
+              token,
+              registeredAt: "2026-07-20T10:00:00.000Z",
+            },
+            auth,
+          };
+          await expect(registerPushToken.run(req as any)).rejects.toThrowError(
+            /Invalid push token format/
+          );
+        }
+      });
+
+      it("rejects invalid registeredAt timestamps", async () => {
+        const farFuture = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 mins future
+        const invalidTimestamps = [
+          "2026-07-20T10:00:00Z", // missing milliseconds
+          "2026-07-20T10:00:00.123456Z", // excessive fractional precision
+          "2026-07-20T10:00:00.000+00:00", // timezone offset instead of Z
+          "2026-02-31T10:00:00.000Z", // invalid calendar date
+          farFuture,
+        ];
+
+        for (const registeredAt of invalidTimestamps) {
+          const req = {
+            data: {
+              deviceId: "karri-device-123456789012",
+              platform: "ios",
+              provider: "expo",
+              token: "ExpoPushToken[token123]",
+              registeredAt,
+            },
+            auth,
+          };
+          await expect(registerPushToken.run(req as any)).rejects.toThrowError(
+            /registeredAt/
+          );
+        }
+      });
+    });
+
+    describe("Registration logic", () => {
+      const auth = { uid: "user-abc", token: { role: "user" } };
+      const validData = {
+        deviceId: "karri-device-123456789012",
+        platform: "ios",
+        provider: "expo",
+        token: "ExpoPushToken[tok123456]",
+        registeredAt: "2026-07-20T10:00:00.000Z",
+      };
+
+      it("creates a deterministic first registration and preserves original fields on duplicate, token refresh is idempotent doc", async () => {
+        // 1. First registration
+        const req1 = { data: validData, auth };
+        const res1 = await registerPushToken.run(req1 as any);
+        expect(res1).toEqual({
+          success: true,
+          deviceId: validData.deviceId,
+          status: "registered",
+          alreadyExisted: false,
+        });
+
+        // Verify document structure in Firestore
+        const deviceRef = db
+          .collection("pushTokenRegistrations")
+          .doc("user-abc")
+          .collection("devices")
+          .doc(validData.deviceId);
+
+        const snap1 = await deviceRef.get();
+        expect(snap1.exists).toBe(true);
+        const data1 = snap1.data();
+        expect(data1).toMatchObject({
+          userId: "user-abc",
+          deviceId: validData.deviceId,
+          platform: "ios",
+          provider: "expo",
+          token: "ExpoPushToken[tok123456]",
+          active: true,
+          registeredAt: "2026-07-20T10:00:00.000Z",
+          revokedAt: null,
+        });
+        expect(data1?.createdAt).toBeDefined();
+        expect(data1?.updatedAt).toBeDefined();
+
+        // 2. Repeat registration (exact same details) is idempotent and returns alreadyExisted: true
+        const res2 = await registerPushToken.run(req1 as any);
+        expect(res2.alreadyExisted).toBe(true);
+
+        // 3. Token refresh updates token, registeredAt, and updatedAt but preserves original createdAt and returns alreadyExisted: true
+        const freshData = {
+          ...validData,
+          token: "ExpoPushToken[refreshed-token-987]",
+          registeredAt: "2026-07-20T10:05:00.000Z",
+        };
+        const req3 = { data: freshData, auth };
+        const res3 = await registerPushToken.run(req3 as any);
+        expect(res3.alreadyExisted).toBe(true); // Existed before
+
+        const snap3 = await deviceRef.get();
+        const data3 = snap3.data();
+        expect(data3?.token).toBe("ExpoPushToken[refreshed-token-987]");
+        expect(data3?.registeredAt).toBe("2026-07-20T10:05:00.000Z");
+        expect(data3?.createdAt).toEqual(data1?.createdAt); // original createdAt preserved
+      });
+
+      it("enforces authentication mapping and guarantees one user cannot address another user's record", async () => {
+        // Register under user-abc
+        const req = { data: validData, auth };
+        await registerPushToken.run(req as any);
+
+        // Try to query or address under user-xyz. Since UID is derived exclusively from auth.uid,
+        // if user-xyz calls register, it will create a separate document under user-xyz/devices
+        // and cannot access user-abc's document.
+        const authXyz = { uid: "user-xyz", token: { role: "user" } };
+        const reqXyz = { data: validData, auth: authXyz };
+        const resXyz = await registerPushToken.run(reqXyz as any);
+        expect(resXyz.alreadyExisted).toBe(false);
+
+        // Verify user-xyz device document is distinct
+        const devRefXyz = db
+          .collection("pushTokenRegistrations")
+          .doc("user-xyz")
+          .collection("devices")
+          .doc(validData.deviceId);
+
+        const snapXyz = await devRefXyz.get();
+        expect(snapXyz.exists).toBe(true);
+        expect(snapXyz.data()?.userId).toBe("user-xyz");
+      });
+    });
+
+    describe("Unregistration logic", () => {
+      const auth = { uid: "user-abc", token: { role: "user" } };
+      const deviceId = "karri-device-123456789012";
+      const validData = {
+        deviceId,
+        platform: "ios",
+        provider: "expo",
+        token: "ExpoPushToken[tok123456]",
+        registeredAt: "2026-07-20T10:00:00.000Z",
+      };
+
+      it("marks the record inactive, deletes the token, and is idempotent on repeat unregistration", async () => {
+        // 1. Unregistering nonexistent device does not create any placeholder
+        const unregNonexistent = { data: { deviceId }, auth };
+        const resNonexistent = await unregisterPushToken.run(unregNonexistent as any);
+        expect(resNonexistent).toEqual({
+          success: true,
+          deviceId,
+          status: "unregistered",
+          alreadyInactive: true,
+        });
+
+        const deviceRef = db
+          .collection("pushTokenRegistrations")
+          .doc("user-abc")
+          .collection("devices")
+          .doc(deviceId);
+        const snapNonexistent = await deviceRef.get();
+        expect(snapNonexistent.exists).toBe(false);
+
+        // 2. Register first
+        const regReq = { data: validData, auth };
+        await registerPushToken.run(regReq as any);
+
+        // 3. Unregister active device
+        const res1 = await unregisterPushToken.run({ data: { deviceId }, auth } as any);
+        expect(res1).toEqual({
+          success: true,
+          deviceId,
+          status: "unregistered",
+          alreadyInactive: false,
+        });
+
+        const snap1 = await deviceRef.get();
+        const data1 = snap1.data();
+        expect(data1?.active).toBe(false);
+        expect(data1?.token).toBeUndefined(); // token deleted
+        expect(data1?.revokedAt).toBeDefined();
+        expect(data1?.updatedAt).toBeDefined();
+        expect(data1?.userId).toBe("user-abc"); // metadata preserved
+
+        // 4. Repeat unregister is idempotent (alreadyInactive: true)
+        const res2 = await unregisterPushToken.run({ data: { deviceId }, auth } as any);
+        expect(res2).toEqual({
+          success: true,
+          deviceId,
+          status: "unregistered",
+          alreadyInactive: true,
+        });
+      });
+
+      it("prevents one user from unregistering another user's device", async () => {
+        // 1. User ABC registers a device
+        const regReq = { data: validData, auth };
+        await registerPushToken.run(regReq as any);
+
+        // 2. User XYZ tries to unregister User ABC's device ID
+        const authXyz = { uid: "user-xyz", token: { role: "user" } };
+        const unregReq = { data: { deviceId }, auth: authXyz };
+        const res = await unregisterPushToken.run(unregReq as any);
+
+        // XYZ gets "alreadyInactive: true" because it doesn't exist on XYZ's path
+        expect(res).toEqual({
+          success: true,
+          deviceId,
+          status: "unregistered",
+          alreadyInactive: true,
+        });
+
+        // 3. User ABC's device remains active and still has the token
+        const deviceRefAbc = db
+          .collection("pushTokenRegistrations")
+          .doc("user-abc")
+          .collection("devices")
+          .doc(deviceId);
+        const snapAbc = await deviceRefAbc.get();
+        expect(snapAbc.exists).toBe(true);
+        expect(snapAbc.data()?.active).toBe(true);
+        expect(snapAbc.data()?.token).toBe("ExpoPushToken[tok123456]");
+      });
+
+      it("reconciles already-inactive records that have leftover tokens and null revokedAt securely", async () => {
+        const deviceRef = db
+          .collection("pushTokenRegistrations")
+          .doc("user-abc")
+          .collection("devices")
+          .doc(deviceId);
+
+        // 1. Directly seed the document in the database matching the criteria
+        const initialTimestamp = admin.firestore.FieldValue.serverTimestamp();
+        await deviceRef.set({
+          userId: "user-abc",
+          deviceId,
+          platform: "ios",
+          provider: "expo",
+          token: "ExpoPushToken[seeded-leftover-token]",
+          active: false,
+          registeredAt: "2026-07-20T10:00:00.000Z",
+          createdAt: initialTimestamp,
+          updatedAt: initialTimestamp,
+          revokedAt: null,
+        });
+
+        // 2. Call unregisterPushToken
+        const res = await unregisterPushToken.run({ data: { deviceId }, auth } as any);
+        expect(res).toEqual({
+          success: true,
+          deviceId,
+          status: "unregistered",
+          alreadyInactive: true,
+        });
+
+        // 3. Verify target fields after reconciliation
+        const snap = await deviceRef.get();
+        expect(snap.exists).toBe(true);
+        const data = snap.data();
+        expect(data?.active).toBe(false);
+        expect(data?.token).toBeUndefined(); // raw token deleted
+        expect(data?.revokedAt).toBeDefined();
+        expect(data?.revokedAt).not.toBeNull();
+        expect(data?.updatedAt).toBeDefined();
+        expect(data?.userId).toBe("user-abc"); // metadata preserved
+        expect(data?.platform).toBe("ios");
+        expect(data?.provider).toBe("expo");
+
+        // 4. Repeat unregistration is idempotent and does not perform additional write
+        const snapBeforeRepeat = await deviceRef.get();
+        const dataBeforeRepeat = snapBeforeRepeat.data();
+
+        const res2 = await unregisterPushToken.run({ data: { deviceId }, auth } as any);
+        expect(res2).toEqual({
+          success: true,
+          deviceId,
+          status: "unregistered",
+          alreadyInactive: true,
+        });
+
+        const snapAfterRepeat = await deviceRef.get();
+        const dataAfterRepeat = snapAfterRepeat.data();
+
+        // Verify that the document wasn't written to again (updatedAt/revokedAt remains same)
+        expect(dataAfterRepeat?.token).toBeUndefined();
+        expect(dataAfterRepeat?.revokedAt).toEqual(dataBeforeRepeat?.revokedAt);
+        expect(dataAfterRepeat?.updatedAt).toEqual(dataBeforeRepeat?.updatedAt);
+      });
+
+      it("reconciles already-inactive records that have malformed revokedAt securely", async () => {
+        const deviceRef = db
+          .collection("pushTokenRegistrations")
+          .doc("user-abc")
+          .collection("devices")
+          .doc(deviceId);
+
+        // 1. Seed document with no token and a malformed revokedAt (ISO string)
+        const initialTimestamp = admin.firestore.FieldValue.serverTimestamp();
+        await deviceRef.set({
+          userId: "user-abc",
+          deviceId,
+          platform: "ios",
+          provider: "expo",
+          active: false,
+          registeredAt: "2026-07-20T10:00:00.000Z",
+          createdAt: initialTimestamp,
+          updatedAt: initialTimestamp,
+          revokedAt: "2026-07-20T10:00:00.000Z", // malformed revokedAt (string)
+        });
+
+        // 2. Call unregisterPushToken
+        const res = await unregisterPushToken.run({ data: { deviceId }, auth } as any);
+        expect(res).toEqual({
+          success: true,
+          deviceId,
+          status: "unregistered",
+          alreadyInactive: true,
+        });
+
+        // 3. Verify target fields after reconciliation
+        const snap = await deviceRef.get();
+        expect(snap.exists).toBe(true);
+        const data = snap.data();
+        expect(data?.active).toBe(false);
+        expect(data?.token).toBeUndefined();
+        // check that revokedAt is now a Firestore Timestamp
+        expect(data?.revokedAt).toBeInstanceOf(admin.firestore.Timestamp);
+        expect(data?.updatedAt).toBeDefined();
+        expect(data?.userId).toBe("user-abc");
+        expect(data?.platform).toBe("ios");
+        expect(data?.provider).toBe("expo");
+
+        // 4. Repeat unregistration is idempotent and does not perform additional write
+        const snapBeforeRepeat = await deviceRef.get();
+        const dataBeforeRepeat = snapBeforeRepeat.data();
+
+        const res2 = await unregisterPushToken.run({ data: { deviceId }, auth } as any);
+        expect(res2).toEqual({
+          success: true,
+          deviceId,
+          status: "unregistered",
+          alreadyInactive: true,
+        });
+
+        const snapAfterRepeat = await deviceRef.get();
+        const dataAfterRepeat = snapAfterRepeat.data();
+
+        // Verify that the document was not written to again
+        expect(dataAfterRepeat?.revokedAt).toEqual(dataBeforeRepeat?.revokedAt);
+        expect(dataAfterRepeat?.updatedAt).toEqual(dataBeforeRepeat?.updatedAt);
+      });
+    });
+
+    describe("Privacy verification", () => {
+      const auth = { uid: "user-abc", token: { role: "user" } };
+      const token = "ExpoPushToken[secret-tok-privacy]";
+      const data = {
+        deviceId: "karri-device-123456789012",
+        platform: "ios",
+        provider: "expo",
+        token,
+        registeredAt: "2026-07-20T10:00:00.000Z",
+      };
+
+      it("never includes the raw token in the callable response", async () => {
+        const res = await registerPushToken.run({ data, auth } as any);
+        expect(JSON.stringify(res)).not.toContain(token);
+      });
+
+      it("never includes the raw token in error message or logs", async () => {
+        // Run invalid platform request but with raw token
+        const badReq = {
+          data: {
+            ...data,
+            platform: "invalid-platform",
+          },
+          auth,
+        };
+        try {
+          await registerPushToken.run(badReq as any);
+          throw new Error("Should have failed");
+        } catch (error: any) {
+          expect(error.message).not.toContain(token);
+          expect(JSON.stringify(error)).not.toContain(token);
+        }
+      });
+
+      it("never leaks raw token when submitted as an additional unknown property name", async () => {
+        const payloadWithTokenAsUnknownField = {
+          ...data,
+          [token]: "some-value",
+        };
+        const badReq = {
+          data: payloadWithTokenAsUnknownField,
+          auth,
+        };
+        try {
+          await registerPushToken.run(badReq as any);
+          throw new Error("Should have failed");
+        } catch (error: any) {
+          expect(error.message).not.toContain(token);
+          expect(JSON.stringify(error)).not.toContain(token);
+        }
+      });
     });
   });
 });

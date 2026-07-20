@@ -2,12 +2,22 @@
 
 ## Status and guardrails
 
-This document covers the controlled client foundation and the still-future trusted delivery system. The mobile app now installs `expo-notifications` and may request permission/obtain an Expo token only after an authenticated user saves Push intent and presses the experimental Profile button. The app does not persist/display/log the token, start a notification listener, navigate from a notification, send a push, or contact FCM/APNs as a sender. No Cloud Function or delivery collection exists yet.
+This document covers the controlled client foundation, the implemented trusted persistence backend (N1), and the still-deferred trusted delivery system.
+
+The following functionality is **implemented in N1**:
+- Authenticated `registerPushToken` and `unregisterPushToken` Cloud Functions (using us-east1 callables, with request authentication validation and payload verification).
+- Server-only deterministic Firestore persistence under `/pushTokenRegistrations/{userId}/devices/{deviceId}`.
+- Automated token removal and inactive-record reconciliation under Firestore transaction boundaries (deleting the token value and setting revokedAt to a Firestore Timestamp).
+
+The following functionality is **deferred/future**:
+- Mobile `FirebasePushTokenRepository` wiring is deferred to Phase N2.
+- The mobile app installs `expo-notifications` but does not persist/display/log the token, start a notification listener, navigate from a notification, or send a push.
+- Trusted push-message delivery, notification queues, receipts, retries, monitoring, cleanup, and provider sending are not implemented.
 
 The activation order is deliberate:
 
 1. Keep an in-app notification record as the canonical user-visible fact.
-2. Keep native permission/token acquisition behind explicit user intent; do not enable trusted persistence until credentials, endpoints, and device tests exist.
+2. Keep native permission/token acquisition behind explicit user intent; do not wire the client repositories (N2) until the persistence callables and rules (N1) are validated.
 3. Add trusted server delivery only after preference enforcement, idempotency, token privacy, retries, and monitoring exist.
 4. Roll out push as an optional hint. Never make it the only record of a booking, custody, delivery, review, or trust event.
 
@@ -19,7 +29,8 @@ The activation order is deliberate:
 | Application | In-app notification orchestration, deferred push/registration contracts, and semantic action routing | No provider imports and no assumption that a stored preference is platform permission |
 | Infrastructure | Firestore repositories, deferred Firebase delivery/persistence, validated payload routing, and the explicit Expo native registration adapter | Provider payload parsing stops at a validated semantic action; permission/token acquisition is user-initiated and delivery remains inert |
 | Presentation | Profile notification/preference UI, availability hook, Expo Router target adapter, and the composition root that injects infrastructure adapters | Screens/components do not call Firebase; no permission prompt, token effect, listener, or automatic navigation |
-| Trusted server (future) | Durable events, canonical notification materialization, policy evaluation, token lookup, provider delivery, receipts, retries, and cleanup | Never expose service credentials or unrestricted token access to a client |
+| Trusted server (N1 persistence) | Authenticated token registration/unregistration callables, token deletion, and inactive-record reconciliation | Direct client access to the pushTokenRegistrations collection is denied; only us-east1 server callables run Firestore transactions |
+| Trusted server delivery (future) | Durable events, canonical notification materialization, policy evaluation, token lookup, provider delivery, receipts, retries, and cleanup | Never expose service credentials or unrestricted token access to a client |
 
 The current `notificationPreferences/{userId}` record stores user intent only. `channels.push == true` does not prove OS authorization, create a token, or authorize delivery. Category defaults also do not opt a user into push because every channel defaults off. The inert `PushNotificationRequest` carries notification/recipient identity and a semantic action, but deliberately excludes canonical title/body content.
 
@@ -98,13 +109,13 @@ The future client flow is explicit and authenticated:
 4. The native adapter obtains the Expo push token using the configured EAS project ID.
 5. The adapter associates it with a random app-installation ID, platform, provider, app version, environment, and current permission state. Do not use a hardware identifier.
 6. `PushRegistrationService` validates ownership/token shape and passes it to the token repository port.
-7. The current repository returns `deferred`; a future authenticated gateway will send it to trusted server code.
-8. The future server derives `userId` from verified authentication, validates project/provider/platform, upserts the installation registration, and returns a non-secret registration ID.
+7. The mobile repository returns `deferred` (wiring is deferred to N2); the backend has the trusted persistence callable implemented (`registerPushToken`).
+8. The server derives `userId` from verified authentication, validates authenticated user ownership, installation device ID, platform, Expo provider, token shape, and canonical registration timestamp, and upserts the installation registration.
 9. Only after server confirmation may the UI show the device as registered. Permission granted without confirmed registration is a recoverable incomplete state.
 
-Clients must not write token documents directly. The current client therefore reports registration as deferred after token acquisition. App Check should be staged before broad rollout, but authentication, ownership validation, and server-only token access are required from the first persistence implementation.
+Clients must not write token documents directly. The backend persistence layer is now implemented via authenticated callables (`registerPushToken` and `unregisterPushToken`), but the client-side repository wiring is still deferred until N2. Push delivery is still deferred (No-Go status). No permission or token behavior should be described as production-complete yet. App Check should be staged before broad rollout, but authentication, ownership validation, and server-only token access are enforced.
 
-`PushRegistrationService.unregister` and the Expo adapter provide the current cleanup seam: automatic Expo token updates can be disabled and the repository remove operation is invoked. The repository remains deferred, so this is not yet authenticated sign-out cleanup or proof of server deletion.
+`PushRegistrationService.unregister` and the Expo adapter provide the current cleanup seam: automatic Expo token updates can be disabled and the repository remove operation is invoked. The repository remains deferred, so this is not yet client-to-server authenticated sign-out cleanup or proof of server deletion.
 
 ### Rotation, sign-out, and invalid-token cleanup
 
