@@ -1,10 +1,13 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import admin from "firebase-admin";
 import { assertPermission } from "./guards/PermissionGuard.js";
 import { AuditLogService } from "./services/AuditLogService.js";
 import { ShipmentSafetyReviewService } from "./services/ShipmentSafetyReviewService.js";
 import { AdministrativeHoldService } from "./services/AdministrativeHoldService.js";
 import { PushTokenPersistenceService } from "./services/PushTokenPersistenceService.js";
+import { BookingAcceptedNotificationService } from "./notifications/BookingAcceptedNotificationService.js";
+import { ExpoPushProvider } from "./providers/ExpoPushProvider.js";
 import {
   ValidationError,
   PermissionDeniedError,
@@ -28,6 +31,10 @@ const auditLogService = new AuditLogService(db);
 const shipmentSafetyReviewService = new ShipmentSafetyReviewService(db, auditLogService);
 const administrativeHoldService = new AdministrativeHoldService(db, auditLogService);
 const pushTokenPersistenceService = new PushTokenPersistenceService(db);
+const bookingAcceptedNotificationService = new BookingAcceptedNotificationService(
+  db,
+  new ExpoPushProvider(),
+);
 
 const callableRuntimeOptions = {
   region: "us-east1",
@@ -273,3 +280,22 @@ export const unregisterPushToken = onCall(callableRuntimeOptions, async (request
     throw mapError(error);
   }
 });
+
+export const onBookingAccepted = onDocumentUpdated(
+  {
+    document: "bookings/{bookingId}",
+    region: "us-east1",
+  },
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    if (!before || !after) {
+      return;
+    }
+    await bookingAcceptedNotificationService.handleBookingUpdate(
+      event.params.bookingId,
+      before,
+      after,
+    );
+  },
+);

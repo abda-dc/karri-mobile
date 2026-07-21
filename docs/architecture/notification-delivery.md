@@ -2,52 +2,67 @@
 
 ## Status and guardrails
 
-This document covers the controlled client foundation, the implemented trusted persistence backend (N1), the mobile repository wiring (N2), and the still-deferred trusted delivery system.
+This document covers the controlled client foundation, trusted persistence backend (N1), mobile repository wiring (N2), and bounded trusted `booking.accepted` delivery (N3A).
 
 The following functionality is **implemented**:
 - N1 trusted push-token persistence
 - N2 FirebasePushTokenRepository wiring for Android/iOS Expo tokens
+- N3A trusted `bookings/{bookingId}` `pending` to `accepted` Firestore trigger in `us-east1`
+- server-derived sender recipient and traveler actor with immutable-core and append-only-history validation
+- deterministic server-owned canonical `booking.accepted` notification
+- exact complete-schema preference validation with fail-closed partial/malformed-record handling and DST-aware quiet-hours suppression
+- deterministic document-ID inspection of at most 100 active, bound Expo Android/iOS registration records with in-memory token deduplication
+- at most 100 deterministic per-device delivery claims and one immediate Expo provider request containing at most 100 messages
+- generic schema-v1 `open_notifications` payload on `karri_activity_v1`
+- immediate `DeviceNotRegistered` deactivation and token deletion
+- default-off server delivery kill switch (`KARRI_PUSH_DELIVERY_ENABLED`)
 - explicit Profile registration
 - existing local notification-response listening and route resolution
 
 The following functionality is **deferred**:
-- FirebasePushNotificationGateway
-- remote trusted push delivery
+- other notification events
+- receipt polling
+- automatic retries
+- queues and scheduled quiet-hours delivery
+- background workers
+- monitoring dashboards
 - automatic registration at login or startup
 - automatic unregistration at logout
 - startup or foreground reconciliation
 - preference-disable or permission-revocation cleanup
-- token rotation lifecycle
-- invalid-provider-token cleanup
-- queues
-- receipts
-- retries
-- monitoring
+- token rotation
+- automatic logout cleanup
+- production enablement and deployment
+- App Check enforcement
 - scheduled cleanup
 - leases
-- hashes
+- keyed token hashes for future retention/deduplication work
 - lastSeenAt
-- provider sending
+- broader device-retention policy, registration pagination, cleanup, and multi-batch fan-out
 
 Note: `unregisterPushToken` is called only when an explicit caller invokes `repository.remove`. No automatic lifecycle caller currently exists. Push notifications are not production-complete.
+
+N3A deterministically orders one recipient's device subcollection by document ID and examines at most the first 100 registration records. Registrations beyond that bound are ignored in this phase: they are not paged, queued, claimed, or disclosed. After existing validation and in-memory token deduplication, N3A claims and sends no more than 100 delivery effects/messages in one Expo request. This cap is a safety and resource boundary for the bounded N3A event, not a production-scale broadcast design. Broader retention policy, pagination, cleanup, and multi-batch fan-out remain deferred.
+
+Creation of the deterministic canonical notification is N3A's event-level dispatch claim. Only the invocation that creates it may read the kill switch or preferences, evaluate quiet hours, inspect registrations, claim device effects, call Expo, or clean up an invalid registration. A matching duplicate returns `event_replay` without reevaluating changed policy, time, or token state, so every first-invocation suppression is terminal for that event. A conflicting deterministic notification still fails closed. A crash after canonical creation but before device claiming can lose the optional push; this is an accepted N3A at-most-one-attempt tradeoff because the in-app notification remains authoritative. No retry, queue, delayed delivery, or historical catch-up behavior is added.
 
 The activation order is deliberate:
 
 1. Keep an in-app notification record as the canonical user-visible fact.
 2. Keep native permission/token acquisition behind explicit user intent.
-3. Add trusted server delivery only after preference enforcement, idempotency, token privacy, retries, and monitoring exist.
-4. Roll out push as an optional hint. Never make it the only record of a booking, custody, delivery, review, or trust event.
+3. Keep N3A bounded to one validated event, fail-closed policy, deterministic one-attempt effects, and a default-off server kill switch.
+4. Require retries, receipts, monitoring, lifecycle reconciliation, and operational approval before any production rollout. Push remains an optional hint, never the only record of a booking, custody, delivery, review, or trust event.
 
 ## Reviewed architecture boundary
 
 | Layer | Current responsibility | Hard boundary |
 | --- | --- | --- |
 | Domain | Notification records, preference rules, categories, channels, and quiet-hours values | No Firebase, Expo, FCM, APNs, permission, token, or navigation APIs |
-| Application | In-app notification orchestration, implemented push registration contracts, deferred remote delivery, and semantic action routing | No provider imports and no assumption that a stored preference is platform permission |
-| Infrastructure | Firestore repositories, implemented token persistence and repository wiring, deferred remote delivery, validated payload routing, and explicit Expo native registration adapter | Provider payload parsing stops at a validated semantic action; permission/token acquisition is user-initiated and delivery remains inert |
+| Application | In-app notification orchestration for non-migrated events, push registration contracts, and semantic action routing | `booking.accepted` materialization is no longer owned by the mobile event bus |
+| Infrastructure | Firestore repositories, implemented token persistence and repository wiring, validated payload routing, and explicit Expo native registration adapter | Mobile delivery remains inert; permission/token acquisition is user-initiated and N3A provider access exists only on the trusted server |
 | Presentation | Profile notification/preference UI, availability hook, Expo Router target adapter, composition root, explicit Profile permission/token orchestration, and existing notification-response listener and route resolution | Screens/components do not call Firebase directly; no permission prompt, token effect, or automatic navigation outside explicit Profile interaction |
 | Trusted server (N1 persistence) | Authenticated token registration/unregistration callables, token deletion, and inactive-record reconciliation | Direct client access to the pushTokenRegistrations collection is denied; only us-east1 server callables run Firestore transactions |
-| Trusted server delivery (future) | Durable events, canonical notification materialization, policy evaluation, token lookup, provider delivery, receipts, retries, and cleanup | Never expose service credentials or unrestricted token access to a client |
+| Trusted server delivery (N3A) | Validate one authoritative booking transition, create its canonical notification, enforce push policy, claim per-device effects, and make one immediate Expo attempt | No client delivery endpoint; recipient/content/route/token are never client inputs; broader delivery, retries, receipts, and production rollout remain deferred |
 
 The current `notificationPreferences/{userId}` record stores user intent only. `channels.push == true` does not prove OS authorization, create a token, or authorize delivery. Category defaults also do not opt a user into push because every channel defaults off. The inert `PushNotificationRequest` carries notification/recipient identity and a semantic action, but deliberately excludes canonical title/body content.
 
@@ -69,14 +84,14 @@ untrusted provider payload
 
 ### Package and provider strategy
 
-Phase 13 uses `expo-notifications` as the native client adapter. It can obtain an `ExpoPushToken`, while the future trusted sender is planned to use Expo Push Service first. This is the smallest operational surface while preserving provider-neutral application contracts and the option to move the server gateway to direct FCM/APNs later.
+Phase 13 uses `expo-notifications` as the native client adapter. It can obtain an `ExpoPushToken`; N3A uses Expo Push Service for its bounded server-side provider boundary while preserving provider-neutral contracts and the option to move to direct FCM/APNs later.
 
 Current controlled foundation:
 
 - The SDK-compatible `expo-notifications` package and config plugin are present; `expo-constants` supplies an EAS project ID when configured.
 - Background remote notifications are explicitly disabled in plugin configuration.
 - Use a development build or signed EAS build. Expo Go is not an acceptance-test environment for remote push.
-- Keep `FirebasePushNotificationGateway` deferred until trusted server endpoints pass the rollout gates below.
+- Keep the client `FirebasePushNotificationGateway` deferred; N3A has no client-callable delivery endpoint.
 - Do not add local notifications, background notification tasks, exact alarms, rich media, or interactive actions in the first activation.
 
 ### Android notification channels
@@ -130,16 +145,16 @@ The current explicit Profile registration flow is explicit and authenticated:
 8. The server derives `userId` from verified authentication, validates authenticated user ownership, installation device ID, platform, Expo provider, token shape, and canonical registration timestamp, and upserts the installation registration.
 9. Only after server confirmation may the UI show the device as registered. Permission granted without confirmed registration is a recoverable incomplete state.
 
-Clients must not write token documents directly. The backend persistence layer is implemented via authenticated callables (`registerPushToken` and `unregisterPushToken`), and client-side repository wiring is implemented in N2. Android/iOS registration can now persist a token after successful permission and Expo token acquisition. Trusted push-message delivery remains deferred. Queues, receipts, retries, monitoring, cleanup, and production provider delivery remain deferred. No permission or token behavior should be described as production-complete yet. App Check should be staged before broad rollout, but authentication, ownership validation, and server-only token access are enforced.
+Clients must not write token documents directly. The backend persistence layer is implemented via authenticated callables (`registerPushToken` and `unregisterPushToken`), and client-side repository wiring is implemented in N2. Android/iOS registration can persist a token after successful permission and Expo token acquisition. N3A may read active bound registrations for one trusted event only after policy gates pass. Queues, receipts, retries, monitoring, broad cleanup, and production enablement remain deferred. No permission, token, or delivery behavior should be described as production-complete. App Check remains disabled as an explicit regression-preserved boundary for this package.
 
 `unregisterPushToken` is called only when an explicit caller invokes `repository.remove`. N2 does not connect token removal to logout, startup, foreground, preference disabling, permission revocation, or any automatic lifecycle trigger. Push notifications are not production-complete.
 
-### Future / unimplemented: Rotation, sign-out, and invalid-token cleanup
+### Future / unimplemented: Rotation, sign-out, and broader token cleanup
 
 - Proposed future behavior: Subscribe to the native token-change signal while the authenticated app is running. Upsert the new token for the same installation and deactivate the old token atomically.
 - Proposed future behavior: Reconcile the current token on foreground/startup after permission is granted and refresh server state. Do not fetch or upload a token when permission is absent or push intent is off.
 - Proposed future behavior: On sign-out, call the authenticated unregister endpoint before local session teardown, then continue sign-out even if the network fails.
-- Proposed future behavior: On `DeviceNotRegistered`, FCM `UNREGISTERED`, or an equivalent confirmed permanent response, immediately deactivate the registration.
+- Implemented in N3A for Expo only: an immediate `DeviceNotRegistered` ticket deactivates the matching still-current registration transactionally and deletes its token. Equivalent FCM/APNs handling remains future work.
 - Proposed future behavior: A reinstalled app or changed token creates/reconciles an installation registration; it never silently inherits another user's binding.
 
 ### Preferences and quiet hours
@@ -152,7 +167,7 @@ Delivery requires all of the following at send time:
 - a valid IANA time zone and a time outside quiet hours, unless a separately approved critical-event policy applies;
 - a deliverable canonical notification and an authorized recipient.
 
-Missing, malformed, or unreadable preferences fail closed for push. There is no critical-event exception today. During quiet hours, retain the canonical in-app record and defer only the optional push until the window ends. Re-evaluate preferences, quiet hours, and token state immediately before a deferred send.
+Missing, malformed, incomplete, mismatched, or unreadable preferences fail closed for push. Before sending, N3A requires the complete stored preference schema: the exact top-level fields, all three boolean channel fields with email/SMS disabled, all seven boolean category fields, matching ownership, Firestore creation/update timestamps, and either null or the exact quiet-hours shape. Partial records and records with unknown fields suppress push without backend repair. There is no critical-event exception today. N3A retains the canonical in-app record and permanently suppresses the optional push when the current instant is inside quiet hours; it does not schedule or queue a deferred send.
 
 ### Deep-link authorization
 
@@ -175,7 +190,7 @@ Automated checks before activation:
 
 - Unit tests for permission-state orchestration, token validation/rotation, action parsing, category mapping, quiet-hour boundaries (same-day, overnight, DST, invalid zone), and route fallback.
 - Emulator tests proving clients cannot read/write another user's preferences, registrations, delivery effects, or notifications.
-- Function tests for duplicate domain events, duplicate worker invocation, preference changes while queued, quiet-hour deferral, invalid tokens, transient provider errors, permanent payload errors, and sign-out cleanup.
+- N3A Function tests cover duplicate trigger invocation, preference and quiet-hour suppression, token selection, invalid registrations, and immediate transient/permanent provider outcomes. Queued preference changes, retries, receipts, and sign-out cleanup require future tests with those features.
 - Contract tests proving no raw token or private notification content enters logs, events, IDs, or analytics.
 
 Device matrix before rollout:
@@ -195,22 +210,23 @@ Device matrix before rollout:
 5. Expand by category and cohort; keep announcements disabled until separately reviewed.
 6. Roll back by disabling server dispatch and client registration independently. In-app records continue working throughout.
 
-## Trusted server-side delivery design
+## Trusted server-side delivery
+
+N3A implements the bounded `booking.accepted` subset described above: canonical creation is the event-level claim, matching replays stop before optional delivery policy, quiet hours and other suppression decisions are terminal, and deterministic device effects permit at most one provider attempt. There are no retries, receipts, queues, delayed sends, historical catch-up, or workers. A timeout/abort or Node/undici network failure while reading the Expo response body is recorded as a safe temporary outcome; invalid or structurally malformed JSON is recorded as a permanent malformed-response outcome. These classifications do not add retry behavior in N3A. The remaining sections describe the broader future target and must not be read as current behavior.
 
 ### Delivery flow
 
 ```mermaid
 flowchart TD
-  Event["Durable domain event"] --> Materializer["Trusted notification materializer"]
-  Materializer --> Canonical["Canonical in-app notification"]
-  Canonical --> Dispatcher["Trusted dispatch worker"]
-  Dispatcher --> Policy["Preference and quiet-hours evaluation"]
-  Policy --> Registrations["Active device registration lookup"]
-  Registrations --> Payload["Minimal privacy-reviewed payload"]
-  Payload --> Provider["Expo Push Service, then FCM/APNs"]
-  Provider --> Result["Ticket and receipt result"]
-  Result --> Delivery["Delivery effect update"]
-  Delivery --> Retry["Retry, deactivate, or dead-letter"]
+  Event["Booking pending to accepted update"] --> Validate["Validate IDs, immutable core, and history append"]
+  Validate --> Canonical["Canonical sender notification"]
+  Canonical --> Switch["Default-off delivery kill switch"]
+  Switch --> Policy["Preferences and quiet-hours evaluation"]
+  Policy --> Registrations["Active bound Expo device lookup"]
+  Registrations --> Claim["Deterministic per-device claim"]
+  Claim --> Provider["One immediate Expo ticket attempt"]
+  Provider --> Result["Persist classified ticket outcome"]
+  Result --> Invalid["Deactivate only DeviceNotRegistered"]
 ```
 
 Client-side push delivery is not trusted because a modified client could choose another recipient, bypass preferences/quiet hours, expose token values, alter templates, replay sends, or use bundled credentials. Firestore rules cannot safely grant a mobile client provider credentials or cross-user token lookup. The mobile `PushNotificationService` therefore remains an inert contract/composition seam; a real delivery gateway belongs in trusted server code.
@@ -221,6 +237,7 @@ The in-app record remains canonical because push is best-effort, may be delayed,
 
 Assume at-least-once event and worker execution:
 
+- N3A derives its canonical ID from `booking.accepted:v1:{bookingId}:{senderId}` and its device effect ID from `push:v1:{notificationId}:{deviceId}`, both through SHA-256 with non-secret prefixes.
 - Give each durable domain event an immutable `eventId` and schema version.
 - Derive `notificationEffectId` from a digest of `notification:v1:{eventId}:{recipientId}`. Preserve the existing deterministic notification IDs during migration or map them explicitly; do not silently duplicate current records.
 - Derive one `deliveryEffectId` from a digest of `push:v1:{notificationId}:{registrationId}:{projectionVersion}`.
@@ -228,25 +245,25 @@ Assume at-least-once event and worker execution:
 - Create/read the notification and delivery effect transactionally. A terminal delivery effect is a no-op on replay; a retryable effect resumes from its persisted attempt state.
 - Use `notificationId` as the provider collapse/deduplication hint where supported. Exactly-once device display cannot be promised if a worker crashes after provider acceptance but before persisting the result.
 
-### Proposed data boundaries
+### Current and proposed data boundaries
 
-These are future collections only. This phase does not create them or broaden current rules.
+N3A uses the existing `notifications`, `notificationPreferences`, and `pushTokenRegistrations/{userId}/devices` collections and adds server-only `notificationDeliveries`. `domainEvents` and the broader registration/delivery schema below remain proposals.
 
 | Collection | Purpose | Client access |
 | --- | --- | --- |
 | `domainEvents/{eventId}` | Durable, versioned completed facts written with trusted business transitions | Deny direct mobile read/write unless a later projection has an explicit need |
-| `notifications/{notificationEffectId}` | Existing canonical user-visible notification projection | Recipient read and constrained read-state update; future materialization is server-only |
-| `pushRegistrations/{registrationId}` | Installation binding, provider, encrypted/protected token value, token hash, permission state, environment, `lastSeenAt`, and active/revoked state | No direct read/write; authenticated server endpoints return only non-secret status |
-| `notificationDeliveries/{deliveryEffectId}` | Policy decision, attempt count, next attempt, provider ticket/receipt identifiers, outcome code, and timestamps | No direct mobile access |
+| `notifications/{notificationEffectId}` | Existing canonical user-visible notification projection; N3A server-materializes `booking.accepted` | Recipient read and constrained read-state update; client creation of `booking.accepted` is denied |
+| `pushTokenRegistrations/{userId}/devices/{deviceId}` | Current N1 installation binding, provider, raw sender-required token, platform, and active/revoked state | No direct read/write; authenticated server endpoints return only non-secret status |
+| `notificationDeliveries/{deliveryEffectId}` | N3A claim and immediate outcome; future versions may add attempts, scheduling, and receipts | No direct mobile access |
 
-Use a terminal `dead_letter` state in `notificationDeliveries` rather than copying private payloads into a separate dead-letter collection. Add indexes and server-only rules only with the future implementation and Emulator Suite tests.
+N3A stores only safe claim/outcome metadata and relies on the existing deny-by-default catch-all rule. A future retry design may add terminal `dead_letter` state and indexes after separate review and Emulator Suite tests.
 
-### Policy evaluation
+### Future policy expansion beyond N3A
 
 - Maintain one versioned map from domain event type to notification category, template, channel ID, default priority, and maximum delivery age.
 - Load preferences after the canonical record exists and again immediately before provider send. Missing/invalid records, push disabled, or category disabled produce a terminal `suppressed_preference` effect without token lookup.
 - Interpret quiet hours using the stored IANA zone and DST-aware time APIs. Start is inclusive and end is exclusive; an end earlier than start is an overnight interval.
-- Quiet hours produce `deferred_quiet_hours` with `nextAttemptAt` at the next local end. If the event expires before then, suppress the push and retain the in-app record.
+- A future queued design may produce `deferred_quiet_hours` with `nextAttemptAt`; N3A instead suppresses permanently without creating a delivery effect.
 - No current category bypasses quiet hours. Any future safety exception requires a product, legal/privacy, and abuse review plus explicit schema versioning.
 
 ### Token privacy and retention

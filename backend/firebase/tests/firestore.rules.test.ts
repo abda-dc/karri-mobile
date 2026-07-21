@@ -736,9 +736,9 @@ describe("notifications", () => {
     );
   });
 
-  it("allows a valid participant-generated booking notification", async () => {
+  it("denies traveler creation of a booking.accepted notification", async () => {
     await seedBookingState("accepted");
-    await assertSucceeds(
+    await assertFails(
       setDoc(
         doc(userDb(travelerUid), `notifications/${notificationId}`),
         notificationFixture({
@@ -747,6 +747,44 @@ describe("notifications", () => {
         }),
       ),
     );
+  });
+
+  it("denies sender creation of a booking.accepted notification for themselves", async () => {
+    await seedBookingState("accepted");
+    await assertFails(
+      setDoc(
+        doc(userDb(senderUid), `notifications/${notificationId}`),
+        notificationFixture({
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+      ),
+    );
+  });
+
+  it("keeps valid client creation for a non-migrated notification type", async () => {
+    await seedBookingState("declined");
+    await assertSucceeds(
+      setDoc(
+        doc(userDb(travelerUid), `notifications/${notificationId}`),
+        notificationFixture({
+          type: "booking.declined",
+          title: "Booking declined",
+          body: "The booking request was declined.",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+      ),
+    );
+  });
+
+  it("allows trusted Admin SDK writes outside client rule enforcement", async () => {
+    await seedDoc(`notifications/${notificationId}`, notificationFixture());
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await assertSucceeds(
+        getDoc(doc(context.firestore(), `notifications/${notificationId}`)),
+      );
+    });
   });
 
   it("denies deletion", async () => {
@@ -838,6 +876,34 @@ describe("notification preferences", () => {
       deleteDoc(
         doc(userDb(senderUid), `notificationPreferences/${senderUid}`),
       ),
+    );
+  });
+});
+
+describe("notification deliveries", () => {
+  it("keeps delivery effects server-only", async () => {
+    const deliveryId = "delivery-n3a-test";
+    await seedDoc(`notificationDeliveries/${deliveryId}`, {
+      notificationId,
+      bookingId,
+      recipientId: senderUid,
+      registrationId: "karri-aaaaaaaaaaaaaaaa",
+      provider: "expo",
+      platform: "android",
+      status: "claimed",
+      outcomeCode: null,
+      providerTicketId: null,
+      createdAt: fixtureTime,
+      updatedAt: fixtureTime,
+    });
+
+    await assertFails(
+      getDoc(doc(userDb(senderUid), `notificationDeliveries/${deliveryId}`)),
+    );
+    await assertFails(
+      setDoc(doc(userDb(senderUid), "notificationDeliveries/forged"), {
+        status: "accepted",
+      }),
     );
   });
 });

@@ -16,10 +16,6 @@ const templates: Partial<Record<PlatformEventType, NotificationTemplate>> = {
     title: "Booking requested",
     body: "A booking request needs your attention.",
   },
-  "booking.accepted": {
-    title: "Booking accepted",
-    body: "The booking was accepted.",
-  },
   "booking.declined": {
     title: "Booking declined",
     body: "The booking request was declined.",

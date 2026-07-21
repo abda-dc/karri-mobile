@@ -1026,14 +1026,10 @@ service cloud.firestore {
                 && get(
                   /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
                 ).data.status == 'pending')
-              || (((request.resource.data.type == 'booking.accepted'
+              || ((request.resource.data.type == 'booking.declined'
                     && get(
                       /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
-                    ).data.status == 'accepted')
-                  || (request.resource.data.type == 'booking.declined'
-                    && get(
-                      /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
-                    ).data.status == 'declined'))
+                    ).data.status == 'declined')
                 && request.auth.uid == get(
                   /databases/$(database)/documents/bookings/$(request.resource.data.relatedId)
                 ).data.travelerId
