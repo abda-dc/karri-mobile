@@ -76,6 +76,10 @@ function mapSignInError(error: unknown): ApplicationError {
 export class FirebaseAuthSessionGateway implements AuthSessionGateway {
   readonly configured = isFirebaseConfigured;
 
+  getCurrentUserId(): string | null {
+    return getFirebaseServices().auth.currentUser?.uid ?? null;
+  }
+
   async startMvpSession(): Promise<AuthenticatedSession> {
     const { auth } = getFirebaseServices();
     const user = auth.currentUser ?? (await signInAnonymously(auth)).user;
@@ -101,8 +105,14 @@ export class FirebaseAuthSessionGateway implements AuthSessionGateway {
     }
   }
 
-  async signOut(): Promise<void> {
+  async signOut(expectedUserId: string | null): Promise<void> {
     const { auth } = getFirebaseServices();
+    const currentUserId = auth.currentUser?.uid ?? null;
+
+    if (currentUserId !== expectedUserId || !auth.currentUser) {
+      return;
+    }
+
     await signOut(auth);
   }
 

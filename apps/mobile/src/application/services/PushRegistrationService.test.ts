@@ -55,6 +55,16 @@ function createHarness(
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+
+  return { promise, resolve };
+}
+
 describe("PushRegistrationService", () => {
   it("unregisters an existing installation with only the validated identity", async () => {
     const { gateway, repository, service } = createHarness();
@@ -211,5 +221,105 @@ describe("PushRegistrationService", () => {
     expect(gateway.getExistingInstallationId).toHaveBeenCalledTimes(2);
     expect(gateway.unregister).toHaveBeenCalledTimes(2);
     expect(repository.remove).toHaveBeenCalledTimes(2);
+  });
+
+  it("serializes unregistration behind an active registration", async () => {
+    const pendingRegistration = deferred<{
+      status: "registered";
+      token: PushToken;
+    }>();
+
+    const { gateway, service } = createHarness({
+      register: vi.fn(() => pendingRegistration.promise),
+    });
+
+    const registration = service.register(userId);
+    const unregistration =
+      service.unregisterCurrentInstallation(userId);
+
+    await vi.waitFor(() => {
+      expect(gateway.register).toHaveBeenCalledOnce();
+    });
+
+    expect(gateway.getExistingInstallationId).not.toHaveBeenCalled();
+
+    pendingRegistration.resolve({
+      status: PushRegistrationStatus.Registered,
+      token: registrationToken,
+    });
+
+    await registration;
+    await unregistration;
+
+    expect(gateway.getExistingInstallationId).toHaveBeenCalledOnce();
+  });
+
+  it("invalidates an abandoned operation and releases the queue", async () => {
+    const pendingRegistration = deferred<{
+      status: "registered";
+      token: PushToken;
+    }>();
+
+    const { gateway, repository, service } = createHarness({
+      getExistingInstallationId: vi.fn(async () => ({
+        status: ExistingPushInstallationStatus.Missing,
+      })),
+      register: vi.fn(() => pendingRegistration.promise),
+    });
+
+    const staleRegistration = service.register(userId);
+
+    await vi.waitFor(() => {
+      expect(gateway.register).toHaveBeenCalledOnce();
+    });
+
+    service.invalidatePendingOperations();
+
+    await expect(
+      service.unregisterCurrentInstallation("user-next"),
+    ).resolves.toEqual({
+      status: PushRegistrationStatus.Unregistered,
+    });
+
+    pendingRegistration.resolve({
+      status: PushRegistrationStatus.Registered,
+      token: registrationToken,
+    });
+
+    await expect(staleRegistration).resolves.toEqual({
+      reason: "The push operation was superseded by sign-out.",
+      status: PushRegistrationStatus.Deferred,
+    });
+
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it("serializes registration behind an active unregistration", async () => {
+    const pendingUnregistration = deferred<{
+      status: "unregistered";
+    }>();
+
+    const { gateway, service } = createHarness({
+      unregister: vi.fn(() => pendingUnregistration.promise),
+    });
+
+    const unregistration =
+      service.unregisterCurrentInstallation(userId);
+    const registration = service.register(userId);
+
+    await vi.waitFor(() => {
+      expect(gateway.unregister).toHaveBeenCalledOnce();
+    });
+
+    expect(gateway.register).not.toHaveBeenCalled();
+
+    pendingUnregistration.resolve({
+      status: PushRegistrationStatus.Unregistered,
+    });
+
+    await unregistration;
+    await registration;
+
+    expect(gateway.register).toHaveBeenCalledOnce();
   });
 });

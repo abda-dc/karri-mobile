@@ -106,7 +106,10 @@ const notificationService = new NotificationService(
 notificationService.start();
 
 export const mobileServices = {
-  auth: new AuthSessionService(new FirebaseAuthSessionGateway()),
+  auth: new AuthSessionService(
+    new FirebaseAuthSessionGateway(),
+    pushRegistrationService,
+  ),
   booking: new BookingService(
     bookingRepository,
     shipmentRepository,

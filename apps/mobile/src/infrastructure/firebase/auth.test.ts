@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FirebaseAuthSessionGateway } from "./auth";
 import { getFirebaseServices } from "./client";
-import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 
 vi.mock("./client", () => ({
   getFirebaseServices: vi.fn(),
@@ -37,6 +37,37 @@ describe("FirebaseAuthSessionGateway", () => {
       db: {} as any,
       storage: {} as any,
     });
+  });
+
+  it("returns the current authenticated user ID without changing auth state", () => {
+    const gateway = new FirebaseAuthSessionGateway();
+
+    expect(gateway.getCurrentUserId()).toBeNull();
+
+    mockAuth.currentUser = mockUser;
+    expect(gateway.getCurrentUserId()).toBe("test-user-123");
+  });
+
+  it("signs out only when the current user matches the captured user", async () => {
+    mockAuth.currentUser = mockUser;
+    vi.mocked(signOut).mockResolvedValueOnce(undefined);
+
+    const gateway = new FirebaseAuthSessionGateway();
+    await gateway.signOut("test-user-123");
+
+    expect(signOut).toHaveBeenCalledWith(mockAuth);
+  });
+
+  it("does not sign out a newly authenticated different user", async () => {
+    mockAuth.currentUser = {
+      ...mockUser,
+      uid: "user-next",
+    };
+
+    const gateway = new FirebaseAuthSessionGateway();
+    await gateway.signOut("user-previous");
+
+    expect(signOut).not.toHaveBeenCalled();
   });
 
   it("resolves role 'user' when custom claims role is absent or undefined", async () => {

@@ -59,13 +59,16 @@ describe("FirebasePushTokenRepository", () => {
       expect(result).toEqual({ status: PushTokenPersistenceStatus.Stored });
 
       expect(registerPushToken).toHaveBeenCalledTimes(1);
-      expect(registerPushToken).toHaveBeenCalledWith({
-        deviceId,
-        platform: "ios",
-        provider: "expo",
-        token: tokenVal,
-        registeredAt,
-      });
+      expect(registerPushToken).toHaveBeenCalledWith(
+        {
+          deviceId,
+          platform: "ios",
+          provider: "expo",
+          token: tokenVal,
+          registeredAt,
+        },
+        userId,
+      );
       const callArgs = registerPushToken.mock.calls[0][0];
       expect(Object.keys(callArgs).sort()).toEqual([
         "deviceId",
@@ -175,7 +178,7 @@ describe("FirebasePushTokenRepository", () => {
       expect(result).toEqual({ status: PushTokenPersistenceStatus.Removed });
 
       expect(unregisterPushToken).toHaveBeenCalledTimes(1);
-      expect(unregisterPushToken).toHaveBeenCalledWith({ deviceId });
+      expect(unregisterPushToken).toHaveBeenCalledWith({ deviceId }, userId);
 
       const callArgs = unregisterPushToken.mock.calls[0][0];
       expect(Object.keys(callArgs)).toEqual(["deviceId"]);
@@ -238,7 +241,7 @@ describe("FirebasePushTokenRepository", () => {
       expect(String(result)).not.toContain(privateMarker);
       expect(JSON.stringify(result)).not.toContain(privateMarker);
       expect(JSON.stringify(validIdentity)).not.toContain(tokenVal);
-      expect(failingUnregister).toHaveBeenCalledWith({ deviceId });
+      expect(failingUnregister).toHaveBeenCalledWith({ deviceId }, userId);
       expect([errorSpy, warnSpy, logSpy].flatMap((spy) => spy.mock.calls.flat()).join(" "))
         .not.toContain(privateMarker);
     });

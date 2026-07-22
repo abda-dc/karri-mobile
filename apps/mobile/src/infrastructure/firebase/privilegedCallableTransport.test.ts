@@ -35,7 +35,7 @@ function createHarness(responses: Response[]) {
   const getAppCheckToken = vi.fn(async (_forceRefresh: boolean) => ({ token: APP_CHECK_TOKEN }));
   const fetchImplementation = vi.fn(async () => responses.shift() ?? jsonResponse({ result: {} }));
   const authProvider: CallableAuthProvider = {
-    getCurrentUser: () => ({ getIdToken }),
+    getCurrentUser: () => ({ uid: "user-current", getIdToken }),
   };
   const transport = new PrivilegedCallableTransport({
     appCheckTokenProvider: { getToken: getAppCheckToken },
@@ -106,7 +106,7 @@ describe("PrivilegedCallableTransport", () => {
   it("fails closed when App Check is unavailable", async () => {
     const transport = new PrivilegedCallableTransport({
       appCheckTokenProvider: new UnavailableAppCheckTokenProvider(),
-      authProvider: { getCurrentUser: () => ({ getIdToken: async () => AUTH_TOKEN }) },
+      authProvider: { getCurrentUser: () => ({ uid: "user-current", getIdToken: async () => AUTH_TOKEN }) },
       fetchImplementation: vi.fn() as typeof fetch,
       projectId: "karri-test",
     });
@@ -119,7 +119,7 @@ describe("PrivilegedCallableTransport", () => {
     const fetchImplementation = vi.fn();
     const transport = new PrivilegedCallableTransport({
       appCheckTokenProvider: { getToken: async () => ({ token }) },
-      authProvider: { getCurrentUser: () => ({ getIdToken: async () => AUTH_TOKEN }) },
+      authProvider: { getCurrentUser: () => ({ uid: "user-current", getIdToken: async () => AUTH_TOKEN }) },
       fetchImplementation: fetchImplementation as typeof fetch,
       projectId: "karri-test",
     });
@@ -203,7 +203,7 @@ describe("PrivilegedCallableTransport", () => {
       const fetchImplementation = vi.fn(async () => jsonResponse({ result: { success: true, holdId: "hold-1", alreadyExisted: false } }));
       const transport = new PrivilegedCallableTransport({
         appCheckTokenProvider: new UnavailableAppCheckTokenProvider(),
-        authProvider: { getCurrentUser: () => ({ getIdToken: async () => AUTH_TOKEN }) },
+        authProvider: { getCurrentUser: () => ({ uid: "user-current", getIdToken: async () => AUTH_TOKEN }) },
         fetchImplementation: fetchImplementation as typeof fetch,
         projectId: "karri-test",
         allowDevelopmentBypass: true,
@@ -232,7 +232,7 @@ describe("PrivilegedCallableTransport", () => {
       const fetchImplementation = vi.fn();
       const transport = new PrivilegedCallableTransport({
         appCheckTokenProvider: new UnavailableAppCheckTokenProvider(),
-        authProvider: { getCurrentUser: () => ({ getIdToken: async () => AUTH_TOKEN }) },
+        authProvider: { getCurrentUser: () => ({ uid: "user-current", getIdToken: async () => AUTH_TOKEN }) },
         fetchImplementation: fetchImplementation as typeof fetch,
         projectId: "karri-test",
         allowDevelopmentBypass: false,
@@ -249,7 +249,7 @@ describe("PrivilegedCallableTransport", () => {
       const fetchImplementation = vi.fn();
       const transport = new PrivilegedCallableTransport({
         appCheckTokenProvider: new UnavailableAppCheckTokenProvider(),
-        authProvider: { getCurrentUser: () => ({ getIdToken: async () => AUTH_TOKEN }) },
+        authProvider: { getCurrentUser: () => ({ uid: "user-current", getIdToken: async () => AUTH_TOKEN }) },
         fetchImplementation: fetchImplementation as typeof fetch,
         projectId: "karri-test",
         allowDevelopmentBypass: true,
@@ -266,7 +266,7 @@ describe("PrivilegedCallableTransport", () => {
       const fetchImplementation = vi.fn();
       const transport = new PrivilegedCallableTransport({
         appCheckTokenProvider: new UnavailableAppCheckTokenProvider(),
-        authProvider: { getCurrentUser: () => ({ getIdToken: async () => AUTH_TOKEN }) },
+        authProvider: { getCurrentUser: () => ({ uid: "user-current", getIdToken: async () => AUTH_TOKEN }) },
         fetchImplementation: fetchImplementation as typeof fetch,
         projectId: "karri-test",
         allowDevelopmentBypass: false,
@@ -295,7 +295,7 @@ describe("PrivilegedCallableTransport", () => {
         jsonResponse({ result: { success: true, deviceId: registerPayload.deviceId, status: "registered", alreadyExisted: false } }),
       ]);
 
-      await expect(harness.transport.registerPushToken(registerPayload)).resolves.toEqual({
+      await expect(harness.transport.registerPushToken(registerPayload, "user-current")).resolves.toEqual({
         success: true,
         deviceId: registerPayload.deviceId,
         status: "registered",
@@ -321,7 +321,7 @@ describe("PrivilegedCallableTransport", () => {
         jsonResponse({ result: { success: true, deviceId: unregisterPayload.deviceId, status: "unregistered", alreadyInactive: true } }),
       ]);
 
-      await expect(harness.transport.unregisterPushToken(unregisterPayload)).resolves.toEqual({
+      await expect(harness.transport.unregisterPushToken(unregisterPayload, "user-current")).resolves.toEqual({
         success: true,
         deviceId: unregisterPayload.deviceId,
         status: "unregistered",
@@ -342,6 +342,42 @@ describe("PrivilegedCallableTransport", () => {
       );
     });
 
+    it("fails closed before credentials when the active UID changed", async () => {
+      const getIdToken = vi.fn(async () => AUTH_TOKEN);
+      const getAppCheckToken = vi.fn(async () => ({
+        token: APP_CHECK_TOKEN,
+      }));
+      const fetchImplementation = vi.fn();
+
+      const transport = new PrivilegedCallableTransport({
+        appCheckTokenProvider: {
+          getToken: getAppCheckToken,
+        },
+        authProvider: {
+          getCurrentUser: () => ({
+            uid: "user-next",
+            getIdToken,
+          }),
+        },
+        fetchImplementation: fetchImplementation as typeof fetch,
+        projectId: "karri-test",
+      });
+
+      await expect(
+        transport.unregisterPushToken(
+          unregisterPayload,
+          "user-previous",
+        ),
+      ).rejects.toMatchObject({
+        code: "callable/user-changed",
+        retryable: false,
+      });
+
+      expect(getIdToken).not.toHaveBeenCalled();
+      expect(getAppCheckToken).not.toHaveBeenCalled();
+      expect(fetchImplementation).not.toHaveBeenCalled();
+    });
+
     it("fails closed when user is signed out", async () => {
       const transport = new PrivilegedCallableTransport({
         appCheckTokenProvider: { getToken: vi.fn() },
@@ -350,7 +386,7 @@ describe("PrivilegedCallableTransport", () => {
         projectId: "karri-test",
       });
 
-      await expect(transport.registerPushToken(registerPayload)).rejects.toMatchObject({
+      await expect(transport.registerPushToken(registerPayload, "user-current")).rejects.toMatchObject({
         code: "callable/signed-out",
         retryable: false,
       });
@@ -359,12 +395,12 @@ describe("PrivilegedCallableTransport", () => {
     it("fails closed when App Check is unavailable", async () => {
       const transport = new PrivilegedCallableTransport({
         appCheckTokenProvider: new UnavailableAppCheckTokenProvider(),
-        authProvider: { getCurrentUser: () => ({ getIdToken: async () => AUTH_TOKEN }) },
+        authProvider: { getCurrentUser: () => ({ uid: "user-current", getIdToken: async () => AUTH_TOKEN }) },
         fetchImplementation: vi.fn() as typeof fetch,
         projectId: "karri-test",
       });
 
-      await expect(transport.registerPushToken(registerPayload)).rejects.toBeInstanceOf(AppCheckTokenProviderError);
+      await expect(transport.registerPushToken(registerPayload, "user-current")).rejects.toBeInstanceOf(AppCheckTokenProviderError);
     });
 
     it("forces one credential refresh and retries once after unauthenticated", async () => {
@@ -373,7 +409,7 @@ describe("PrivilegedCallableTransport", () => {
         jsonResponse({ result: { success: true, deviceId: registerPayload.deviceId, status: "registered", alreadyExisted: false } }),
       ]);
 
-      await expect(harness.transport.registerPushToken(registerPayload)).resolves.toMatchObject({ status: "registered" });
+      await expect(harness.transport.registerPushToken(registerPayload, "user-current")).resolves.toMatchObject({ status: "registered" });
       expect(harness.fetchImplementation).toHaveBeenCalledTimes(2);
       expect(harness.getIdToken.mock.calls.map(([force]) => force)).toEqual([false, true]);
     });
@@ -401,7 +437,7 @@ describe("PrivilegedCallableTransport", () => {
 
       let failure: any;
       try {
-        await harness.transport.registerPushToken(registerPayload);
+        await harness.transport.registerPushToken(registerPayload, "user-current");
       } catch (error) {
         failure = error;
       }
@@ -433,7 +469,7 @@ describe("PrivilegedCallableTransport", () => {
 
       let failure: any;
       try {
-        await harness.transport.registerPushToken(registerPayload);
+        await harness.transport.registerPushToken(registerPayload, "user-current");
       } catch (error) {
         failure = error;
       }
@@ -488,10 +524,13 @@ describe("PrivilegedCallableTransport", () => {
 
       let failure: any;
       try {
-        await harness.transport.registerPushToken({
-          ...registerPayload,
-          token: pushToken,
-        });
+        await harness.transport.registerPushToken(
+          {
+            ...registerPayload,
+            token: pushToken,
+          },
+          "user-current",
+        );
       } catch (error) {
         failure = error;
       }
@@ -552,10 +591,13 @@ describe("PrivilegedCallableTransport", () => {
 
       let failure: any;
       try {
-        await harness.transport.registerPushToken({
-          ...registerPayload,
-          token: pushToken,
-        });
+        await harness.transport.registerPushToken(
+          {
+            ...registerPayload,
+            token: pushToken,
+          },
+          "user-current",
+        );
       } catch (error) {
         failure = error;
       }
@@ -616,10 +658,13 @@ describe("PrivilegedCallableTransport", () => {
 
       let failure: any;
       try {
-        await harness.transport.registerPushToken({
-          ...registerPayload,
-          token: targetToken,
-        });
+        await harness.transport.registerPushToken(
+          {
+            ...registerPayload,
+            token: targetToken,
+          },
+          "user-current",
+        );
       } catch (error) {
         failure = error;
       }
@@ -681,10 +726,13 @@ describe("PrivilegedCallableTransport", () => {
 
       let failure: any;
       try {
-        await harness.transport.registerPushToken({
-          ...registerPayload,
-          token: targetToken,
-        });
+        await harness.transport.registerPushToken(
+          {
+            ...registerPayload,
+            token: targetToken,
+          },
+          "user-current",
+        );
       } catch (error) {
         failure = error;
       }

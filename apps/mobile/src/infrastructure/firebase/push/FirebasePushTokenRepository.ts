@@ -14,8 +14,14 @@ import type {
 } from "../privilegedCallableTransport";
 
 export interface PushTokenTransport {
-  registerPushToken(payload: RegisterPushTokenPayload): Promise<RegisterPushTokenResult>;
-  unregisterPushToken(payload: UnregisterPushTokenPayload): Promise<UnregisterPushTokenResult>;
+  registerPushToken(
+    payload: RegisterPushTokenPayload,
+    expectedUserId: string,
+  ): Promise<RegisterPushTokenResult>;
+  unregisterPushToken(
+    payload: UnregisterPushTokenPayload,
+    expectedUserId: string,
+  ): Promise<UnregisterPushTokenResult>;
 }
 
 export class FirebasePushTokenRepository implements PushTokenRepository {
@@ -64,9 +70,12 @@ export class FirebasePushTokenRepository implements PushTokenRepository {
     }
 
     try {
-      const res = await this.transport.unregisterPushToken({
-        deviceId: identity.deviceId,
-      });
+      const res = await this.transport.unregisterPushToken(
+        {
+          deviceId: identity.deviceId,
+        },
+        identity.userId,
+      );
       if (this.isValidUnregisterResponse(res, identity.deviceId)) {
         return { status: PushTokenPersistenceStatus.Removed };
       }
@@ -105,13 +114,16 @@ export class FirebasePushTokenRepository implements PushTokenRepository {
     }
 
     try {
-      const res = await this.transport.registerPushToken({
-        deviceId: token.deviceId,
-        platform: token.platform,
-        provider: token.provider,
-        token: token.value,
-        registeredAt: token.registeredAt,
-      });
+      const res = await this.transport.registerPushToken(
+        {
+          deviceId: token.deviceId,
+          platform: token.platform,
+          provider: token.provider,
+          token: token.value,
+          registeredAt: token.registeredAt,
+        },
+        token.userId,
+      );
       if (this.isValidRegisterResponse(res, token.deviceId)) {
         return { status: PushTokenPersistenceStatus.Stored };
       }

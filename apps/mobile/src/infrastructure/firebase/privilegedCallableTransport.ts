@@ -84,6 +84,7 @@ export interface SafetyReviewResult {
 }
 
 interface CallableAuthUser {
+  readonly uid: string;
   getIdToken(forceRefresh?: boolean): Promise<string>;
 }
 
@@ -209,18 +210,35 @@ export class PrivilegedCallableTransport {
     return this.invoke("submitSafetyReview", payload);
   }
 
-  registerPushToken(payload: RegisterPushTokenPayload): Promise<RegisterPushTokenResult> {
-    return this.invoke("registerPushToken", payload, [payload.token]);
+  registerPushToken(
+    payload: RegisterPushTokenPayload,
+    expectedUserId: string,
+  ): Promise<RegisterPushTokenResult> {
+    return this.invoke(
+      "registerPushToken",
+      payload,
+      [payload.token],
+      expectedUserId,
+    );
   }
 
-  unregisterPushToken(payload: UnregisterPushTokenPayload): Promise<UnregisterPushTokenResult> {
-    return this.invoke("unregisterPushToken", payload);
+  unregisterPushToken(
+    payload: UnregisterPushTokenPayload,
+    expectedUserId: string,
+  ): Promise<UnregisterPushTokenResult> {
+    return this.invoke(
+      "unregisterPushToken",
+      payload,
+      [],
+      expectedUserId,
+    );
   }
 
   private async invoke<TResult>(
     functionName: PrivilegedCallableName,
     payload: object,
     sensitiveTokens: string[] = [],
+    expectedUserId?: string,
   ): Promise<TResult> {
     const user = this.authProvider.getCurrentUser();
     if (!user) {
@@ -228,6 +246,15 @@ export class PrivilegedCallableTransport {
         code: "callable/signed-out",
         retryable: false,
         safeMessage: "Sign in before performing this action.",
+      });
+    }
+
+    if (expectedUserId && user.uid !== expectedUserId) {
+      throw new PrivilegedCallableError({
+        code: "callable/user-changed",
+        retryable: false,
+        safeMessage:
+          "The active sign-in changed before this action could finish.",
       });
     }
 

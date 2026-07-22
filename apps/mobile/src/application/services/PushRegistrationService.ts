@@ -107,6 +107,9 @@ export interface PushTokenRepository {
 }
 
 export class PushRegistrationService {
+  private operationGeneration = 0;
+  private operationTail: Promise<void> = Promise.resolve();
+
   constructor(
     private readonly registrationGateway: PushTokenRegistrationGateway,
     private readonly tokens: PushTokenRepository,
@@ -124,15 +127,44 @@ export class PushRegistrationService {
     return this.registrationGateway.getPermissionStatus();
   }
 
-  async register(userId: string): Promise<PushRegistrationResult> {
+  invalidatePendingOperations(): void {
+    this.operationGeneration += 1;
+    this.operationTail = Promise.resolve();
+  }
+
+  register(userId: string): Promise<PushRegistrationResult> {
+    return this.runExclusive((generation) =>
+      this.registerExclusive(userId, generation),
+    );
+  }
+
+  private async registerExclusive(
+    userId: string,
+    generation: number,
+  ): Promise<PushRegistrationResult> {
     const activeUserId = requireText(userId, "userId", 128);
+    if (!this.isCurrentGeneration(generation)) {
+      return this.supersededResult();
+    }
+
     const registration = await this.registrationGateway.register(activeUserId);
+    if (!this.isCurrentGeneration(generation)) {
+      return this.supersededResult();
+    }
     if (registration.status !== PushRegistrationStatus.Registered) {
       return registration;
     }
     assertPushToken(registration.token, activeUserId);
 
+    if (!this.isCurrentGeneration(generation)) {
+      return this.supersededResult();
+    }
+
     const persistence = await this.tokens.save(registration.token);
+    if (!this.isCurrentGeneration(generation)) {
+      return this.supersededResult();
+    }
+
     if (persistence.status !== PushTokenPersistenceStatus.Stored) {
       return {
         reason:
@@ -146,10 +178,24 @@ export class PushRegistrationService {
     return registration;
   }
 
-  async unregisterCurrentInstallation(userId: string): Promise<PushRegistrationResult> {
+  unregisterCurrentInstallation(
+    userId: string,
+  ): Promise<PushRegistrationResult> {
+    return this.runExclusive((generation) =>
+      this.unregisterCurrentInstallationExclusive(userId, generation),
+    );
+  }
+
+  private async unregisterCurrentInstallationExclusive(
+    userId: string,
+    generation: number,
+  ): Promise<PushRegistrationResult> {
     const activeUserId = requireText(userId, "userId", 128);
     if (activeUserId !== userId) {
       throw new DomainValidationError("userId must be trimmed.");
+    }
+    if (!this.isCurrentGeneration(generation)) {
+      return this.supersededResult();
     }
 
     let existing: ExistingPushInstallationResult;
@@ -160,6 +206,9 @@ export class PushRegistrationService {
         reason: "The stored installation identity could not be read safely.",
         status: PushRegistrationStatus.Deferred,
       };
+    }
+    if (!this.isCurrentGeneration(generation)) {
+      return this.supersededResult();
     }
     if (existing.status === ExistingPushInstallationStatus.Missing) {
       return { status: PushRegistrationStatus.Unregistered };
@@ -190,11 +239,18 @@ export class PushRegistrationService {
         status: PushRegistrationStatus.Deferred,
       };
     }
+    if (!this.isCurrentGeneration(generation)) {
+      return this.supersededResult();
+    }
     if (registration.status !== PushRegistrationStatus.Unregistered) {
       return registration;
     }
 
     const persistence = await this.tokens.remove(identity);
+    if (!this.isCurrentGeneration(generation)) {
+      return this.supersededResult();
+    }
+
     if (persistence.status !== PushTokenPersistenceStatus.Removed) {
       return {
         reason:
@@ -206,5 +262,33 @@ export class PushRegistrationService {
     }
 
     return registration;
+  }
+
+  private isCurrentGeneration(generation: number): boolean {
+    return generation === this.operationGeneration;
+  }
+
+  private supersededResult(): PushRegistrationResult {
+    return {
+      reason: "The push operation was superseded by sign-out.",
+      status: PushRegistrationStatus.Deferred,
+    };
+  }
+
+  private runExclusive<T>(
+    operation: (generation: number) => Promise<T>,
+  ): Promise<T> {
+    const generation = this.operationGeneration;
+    const result = this.operationTail.then(
+      () => operation(generation),
+      () => operation(generation),
+    );
+
+    this.operationTail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+
+    return result;
   }
 }
