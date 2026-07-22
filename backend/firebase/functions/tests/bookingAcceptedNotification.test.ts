@@ -117,6 +117,7 @@ async function setRegistration(
     active: true,
     provider: "expo",
     platform: "android",
+    registrationVersion: 1,
     ...overrides,
   };
   if (token !== undefined) {
@@ -125,7 +126,11 @@ async function setRegistration(
   await db.collection("pushTokenRegistrations").doc(senderId).collection("devices").doc(deviceId).set(data);
 }
 
-function service(provider = new FakeProvider(), enabled = true, now = new Date("2026-07-01T12:00:00.000Z")) {
+function service(
+  provider: PushProvider = new FakeProvider(),
+  enabled = true,
+  now = new Date("2026-07-01T12:00:00.000Z"),
+) {
   return new BookingAcceptedNotificationService(db, provider, () => enabled, () => now);
 }
 
@@ -438,6 +443,7 @@ describe("trusted token selection and delivery effects", () => {
     await setRegistration("karri-ffffffffffffffff", tokenTwo, { platform: "web" });
     await setRegistration("karri-gggggggggggggggg", undefined);
     await setRegistration("karri-hhhhhhhhhhhhhhhh", "not-an-expo-token");
+    await setRegistration("karri-iiiiiiiiiiiiiiii", tokenTwo, { registrationVersion: 0 });
     const provider = new FakeProvider();
     const { before, after } = transition();
 
@@ -491,8 +497,11 @@ describe("trusted token selection and delivery effects", () => {
     expect(provider.messages).toHaveLength(1);
     expect((await db.collection("notifications").get()).size).toBe(1);
     expect((await db.collection("notificationDeliveries").get()).size).toBe(1);
-    expect((await db.collection("notificationDeliveries")
-      .doc(derivePushDeliveryEffectId(first.notificationId!, deviceOne)).get()).exists).toBe(true);
+    const effect = await db.collection("notificationDeliveries")
+      .doc(derivePushDeliveryEffectId(first.notificationId!, deviceOne)).get();
+    expect(effect.exists).toBe(true);
+    expect(effect.data()?.registrationVersion).toBe(1);
+    expect(JSON.stringify(effect.data())).not.toContain(tokenOne);
   });
 
   it("deterministically bounds registration inspection, delivery claims, and provider messages at 100", async () => {
@@ -529,6 +538,48 @@ describe("trusted token selection and delivery effects", () => {
     expect(provider.messages[0].map((entry) => entry.to)).not.toContain(registrations[registrationLimit].token);
   });
 
+  it("does not deactivate a newer registration generation after an older send is rejected", async () => {
+    await setPreferences();
+    await setRegistration(deviceOne, tokenOne);
+
+    const rotatedToken = "ExpoPushToken[FAKE_N3B_ROTATED_TOKEN]";
+    const registrationRef = db.collection("pushTokenRegistrations").doc(senderId)
+      .collection("devices").doc(deviceOne);
+
+    const provider: PushProvider = {
+      async send() {
+        await registrationRef.update({
+          token: rotatedToken,
+          registrationVersion: 2,
+          registeredAt: "2026-07-01T12:02:00.000Z",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        return [{
+          status: "invalid_registration",
+          outcomeCode: "device_not_registered",
+          providerTicketId: null,
+        }];
+      },
+    };
+
+    const { before, after } = transition();
+    const result = await service(provider).handleBookingUpdate(bookingId, before, after);
+
+    const registration = (await registrationRef.get()).data();
+    expect(registration?.active).toBe(true);
+    expect(registration?.token).toBe(rotatedToken);
+    expect(registration?.registrationVersion).toBe(2);
+    expect(registration?.revokedAt).toBeUndefined();
+
+    const effect = await db.collection("notificationDeliveries")
+      .doc(derivePushDeliveryEffectId(result.notificationId!, deviceOne)).get();
+    expect(effect.data()?.status).toBe("invalid_registration");
+    expect(effect.data()?.registrationVersion).toBe(1);
+    expect(JSON.stringify(effect.data())).not.toContain(tokenOne);
+    expect(JSON.stringify(effect.data())).not.toContain(rotatedToken);
+  });
+
   it("persists partial outcomes and transactionally removes an explicitly invalid token", async () => {
     await setPreferences();
     await setRegistration(deviceOne, tokenOne);
@@ -541,6 +592,7 @@ describe("trusted token selection and delivery effects", () => {
     const result = await service(provider).handleBookingUpdate(bookingId, before, after);
     const effects = await db.collection("notificationDeliveries").get();
     expect(effects.docs.map((entry) => entry.data().status).sort()).toEqual(["accepted", "invalid_registration"]);
+    expect(effects.docs.every((entry) => entry.data().registrationVersion === 1)).toBe(true);
 
     const invalidRegistration = await db.collection("pushTokenRegistrations").doc(senderId)
       .collection("devices").doc(deviceTwo).get();

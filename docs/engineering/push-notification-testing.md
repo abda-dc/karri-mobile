@@ -2,7 +2,7 @@
 
 ## Scope
 
-This remains a development-only test foundation. Local notification-response routing exists, registration occurs only through explicit Profile registration, and N3A adds trusted delivery only for a validated `bookings/{bookingId}` `pending` to `accepted` transition. Repository unregistration occurs only when an explicit caller invokes `remove`. No automatic logout, startup, preference-disable, permission-revocation, or token-rotation lifecycle is present.
+This remains a development-only test foundation. Local notification-response routing exists, registration occurs only through explicit Profile registration, N3A adds trusted delivery only for a validated `bookings/{bookingId}` `pending` to `accepted` transition, and N3B binds each delivery effect to a server-owned registration generation. Repository unregistration occurs only when an explicit caller invokes `remove`. No automatic logout, startup, preference-disable, permission-revocation, or token-change lifecycle is present.
 
 The following items remain future/unimplemented:
 - server-side deactivation lifecycle
@@ -19,7 +19,7 @@ Phase 13 can request permission and obtain an Expo token only after an authentic
 1. enables and saves the Push preference; and
 2. presses **Enable device notifications** in Profile.
 
-The token repository wiring (implemented in N2) persists the token securely using the trusted backend callables (`registerPushToken`/`unregisterPushToken`). The token is never displayed or logged on the client. Creation of the deterministic canonical notification is N3A's event-level dispatch claim; only its creating invocation evaluates optional delivery. A matching duplicate returns `event_replay` before reading the kill switch, preferences, quiet hours, or registrations, making first-invocation suppression terminal even if runtime state later changes. Before token lookup, that creating invocation validates the complete persisted notification-preference schema, including exact top-level, channel, category, and quiet-hours keys, ownership, boolean values, and Firestore timestamps; partial, malformed, mismatched, or extended records suppress push. N3A orders the recipient's registration documents by document ID, examines at most 100 records, and ignores records beyond that bound without pagination or overflow queuing. It claims no more than 100 delivery effects and sends at most 100 messages in one Expo request. A crash after canonical creation but before a device claim can lose the optional push; this accepted at-most-one-attempt tradeoff preserves the canonical in-app record. This is a safety and resource cap for N3A, not a production-scale broadcast design; broader retention policy, pagination, cleanup, and multi-batch fan-out remain deferred. Provider response-body timeout/abort and network-stream failures produce safe temporary outcomes, while invalid or structurally malformed JSON produces a permanent malformed-response outcome. N3A adds no retry, queue, delayed delivery, or catch-up behavior. Provider sending remains disabled by default behind `KARRI_PUSH_DELIVERY_ENABLED`; it is not production-ready.
+The token repository wiring (implemented in N2) persists the token securely using the trusted backend callables (`registerPushToken`/`unregisterPushToken`). The token is never displayed or logged on the client. N3B adds a server-owned positive integer `registrationVersion`: a new registration starts at `1`, the same active token preserves it, token replacement or inactive reactivation increments it, a legacy record without the field upgrades to `1`, and malformed or exhausted state fails closed without overwriting the registration. Creation of the deterministic canonical notification is N3A's event-level dispatch claim; only its creating invocation evaluates optional delivery. A matching duplicate returns `event_replay` before reading the kill switch, preferences, quiet hours, or registrations, making first-invocation suppression terminal even if runtime state later changes. Before token lookup, that creating invocation validates the complete persisted notification-preference schema. N3A/N3B order the recipient's registration documents by document ID, examine at most 100 records, and select only active, bound Expo registrations with a valid generation. Each claimed delivery effect records that generation but never the raw token. Immediate `DeviceNotRegistered` cleanup re-reads the registration transactionally and cannot deactivate a newer token generation. The service claims no more than 100 delivery effects and sends at most 100 messages in one Expo request. A crash after canonical creation but before a device claim can lose the optional push; this accepted at-most-one-attempt tradeoff preserves the canonical in-app record. Broader retention policy, pagination, cleanup, receipt polling, and multi-batch fan-out remain deferred. Provider response-body timeout/abort and network-stream failures produce safe temporary outcomes, while invalid or structurally malformed JSON produces a permanent malformed-response outcome. N3A/N3B add no retry, queue, delayed delivery, receipt reconciliation, or catch-up behavior. Provider sending remains disabled by default behind `KARRI_PUSH_DELIVERY_ENABLED`; it is not production-ready.
 
 ## Minimal payload contract
 
@@ -137,6 +137,9 @@ For invalid payloads, `validateNotificationPushPayload` returns explicit errors 
 - [ ] Verify allow, deny, provisional/ephemeral where applicable, and already-denied behavior.
 - [ ] Verify no raw token appears in the UI, console, application logs, Firestore, analytics, or error reporting.
 - [ ] Verify that the UI reports server registration is confirmed after successful registration.
+- [ ] Verify clients neither provide nor receive `registrationVersion`; inspect it only with trusted development tooling.
+- [ ] Verify first registration creates version `1`, exact active-token registration preserves it, token replacement increments it, inactive reactivation increments it, and a missing legacy value upgrades safely.
+- [ ] Verify malformed or exhausted registration versions fail closed without changing the stored token or generation.
 - [ ] Verify toggling the preference alone never requests permission or token registration.
 
 ## Controlled N3A delivery test checklist
@@ -148,14 +151,16 @@ Only an approved, isolated development environment may enable the server kill sw
 - [ ] Trigger only a valid test booking transition from `pending` to `accepted`; never introduce a delivery callable or accept client recipient/content input.
 - [ ] Verify the canonical notification exists even when push is disabled, suppressed, or fails.
 - [ ] Send only **Karri update** / **Open Karri to view your latest activity.** with `{schemaVersion: 1, notificationId, action: "open_notifications"}` and Android channel `karri_activity_v1`.
-- [ ] Verify one deterministic server-only delivery effect per selected device and no token or private message content in it.
-- [ ] With more than 100 deterministic fake registration records, verify N3A inspects/selects, claims, and sends no more than 100; verify a replay sends nothing again.
+- [ ] Verify one deterministic server-only delivery effect per selected device, containing the selected positive `registrationVersion` but no token or private message content.
+- [ ] Verify registrations with missing, zero, negative, non-integer, or unsafe generations are not selected for delivery; a legacy record becomes eligible only after authenticated registration upgrades it.
+- [ ] With more than 100 deterministic fake registration records, verify N3A/N3B inspect/select, claim, and send no more than 100; verify a replay sends nothing again.
 - [ ] Verify the Expo provider rejects a direct 101-message batch without a network request and returns only safe `permanent_failure` / `batch_limit_exceeded` outcomes.
 - [ ] Verify complete stored preference records may pass policy, while partial, malformed, mismatched, or unknown-key records suppress push and retain the canonical notification.
 - [ ] Verify response-body timeout/abort and network failures are temporary, malformed JSON is permanent, and none of these N3A outcomes triggers a retry.
 - [ ] Verify quiet-hours, preference, kill-switch, and no-token suppression remain terminal when a duplicate event arrives after those conditions change; each replay must return `event_replay` without a provider call or device effect.
 - [ ] Verify a successful creating invocation sends once and creates one deterministic device effect, while its replay sends nothing and leaves one canonical notification and one effect.
 - [ ] Record immediate provider ticket outcome without logging the request or raw response.
+- [ ] For `DeviceNotRegistered`, verify cleanup removes the token only when both the token and captured `registrationVersion` still match; rotate the registration during the provider call and verify the newer generation remains active.
 - [ ] Confirm provider acceptance is not reported as user/device receipt.
 - [ ] Confirm the app does not navigate automatically. If a future tap observer is tested, it must authenticate and authorize the canonical record first.
 - [ ] Test each valid payload and every failure row in the expected-outcomes table.
@@ -174,19 +179,21 @@ Only an approved, isolated development environment may enable the server kill sw
 
 ## Disable and remove test registrations
 
-Current N2 foundation:
+Current N2/N3B foundation:
 
 - Registration occurs only through explicit Profile registration.
 - Repository unregistration occurs only when an explicit caller invokes `remove`.
-- N2 does not connect removal to logout, startup, preference disabling, permission revocation, or another lifecycle trigger.
+- The server maintains `registrationVersion` transactionally for explicit registration, token replacement, and inactive reactivation.
+- Immediate Expo `DeviceNotRegistered` cleanup is generation-safe and preserves a newer registration.
+- No automatic lifecycle trigger connects removal or reconciliation to logout, startup, foreground, preference disabling, permission revocation, or native token-change events.
 
 Future / unimplemented cleanup:
 
-- Server-side deactivation lifecycle
-- Token rotation and reconciliation beyond N3A's immediate `DeviceNotRegistered` deactivation
+- Broader server-side deactivation lifecycle
+- Automatic token-change detection and startup/foreground reconciliation
 - Leases
 - Retention purging
-- Receipt polling and provider-response cleanup
+- Receipt polling and generation-checked receipt cleanup
 - Delivery for events other than `booking.accepted`
 
 ## Stop conditions

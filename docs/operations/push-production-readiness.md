@@ -4,7 +4,7 @@
 
 **Production push authorization: Not granted.**
 
-Milestone 6 supplies a controlled client-registration and payload-validation foundation. It does not supply trusted token persistence, server delivery, production credentials, automatic listeners/navigation, monitoring, or production approval.
+The current N1-N3B package supplies controlled client registration, trusted token persistence, bounded `booking.accepted` server delivery, and registration-generation binding. It does not supply production credentials, receipt polling, retries, queues, automatic lifecycle reconciliation, monitoring, real-device acceptance evidence, or production approval.
 
 Every required checkbox below must have an owner, dated evidence, environment, and reviewer. A build passing TypeScript or Expo Doctor is not production approval.
 
@@ -47,26 +47,31 @@ Every required checkbox below must have an owner, dated evidence, environment, a
 ## Secrets and trusted server delivery
 
 - [x] No FCM/APNs/server secret is present in mobile code, `EXPO_PUBLIC_*`, Firestore, docs examples, or the repository.
-- [x] Mobile push delivery gateway remains deferred; no domain event sends a push.
-- [ ] Authenticated registration/unregistration endpoints run in trusted server code and derive user identity from verified authentication.
-- [ ] Token and delivery collections are server-only under deployed and Emulator-tested rules.
+- [x] Mobile delivery remains unavailable; the bounded provider path exists only in trusted server code behind a default-off kill switch.
+- [x] Authenticated registration/unregistration endpoints run in trusted server code and derive user identity from verified authentication.
+- [x] Emulator tests prove clients cannot directly read or write token and delivery collections.
+- [ ] Deployed production rules and IAM evidence prove token and delivery collections remain server-only.
 - [ ] Expo Push Service access token/enhanced security is enabled if Expo transport is selected.
 - [ ] All provider credentials use managed secret storage, least privilege, access audit, rotation owner, and break-glass procedure.
-- [ ] Trusted materializer creates the canonical in-app notification before dispatch.
-- [ ] Trusted dispatcher is the only component that evaluates recipients and sends provider requests.
-- [ ] Emergency controls can independently disable registration, dispatch, event categories, and environments.
+- [x] The trusted `booking.accepted` materializer creates the canonical in-app notification before optional dispatch.
+- [x] The trusted dispatcher alone evaluates recipient registrations and sends the bounded provider request.
+- [x] A server-only default-off control can disable dispatch independently.
+- [ ] Registration, category, cohort, and environment emergency controls are designed and operationally tested.
 
 ## Token lifecycle and cleanup
 
 - [x] Client token model validates user, installation ID, platform/provider, timestamp, and value bounds.
 - [x] Expo automatic token-update mode is disabled by the controlled gateway.
-- [ ] Registration endpoint atomically upserts installation binding and deactivates replaced tokens.
+- [x] The registration endpoint transactionally upserts the installation binding and maintains a server-owned positive `registrationVersion`.
+- [x] First registration starts at `1`; the same active token preserves its version; token replacement and inactive reactivation increment it.
+- [x] A missing legacy version upgrades to `1`; malformed or exhausted version state fails closed without overwriting the registration.
 - [ ] Foreground/token-change reconciliation is designed, user-consented, bounded, and tested before enabling any listener.
 - [ ] Sign-out calls authenticated cleanup before session teardown, continues safely if offline, and records a non-secret retry tombstone.
 - [ ] Account deletion deactivates every installation.
-- [ ] `DeviceNotRegistered`, FCM `UNREGISTERED`, and equivalent permanent results deactivate tokens immediately.
+- [x] Immediate Expo `DeviceNotRegistered` cleanup requires the current token and captured `registrationVersion` to match, preserving a newer generation.
+- [ ] Receipt-polled `DeviceNotRegistered`, FCM `UNREGISTERED`, and equivalent permanent results use the same generation-safe cleanup rule.
 - [ ] `INVALID_ARGUMENT` is treated as invalid-token evidence only after independent payload validation.
-- [ ] Registration leases, 30-day freshness review, inactive-token deletion, tombstone retention, and data-subject deletion are approved and automated.
+- [ ] Registration leases, freshness review, inactive-token deletion, tombstone retention, and data-subject deletion are approved and automated.
 
 ## Preferences and quiet hours
 
@@ -96,15 +101,18 @@ Every required checkbox below must have an owner, dated evidence, environment, a
 - [ ] Registration/unregistration endpoints enforce authentication, App Check rollout policy, rate limits, schema validation, environment binding, and replay protection.
 - [ ] Dispatch enforces per-user, per-installation, per-category, and global rate limits plus provider concurrency limits.
 - [ ] Topic/broadcast sending is disabled unless separately designed and approved.
-- [ ] Idempotency/effect IDs contain no token or private content and are collision-tested.
+- [x] Current deterministic notification/delivery IDs contain no token or private content, and delivery effects capture only the non-secret registration generation.
+- [ ] Future retry, receipt, and projection-version effect IDs are collision-tested under their final schemas.
 - [ ] Threat model covers modified clients, forged payloads, leaked tokens, credential misuse, notification spam, enumeration, cross-environment tokens, and operator abuse.
 - [ ] Mobile, Firestore rules, Cloud Functions, IAM/service accounts, dependencies, and secret scanning pass security review.
 - [ ] Support/admin tools are least-privilege, audited, and unable to reveal raw tokens by default.
 
 ## Retry, receipts, monitoring, and dead letters
 
-- [ ] Provider tickets and receipts are persisted as outcome metadata without raw token or body.
-- [ ] Provider acceptance is never reported as device/user receipt.
+- [x] Immediate provider ticket outcomes are persisted without raw token or private body, with the selected `registrationVersion`.
+- [ ] Provider receipts are polled and persisted as outcome metadata without raw token or body.
+- [x] Provider acceptance is never reported as device/user receipt.
+- [ ] Receipt cleanup compares the effect's captured generation with the current registration before token deletion or deactivation.
 - [ ] Only network errors, timeouts, HTTP 429/5xx, and provider rate limits retry with capped exponential backoff and jitter.
 - [ ] Invalid credentials, malformed/oversized payloads, sender mismatch, unauthorized requests, and deterministic schema errors fail permanently and alert.
 - [ ] Retry attempts, maximum delivery age, terminal states, dead-letter transition, and operator replay checks match the delivery design.
@@ -158,6 +166,8 @@ Automatic no-go conditions:
 
 - Any production secret or raw token is committed, bundled, displayed, or logged.
 - Any permission prompt, token registration, send, listener, or navigation occurs without the documented user/server gate.
+- A client can provide, overwrite, or read the server-owned registration generation.
+- A delayed or immediate failure can deactivate a registration whose token or `registrationVersion` no longer matches the attempted send.
 - Client code can select arbitrary recipients or deliver directly.
 - Preference, quiet-hours, authentication, or authorization checks can be bypassed.
 - Canonical in-app notification creation depends on push success.

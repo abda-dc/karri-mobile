@@ -129,6 +129,34 @@ export class PushTokenPersistenceService {
     const alreadyExisted = deviceSnap.exists;
 
     if (alreadyExisted) {
+      const existingData = deviceSnap.data() ?? {};
+      const currentVersion = existingData.registrationVersion;
+      let registrationVersion = 1;
+
+      if (currentVersion !== undefined) {
+        if (
+          typeof currentVersion !== "number" ||
+          !Number.isSafeInteger(currentVersion) ||
+          currentVersion < 1
+        ) {
+          throw new Error("Invalid push registration version.");
+        }
+
+        const sameActiveToken =
+          existingData.active === true &&
+          existingData.token === token;
+
+        if (sameActiveToken) {
+          registrationVersion = currentVersion;
+        } else {
+          if (currentVersion === Number.MAX_SAFE_INTEGER) {
+            throw new Error("Push registration version exhausted.");
+          }
+
+          registrationVersion = currentVersion + 1;
+        }
+      }
+
       const recordUpdate = {
         userId: uid,
         deviceId,
@@ -136,6 +164,7 @@ export class PushTokenPersistenceService {
         provider,
         token,
         active: true,
+        registrationVersion,
         registeredAt,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         revokedAt: null,
@@ -149,6 +178,7 @@ export class PushTokenPersistenceService {
         provider,
         token,
         active: true,
+        registrationVersion: 1,
         registeredAt,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),

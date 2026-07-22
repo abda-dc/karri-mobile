@@ -888,6 +888,7 @@ describe("notification deliveries", () => {
       bookingId,
       recipientId: senderUid,
       registrationId: "karri-aaaaaaaaaaaaaaaa",
+      registrationVersion: 1,
       provider: "expo",
       platform: "android",
       status: "claimed",

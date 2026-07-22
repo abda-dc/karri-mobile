@@ -902,8 +902,7 @@ describe("Administrative Actions Functions Integration", () => {
         registeredAt: "2026-07-20T10:00:00.000Z",
       };
 
-      it("creates a deterministic first registration and preserves original fields on duplicate, token refresh is idempotent doc", async () => {
-        // 1. First registration
+      it("creates version 1, preserves it for the same active token, and increments it for rotation and reactivation", async () => {
         const req1 = { data: validData, auth };
         const res1 = await registerPushToken.run(req1 as any);
         expect(res1).toEqual({
@@ -913,7 +912,6 @@ describe("Administrative Actions Functions Integration", () => {
           alreadyExisted: false,
         });
 
-        // Verify document structure in Firestore
         const deviceRef = db
           .collection("pushTokenRegistrations")
           .doc("user-abc")
@@ -930,17 +928,19 @@ describe("Administrative Actions Functions Integration", () => {
           provider: "expo",
           token: "ExpoPushToken[tok123456]",
           active: true,
+          registrationVersion: 1,
           registeredAt: "2026-07-20T10:00:00.000Z",
           revokedAt: null,
         });
         expect(data1?.createdAt).toBeDefined();
         expect(data1?.updatedAt).toBeDefined();
 
-        // 2. Repeat registration (exact same details) is idempotent and returns alreadyExisted: true
         const res2 = await registerPushToken.run(req1 as any);
         expect(res2.alreadyExisted).toBe(true);
 
-        // 3. Token refresh updates token, registeredAt, and updatedAt but preserves original createdAt and returns alreadyExisted: true
+        const data2 = (await deviceRef.get()).data();
+        expect(data2?.registrationVersion).toBe(1);
+
         const freshData = {
           ...validData,
           token: "ExpoPushToken[refreshed-token-987]",
@@ -948,13 +948,174 @@ describe("Administrative Actions Functions Integration", () => {
         };
         const req3 = { data: freshData, auth };
         const res3 = await registerPushToken.run(req3 as any);
-        expect(res3.alreadyExisted).toBe(true); // Existed before
+        expect(res3.alreadyExisted).toBe(true);
 
-        const snap3 = await deviceRef.get();
-        const data3 = snap3.data();
+        const data3 = (await deviceRef.get()).data();
         expect(data3?.token).toBe("ExpoPushToken[refreshed-token-987]");
+        expect(data3?.registrationVersion).toBe(2);
         expect(data3?.registeredAt).toBe("2026-07-20T10:05:00.000Z");
-        expect(data3?.createdAt).toEqual(data1?.createdAt); // original createdAt preserved
+        expect(data3?.createdAt).toEqual(data1?.createdAt);
+
+        await unregisterPushToken.run({
+          data: { deviceId: validData.deviceId },
+          auth,
+        } as any);
+
+        const inactiveData = (await deviceRef.get()).data();
+        expect(inactiveData?.active).toBe(false);
+        expect(inactiveData?.token).toBeUndefined();
+        expect(inactiveData?.registrationVersion).toBe(2);
+
+        const res4 = await registerPushToken.run(req3 as any);
+        expect(res4.alreadyExisted).toBe(true);
+
+        const data4 = (await deviceRef.get()).data();
+        expect(data4?.active).toBe(true);
+        expect(data4?.token).toBe("ExpoPushToken[refreshed-token-987]");
+        expect(data4?.registrationVersion).toBe(3);
+        expect(data4?.createdAt).toEqual(data1?.createdAt);
+      });
+
+      it("upgrades a legacy registration without a version to version 1", async () => {
+        const deviceRef = db
+          .collection("pushTokenRegistrations")
+          .doc("user-abc")
+          .collection("devices")
+          .doc(validData.deviceId);
+
+        const timestamp = admin.firestore.Timestamp.fromDate(
+          new Date("2026-07-20T09:55:00.000Z"),
+        );
+
+        await deviceRef.set({
+          userId: "user-abc",
+          deviceId: validData.deviceId,
+          platform: "ios",
+          provider: "expo",
+          token: validData.token,
+          active: true,
+          registeredAt: validData.registeredAt,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          revokedAt: null,
+        });
+
+        const result = await registerPushToken.run({
+          data: validData,
+          auth,
+        } as any);
+
+        expect(result).toEqual({
+          success: true,
+          deviceId: validData.deviceId,
+          status: "registered",
+          alreadyExisted: true,
+        });
+        expect(JSON.stringify(result)).not.toContain(validData.token);
+
+        const upgraded = (await deviceRef.get()).data();
+        expect(upgraded?.registrationVersion).toBe(1);
+        expect(upgraded?.createdAt).toEqual(timestamp);
+      });
+
+      it("fails closed when an existing registration has a malformed version", async () => {
+        const deviceRef = db
+          .collection("pushTokenRegistrations")
+          .doc("user-abc")
+          .collection("devices")
+          .doc(validData.deviceId);
+
+        const timestamp = admin.firestore.Timestamp.fromDate(
+          new Date("2026-07-20T09:55:00.000Z"),
+        );
+
+        await deviceRef.set({
+          userId: "user-abc",
+          deviceId: validData.deviceId,
+          platform: "ios",
+          provider: "expo",
+          token: validData.token,
+          active: true,
+          registrationVersion: 0,
+          registeredAt: validData.registeredAt,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          revokedAt: null,
+        });
+
+        const rotatedToken = "ExpoPushToken[malformed-version-rotation]";
+
+        const attempt = registerPushToken.run({
+          data: {
+            ...validData,
+            token: rotatedToken,
+            registeredAt: "2026-07-20T10:05:00.000Z",
+          },
+          auth,
+        } as any);
+
+        await expect(attempt).rejects.toThrowError(
+          /An internal error occurred/,
+        );
+
+        const unchanged = (await deviceRef.get()).data();
+        expect(unchanged?.active).toBe(true);
+        expect(unchanged?.token).toBe(validData.token);
+        expect(unchanged?.registrationVersion).toBe(0);
+        expect(unchanged?.registeredAt).toBe(validData.registeredAt);
+        expect(unchanged?.createdAt).toEqual(timestamp);
+        expect(JSON.stringify(unchanged)).not.toContain(rotatedToken);
+      });
+
+      it("fails closed when registration version is exhausted", async () => {
+        const deviceRef = db
+          .collection("pushTokenRegistrations")
+          .doc("user-abc")
+          .collection("devices")
+          .doc(validData.deviceId);
+
+        const timestamp = admin.firestore.Timestamp.fromDate(
+          new Date("2026-07-20T09:55:00.000Z"),
+        );
+
+        await deviceRef.set({
+          userId: "user-abc",
+          deviceId: validData.deviceId,
+          platform: "ios",
+          provider: "expo",
+          token: validData.token,
+          active: true,
+          registrationVersion: Number.MAX_SAFE_INTEGER,
+          registeredAt: validData.registeredAt,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          revokedAt: null,
+        });
+
+        const rotatedToken = "ExpoPushToken[exhausted-version-rotation]";
+
+        const attempt = registerPushToken.run({
+          data: {
+            ...validData,
+            token: rotatedToken,
+            registeredAt: "2026-07-20T10:05:00.000Z",
+          },
+          auth,
+        } as any);
+
+        await expect(attempt).rejects.toThrowError(
+          /An internal error occurred/,
+        );
+
+        const unchanged = (await deviceRef.get()).data();
+        expect(unchanged?.active).toBe(true);
+        expect(unchanged?.token).toBe(validData.token);
+        expect(unchanged?.registrationVersion).toBe(
+          Number.MAX_SAFE_INTEGER,
+        );
+        expect(unchanged?.registeredAt).toBe(validData.registeredAt);
+        expect(unchanged?.createdAt).toEqual(timestamp);
+        expect(JSON.stringify(unchanged)).not.toContain(rotatedToken);
       });
 
       it("enforces authentication mapping and guarantees one user cannot address another user's record", async () => {

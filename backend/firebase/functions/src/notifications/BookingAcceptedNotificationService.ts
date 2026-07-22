@@ -42,6 +42,7 @@ interface SelectedRegistration {
   readonly deviceId: string;
   readonly token: string;
   readonly platform: "android" | "ios";
+  readonly registrationVersion: number;
 }
 
 interface ClaimedRegistration extends SelectedRegistration {
@@ -225,7 +226,10 @@ function validRegistration(data: DocumentData, documentId: string, senderId: str
     (data.platform === "android" || data.platform === "ios") &&
     data.userId === senderId &&
     typeof data.deviceId === "string" && data.deviceId === documentId && DEVICE_ID_PATTERN.test(data.deviceId) &&
-    typeof data.token === "string" && data.token.length <= 512 && EXPO_TOKEN_PATTERN.test(data.token);
+    typeof data.token === "string" && data.token.length <= 512 && EXPO_TOKEN_PATTERN.test(data.token) &&
+    typeof data.registrationVersion === "number" &&
+    Number.isSafeInteger(data.registrationVersion) &&
+    data.registrationVersion >= 1;
 }
 
 function canonicalIdentityMatches(data: DocumentData, bookingId: string, senderId: string): boolean {
@@ -325,6 +329,7 @@ export class BookingAcceptedNotificationService {
           deviceId: data.deviceId as string,
           token: data.token as string,
           platform: data.platform as "android" | "ios",
+          registrationVersion: data.registrationVersion as number,
         }];
       });
     } catch {
@@ -403,6 +408,7 @@ export class BookingAcceptedNotificationService {
         bookingId,
         recipientId: senderId,
         registrationId: registration.deviceId,
+        registrationVersion: registration.registrationVersion,
         provider: "expo",
         platform: registration.platform,
         status: "claimed",
@@ -420,7 +426,13 @@ export class BookingAcceptedNotificationService {
     await this.db.runTransaction(async (transaction) => {
       const snapshot = await transaction.get(registration.ref);
       const data = snapshot.data();
-      if (!snapshot.exists || !data || data.active !== true || data.token !== registration.token) {
+      if (
+        !snapshot.exists ||
+        !data ||
+        data.active !== true ||
+        data.token !== registration.token ||
+        data.registrationVersion !== registration.registrationVersion
+      ) {
         return;
       }
       transaction.update(registration.ref, {
