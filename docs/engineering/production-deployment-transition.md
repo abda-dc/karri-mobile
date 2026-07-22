@@ -327,3 +327,48 @@ Recommended cleanup after Milestone 12.5 is safely committed:
 1. Stop the old temporary App Service.
 2. Keep it briefly as a safety reference.
 3. Delete it later after the Static Web Apps validation path is accepted.
+
+## Azure Static Web Apps deployment incident closure - July 21, 2026
+
+Notifications N3A commit `3107e7e109981b9d70172e46ea44db550c0d78d6` triggered Azure Static Web Apps workflow run `29848690113` for `swa-karri-mobile-web-test`. The Expo/Oryx web build completed successfully on every investigated attempt, but Azure's post-upload deployment pipeline failed or stalled during the first three attempts.
+
+| Attempt | Result | Observed failure mode |
+| --- | --- | --- |
+| 1 | Failure | The build completed, but Azure reported problems communicating with its content server. |
+| 2 | Failure | The build completed, but Azure again reported problems communicating with its content server. |
+| 3 | Failure | ZIP creation and upload completed, deployment polling remained `InProgress`, and the action returned `Upload Timed Out. Unsure if deployment was successful or not.` |
+| 4 | Success | The approved controlled rerun completed the Build and Deploy Job successfully. |
+
+Attempt 3 used deployment ID `7cbdcf6d-257c-441e-9175-33545438d4ed`. Its retained investigation log is:
+
+    artifacts/azure-static-web-apps-29848690113-third-attempt-88717137853.log
+
+The successful fourth attempt used job `88741933918`. It started at `2026-07-21T19:37:59Z` and completed at `2026-07-21T19:40:25Z`.
+
+All failed attempts and the successful attempt used the same deployment components:
+
+| Component | Exact version |
+| --- | --- |
+| `Azure/static-web-apps-deploy` action | `1a947af9992250f3bc2e68ad0754c0b0c11566c9` |
+| StaticSitesClient base image | `sha256:8ed8ea489d04d0636b5c47fbaa44f005975ab0d1f03eddc28014cdf7a061f7f4` |
+| Oryx | `0.2.20260109.4` |
+
+The investigation found no evidence of a Git checkout failure, Expo export failure, missing `dist` output, ZIP creation failure, initial artifact-upload failure, deployment-token rejection, dependency change, workflow change, Expo configuration change, Static Web Apps configuration change, or deployment-tool version drift. N3A did not modify deployment-sensitive files.
+
+Azure exposed no deployment-detail read endpoint keyed by the action deployment ID. No Azure Monitor diagnostic setting existed during the incident, and no applicable subscription-level Service Health event was returned.
+
+Production verification succeeded after attempt 4:
+
+| Verification | Result |
+| --- | --- |
+| Environment | `default` |
+| Source branch | `main` |
+| Azure status | `Ready` |
+| Azure last updated | `2026-07-21T19:40:07.850954+00:00` |
+| Live-site HTTP status | `200` |
+| `Last-Modified` | `Tue, 21 Jul 2026 19:40:07 GMT` |
+| `Content-Length` | `23784` |
+
+The evidence supports classifying the incident as a probable transient failure or stalled operation within Azure Static Web Apps' post-upload content-processing and distribution pipeline. An application, repository, workflow, deployment-token, or Azure resource defect is not supported by the evidence.
+
+The incident is resolved. No application code, GitHub Actions workflow, secret, Firebase configuration, deployment token, or Azure resource correction was required.

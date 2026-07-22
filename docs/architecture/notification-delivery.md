@@ -4,6 +4,24 @@
 
 This document covers the controlled client foundation, trusted persistence backend (N1), mobile repository wiring (N2), and bounded trusted `booking.accepted` delivery (N3A).
 
+### Notifications N3A implementation and deployment closure
+
+Notifications N3A is implemented, committed, pushed, validated, and deployed at exact commit `3107e7e109981b9d70172e46ea44db550c0d78d6` (`Implement trusted booking accepted push delivery`).
+
+Exact-SHA validation completed successfully:
+
+| Workflow | Run | Conclusion |
+| --- | --- | --- |
+| Firebase Validate | `29848690515` | Success |
+| Mobile Validate | `29848690285` | Success |
+| Publish Docs | `29848690492` | Success |
+
+Azure Static Web Apps workflow run `29848690113` failed during Azure post-upload processing on attempts 1 through 3 and succeeded on the approved controlled fourth attempt. The default Azure environment subsequently reported `Ready`, and the live Static Web Apps site served the exact commit successfully.
+
+This Azure web deployment verification does not enable push delivery. The server-only `KARRI_PUSH_DELIVERY_ENABLED` kill switch remains default-off, and production push readiness remains governed by the separate No-Go checklist.
+
+Notifications N3B is the next candidate phase. This closure does not approve, authorize, or begin N3B implementation.
+
 The following functionality is **implemented**:
 - N1 trusted push-token persistence
 - N2 FirebasePushTokenRepository wiring for Android/iOS Expo tokens
