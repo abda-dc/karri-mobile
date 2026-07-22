@@ -29,6 +29,9 @@ export function PushNotificationRegistrationCard({
 }: PushNotificationRegistrationCardProps) {
   const available =
     registration.availability === PushRegistrationAvailability.Available;
+  const unregistrationAvailable =
+    registration.unregistrationAvailability ===
+    PushRegistrationAvailability.Available;
   const permissionLabel = registration.permissionStatus
     ? permissionLabels[registration.permissionStatus]
     : "not checked";
@@ -50,7 +53,7 @@ export function PushNotificationRegistrationCard({
 
       <Banner
         compact
-        message="Karri requests platform permission only after you press the button below. No token is displayed, logged, or written directly to Firestore."
+        message="Karri requests platform permission only after you press Register this device. Unregistration does not request permission or read a push token. No token is displayed, logged, or written directly to Firestore."
         title="User initiated registration"
         variant="development"
       />
@@ -83,20 +86,32 @@ export function PushNotificationRegistrationCard({
           compact
           message={registration.message}
           title={
-            registration.outcome === "success"
-              ? "Registration confirmed"
-              : "Registration deferred"
+            registration.messageOperation === "unregister"
+              ? registration.outcome === "success"
+                ? "Device unregistered"
+                : "Unregistration deferred"
+              : registration.outcome === "success"
+                ? "Registration confirmed"
+                : "Registration deferred"
           }
           variant={registration.outcome === "success" ? "success" : "warning"}
         />
       ) : null}
 
       <PrimaryButton
-        disabled={!pushPreferenceEnabled || !available}
-        loading={registration.busy}
+        disabled={registration.busy || !pushPreferenceEnabled || !available}
+        loading={registration.activeOperation === "register"}
         onPress={() => void registration.register()}
       >
         Register this device
+      </PrimaryButton>
+      <PrimaryButton
+        disabled={registration.busy || !unregistrationAvailable}
+        loading={registration.activeOperation === "unregister"}
+        onPress={() => void registration.unregister()}
+        variant="secondary"
+      >
+        Unregister this device
       </PrimaryButton>
     </Card>
   );

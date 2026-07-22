@@ -2,7 +2,7 @@
 
 ## Status and guardrails
 
-This document covers the controlled client foundation, trusted persistence backend (N1), mobile repository wiring (N2), bounded trusted `booking.accepted` delivery (N3A), and registration-generation binding (N3B).
+This document covers the controlled client foundation, trusted persistence backend (N1), mobile repository wiring (N2), bounded trusted `booking.accepted` delivery (N3A), registration-generation binding (N3B), and explicit current-installation unregistration (N4A).
 
 ### Notifications N3A implementation and deployment closure
 
@@ -39,6 +39,7 @@ The following functionality is **implemented**:
 - immediate `DeviceNotRegistered` deactivation and token deletion only when the still-current token and registration generation both match the attempted send
 - default-off server delivery kill switch (`KARRI_PUSH_DELIVERY_ENABLED`)
 - explicit Profile registration
+- explicit, user-initiated Profile unregistration for the current installation without reading or retaining the raw token
 - existing local notification-response listening and route resolution
 
 The following functionality is **deferred**:
@@ -62,7 +63,7 @@ The following functionality is **deferred**:
 - lastSeenAt
 - broader device-retention policy, registration pagination, cleanup, and multi-batch fan-out
 
-Note: `unregisterPushToken` is called only when an explicit caller invokes `repository.remove`. No automatic lifecycle caller currently exists. Push notifications are not production-complete.
+N4A calls `unregisterPushToken` only after the authenticated user explicitly selects **Unregister this device** in Profile. The application reads the existing retained installation ID without creating one, combines it with the active user ID for local validation, and sends only `{ deviceId }` to the trusted callable; backend authentication remains the sole source of registration ownership. Removal never reads, retrieves, stores, returns, or logs a raw push token. Missing local installation state is an idempotent successful no-op, while malformed or unreadable state defers safely. Successful removal disables Expo automatic token updates, deactivates the server registration, deletes its raw token through the unchanged backend, and retains the local installation ID so later explicit registration can reuse the same device document and server-owned generation behavior. No automatic lifecycle caller exists.
 
 N3A/N3B deterministically orders one recipient's device subcollection by document ID and examines at most the first 100 registration records. A selected record must contain a valid positive safe-integer `registrationVersion`; legacy records remain ineligible for delivery until the authenticated registration endpoint upgrades them. Registrations beyond the inspection bound are ignored: they are not paged, queued, claimed, or disclosed. After validation and in-memory token deduplication, the service claims and sends no more than 100 delivery effects/messages in one Expo request. This cap is a safety and resource boundary, not a production-scale broadcast design. Broader retention policy, pagination, cleanup, and multi-batch fan-out remain deferred.
 
@@ -169,7 +170,7 @@ The current explicit Profile registration flow is explicit and authenticated:
 
 Clients must not write token documents directly or provide a registration generation. The backend persistence layer is implemented through authenticated callables (`registerPushToken` and `unregisterPushToken`), and client-side repository wiring is implemented in N2. Android/iOS registration can persist a token after successful permission and Expo token acquisition. N3A/N3B may read only active, bound registrations with a valid server-owned generation after policy gates pass. Queues, receipt polling, retries, monitoring, broad cleanup, and production enablement remain deferred. No permission, token, or delivery behavior should be described as production-complete. App Check remains disabled as an explicit regression-preserved boundary for this package.
 
-`unregisterPushToken` is called only when an explicit caller invokes `repository.remove`. N2 does not connect token removal to logout, startup, foreground, preference disabling, permission revocation, or any automatic lifecycle trigger. Push notifications are not production-complete.
+N4A exposes the explicit current-installation removal described above. It does not require the Push preference or notification permission, request permission, create Android channels, obtain a token, generate a new installation ID, remove the retained installation ID, or sign the user out. Automatic logout, startup, foreground, preference-disable, permission-revocation, and token-change cleanup remain deferred. Push notifications are not production-complete.
 
 ### Future / unimplemented: Rotation, sign-out, and broader token cleanup
 

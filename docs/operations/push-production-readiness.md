@@ -4,7 +4,7 @@
 
 **Production push authorization: Not granted.**
 
-The current N1-N3B package supplies controlled client registration, trusted token persistence, bounded `booking.accepted` server delivery, and registration-generation binding. It does not supply production credentials, receipt polling, retries, queues, automatic lifecycle reconciliation, monitoring, real-device acceptance evidence, or production approval.
+The current N1-N4A package supplies controlled client registration, trusted token persistence, bounded `booking.accepted` server delivery, registration-generation binding, and explicit current-installation unregistration. It does not supply production credentials, receipt polling, retries, queues, workers, schedulers, automatic lifecycle reconciliation, App Check enforcement changes, monitoring, real-device acceptance evidence, provider enablement, or production approval.
 
 Every required checkbox below must have an owner, dated evidence, environment, and reviewer. A build passing TypeScript or Expo Doctor is not production approval.
 
@@ -62,6 +62,8 @@ Every required checkbox below must have an owner, dated evidence, environment, a
 
 - [x] Client token model validates user, installation ID, platform/provider, timestamp, and value bounds.
 - [x] Expo automatic token-update mode is disabled by the controlled gateway.
+- [x] Profile offers explicit current-installation unregistration using the authenticated user plus the retained installation ID; removal needs no raw token and sends only `deviceId` to the trusted callable.
+- [x] Missing installation state is an idempotent no-op, malformed state fails closed, and successful removal retains the installation ID for later registration reuse.
 - [x] The registration endpoint transactionally upserts the installation binding and maintains a server-owned positive `registrationVersion`.
 - [x] First registration starts at `1`; the same active token preserves its version; token replacement and inactive reactivation increment it.
 - [x] A missing legacy version upgrades to `1`; malformed or exhausted version state fails closed without overwriting the registration.
@@ -175,4 +177,3 @@ Automatic no-go conditions:
 - Production and development credentials/projects can be mixed.
 
 Until a dated decision satisfies every condition, the status remains **No-Go**.
-

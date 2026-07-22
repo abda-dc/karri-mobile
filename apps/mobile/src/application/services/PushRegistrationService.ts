@@ -3,7 +3,31 @@ import {
   type PushToken,
 } from "../notifications/PushToken";
 import type { NotificationPermissionStatus } from "../notifications/NotificationPermission";
-import { requireText } from "./validation";
+import { DomainValidationError, requireText } from "./validation";
+
+const installationIdPattern = /^karri-[a-z0-9-]{16,100}$/;
+
+export interface PushRegistrationIdentity {
+  readonly userId: string;
+  readonly deviceId: string;
+}
+
+export function assertPushRegistrationIdentity(
+  identity: PushRegistrationIdentity,
+  expectedUserId: string,
+): void {
+  if (
+    !identity.userId ||
+    identity.userId !== expectedUserId ||
+    identity.userId !== identity.userId.trim() ||
+    identity.userId.length > 128
+  ) {
+    throw new DomainValidationError("Push registration must belong to the active user.");
+  }
+  if (!installationIdPattern.test(identity.deviceId)) {
+    throw new DomainValidationError("Push registration requires a valid installation ID.");
+  }
+}
 
 export const PushRegistrationAvailability = {
   Available: "available",
@@ -32,6 +56,25 @@ export type PushRegistrationResult =
       readonly status: typeof PushRegistrationStatus.Unregistered;
     };
 
+export const ExistingPushInstallationStatus = {
+  Deferred: "deferred",
+  Found: "found",
+  Missing: "missing",
+} as const;
+
+export type ExistingPushInstallationResult =
+  | {
+      readonly reason: string;
+      readonly status: typeof ExistingPushInstallationStatus.Deferred;
+    }
+  | {
+      readonly deviceId: string;
+      readonly status: typeof ExistingPushInstallationStatus.Found;
+    }
+  | {
+      readonly status: typeof ExistingPushInstallationStatus.Missing;
+    };
+
 export const PushTokenPersistenceStatus = {
   Deferred: "deferred",
   Removed: "removed",
@@ -51,13 +94,15 @@ export type PushTokenPersistenceResult =
 
 export interface PushTokenRegistrationGateway {
   readonly availability: PushRegistrationAvailability;
+  readonly unregistrationAvailability: PushRegistrationAvailability;
+  getExistingInstallationId(): Promise<ExistingPushInstallationResult>;
   getPermissionStatus(): Promise<NotificationPermissionStatus>;
   register(userId: string): Promise<PushRegistrationResult>;
-  unregister(token: PushToken): Promise<PushRegistrationResult>;
+  unregister(identity: PushRegistrationIdentity): Promise<PushRegistrationResult>;
 }
 
 export interface PushTokenRepository {
-  remove(token: PushToken): Promise<PushTokenPersistenceResult>;
+  remove(identity: PushRegistrationIdentity): Promise<PushTokenPersistenceResult>;
   save(token: PushToken): Promise<PushTokenPersistenceResult>;
 }
 
@@ -69,6 +114,10 @@ export class PushRegistrationService {
 
   get availability(): PushRegistrationAvailability {
     return this.registrationGateway.availability;
+  }
+
+  get unregistrationAvailability(): PushRegistrationAvailability {
+    return this.registrationGateway.unregistrationAvailability;
   }
 
   getPermissionStatus(): Promise<NotificationPermissionStatus> {
@@ -97,14 +146,55 @@ export class PushRegistrationService {
     return registration;
   }
 
-  async unregister(token: PushToken): Promise<PushRegistrationResult> {
-    assertPushToken(token, token.userId);
-    const registration = await this.registrationGateway.unregister(token);
+  async unregisterCurrentInstallation(userId: string): Promise<PushRegistrationResult> {
+    const activeUserId = requireText(userId, "userId", 128);
+    if (activeUserId !== userId) {
+      throw new DomainValidationError("userId must be trimmed.");
+    }
+
+    let existing: ExistingPushInstallationResult;
+    try {
+      existing = await this.registrationGateway.getExistingInstallationId();
+    } catch {
+      return {
+        reason: "The stored installation identity could not be read safely.",
+        status: PushRegistrationStatus.Deferred,
+      };
+    }
+    if (existing.status === ExistingPushInstallationStatus.Missing) {
+      return { status: PushRegistrationStatus.Unregistered };
+    }
+    if (existing.status === ExistingPushInstallationStatus.Deferred) {
+      return existing;
+    }
+
+    const identity: PushRegistrationIdentity = {
+      deviceId: existing.deviceId,
+      userId: activeUserId,
+    };
+    try {
+      assertPushRegistrationIdentity(identity, activeUserId);
+    } catch {
+      return {
+        reason: "The stored installation identity is invalid.",
+        status: PushRegistrationStatus.Deferred,
+      };
+    }
+
+    let registration: PushRegistrationResult;
+    try {
+      registration = await this.registrationGateway.unregister(identity);
+    } catch {
+      return {
+        reason: "Device unregistration could not be prepared safely.",
+        status: PushRegistrationStatus.Deferred,
+      };
+    }
     if (registration.status !== PushRegistrationStatus.Unregistered) {
       return registration;
     }
 
-    const persistence = await this.tokens.remove(token);
+    const persistence = await this.tokens.remove(identity);
     if (persistence.status !== PushTokenPersistenceStatus.Removed) {
       return {
         reason:

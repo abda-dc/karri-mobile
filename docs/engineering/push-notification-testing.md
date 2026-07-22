@@ -2,7 +2,7 @@
 
 ## Scope
 
-This remains a development-only test foundation. Local notification-response routing exists, registration occurs only through explicit Profile registration, N3A adds trusted delivery only for a validated `bookings/{bookingId}` `pending` to `accepted` transition, and N3B binds each delivery effect to a server-owned registration generation. Repository unregistration occurs only when an explicit caller invokes `remove`. No automatic logout, startup, preference-disable, permission-revocation, or token-change lifecycle is present.
+This remains a development-only test foundation. Local notification-response routing exists, registration occurs only through explicit Profile registration, N3A adds trusted delivery only for a validated `bookings/{bookingId}` `pending` to `accepted` transition, and N3B binds each delivery effect to a server-owned registration generation. N4A adds explicit, user-initiated current-installation unregistration in Profile. No automatic logout, startup, foreground, preference-disable, permission-revocation, or token-change lifecycle is present.
 
 The following items remain future/unimplemented:
 - server-side deactivation lifecycle
@@ -179,10 +179,14 @@ Only an approved, isolated development environment may enable the server kill sw
 
 ## Disable and remove test registrations
 
-Current N2/N3B foundation:
+Current N2/N3B/N4A foundation:
 
 - Registration occurs only through explicit Profile registration.
-- Repository unregistration occurs only when an explicit caller invokes `remove`.
+- **Unregister this device** is a separate authenticated Profile action and does not require the Push preference or granted notification permission.
+- Removal reads the retained installation ID without creating one and calls the trusted repository with only `{userId, deviceId}`; the callable payload contains exactly `{deviceId}` because backend authentication owns user identity.
+- Missing local installation state is an idempotent successful no-op; malformed or unreadable state fails closed.
+- Unregistration disables Expo automatic token updates but does not request permission, create channels, call a token API, display/log a token, remove the local installation ID, or sign out.
+- Repeat explicit removal remains safe, and later explicit registration reuses the retained installation identity and server generation behavior.
 - The server maintains `registrationVersion` transactionally for explicit registration, token replacement, and inactive reactivation.
 - Immediate Expo `DeviceNotRegistered` cleanup is generation-safe and preserves a newer registration.
 - No automatic lifecycle trigger connects removal or reconciliation to logout, startup, foreground, preference disabling, permission revocation, or native token-change events.

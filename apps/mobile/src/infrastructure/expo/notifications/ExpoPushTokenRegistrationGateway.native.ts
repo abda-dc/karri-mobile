@@ -12,8 +12,11 @@ import {
   type PushToken,
 } from "../../../application/notifications/PushToken";
 import {
+  ExistingPushInstallationStatus,
   PushRegistrationAvailability,
   PushRegistrationStatus,
+  type ExistingPushInstallationResult,
+  type PushRegistrationIdentity,
   type PushRegistrationResult,
   type PushTokenRegistrationGateway,
 } from "../../../application/services/PushRegistrationService";
@@ -121,6 +124,12 @@ export class ExpoPushTokenRegistrationGateway
       : PushRegistrationAvailability.Deferred;
   }
 
+  get unregistrationAvailability(): PushRegistrationAvailability {
+    return isNativePlatform()
+      ? PushRegistrationAvailability.Available
+      : PushRegistrationAvailability.Deferred;
+  }
+
   async getPermissionStatus(): Promise<NotificationPermissionStatus> {
     if (!isNativePlatform()) {
       return NotificationPermissionStatus.Unsupported;
@@ -130,6 +139,37 @@ export class ExpoPushTokenRegistrationGateway
       return mapPermissionStatus(await Notifications.getPermissionsAsync());
     } catch {
       return NotificationPermissionStatus.Unsupported;
+    }
+  }
+
+  async getExistingInstallationId(): Promise<ExistingPushInstallationResult> {
+    if (!isNativePlatform()) {
+      return {
+        reason: "Push registration is available only in Android and iOS builds.",
+        status: ExistingPushInstallationStatus.Deferred,
+      };
+    }
+
+    try {
+      const existing = await AsyncStorage.getItem(installationIdKey);
+      if (existing === null) {
+        return { status: ExistingPushInstallationStatus.Missing };
+      }
+      if (!installationIdPattern.test(existing)) {
+        return {
+          reason: "The stored installation identity is invalid.",
+          status: ExistingPushInstallationStatus.Deferred,
+        };
+      }
+      return {
+        deviceId: existing,
+        status: ExistingPushInstallationStatus.Found,
+      };
+    } catch {
+      return {
+        reason: "The stored installation identity could not be read safely.",
+        status: ExistingPushInstallationStatus.Deferred,
+      };
     }
   }
 
@@ -206,7 +246,9 @@ export class ExpoPushTokenRegistrationGateway
     }
   }
 
-  async unregister(_token: PushToken): Promise<PushRegistrationResult> {
+  async unregister(
+    _identity: PushRegistrationIdentity,
+  ): Promise<PushRegistrationResult> {
     return (await disableExpoAutomaticTokenUpdates())
       ? { status: PushRegistrationStatus.Unregistered }
       : {

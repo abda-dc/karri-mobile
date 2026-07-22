@@ -12,14 +12,19 @@ import {
 import { mobileServices } from "../services/mobileServices";
 
 export type PushRegistrationOutcome = "idle" | "success" | "warning";
+export type PushRegistrationOperation = "register" | "unregister";
 
 export interface PushNotificationRegistrationState {
   readonly availability: PushRegistrationAvailabilityValue;
+  readonly activeOperation: PushRegistrationOperation | null;
+  readonly unregistrationAvailability: PushRegistrationAvailabilityValue;
   readonly busy: boolean;
   readonly message: string | null;
+  readonly messageOperation: PushRegistrationOperation | null;
   readonly outcome: PushRegistrationOutcome;
   readonly permissionStatus: NotificationPermissionStatus | null;
   register(): Promise<void>;
+  unregister(): Promise<void>;
 }
 
 export function usePushNotificationRegistration(
@@ -27,25 +32,34 @@ export function usePushNotificationRegistration(
   preferences: NotificationPreferences | null,
 ): PushNotificationRegistrationState {
   const availability = mobileServices.pushRegistration.availability;
+  const unregistrationAvailability =
+    mobileServices.pushRegistration.unregistrationAvailability;
   const [busy, setBusy] = useState(false);
+  const [activeOperation, setActiveOperation] =
+    useState<PushRegistrationOperation | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageOperation, setMessageOperation] =
+    useState<PushRegistrationOperation | null>(null);
   const [outcome, setOutcome] = useState<PushRegistrationOutcome>("idle");
   const [permissionStatus, setPermissionStatus] =
     useState<NotificationPermissionStatus | null>(null);
-  const attemptRef = useRef(0);
+  const sessionGenerationRef = useRef(0);
+  const operationIdRef = useRef(0);
+  const busyRef = useRef(false);
 
   useEffect(() => {
-    attemptRef.current += 1;
-    setBusy(false);
+    sessionGenerationRef.current += 1;
     setMessage(null);
+    setMessageOperation(null);
     setOutcome("idle");
     setPermissionStatus(null);
   }, [userId]);
 
   const register = useCallback(async () => {
-    if (busy) {
+    if (busyRef.current) {
       return;
     }
+    setMessageOperation("register");
     if (!userId) {
       setMessage("Sign in before registering this device.");
       setOutcome("warning");
@@ -64,19 +78,22 @@ export function usePushNotificationRegistration(
       return;
     }
 
+    busyRef.current = true;
     setBusy(true);
+    setActiveOperation("register");
     setMessage(null);
     setOutcome("idle");
-    const attempt = ++attemptRef.current;
+    const sessionGeneration = sessionGenerationRef.current;
+    const operationId = ++operationIdRef.current;
     try {
       const result = await mobileServices.pushRegistration.register(userId);
-      if (attempt !== attemptRef.current) {
+      if (sessionGeneration !== sessionGenerationRef.current) {
         return;
       }
       setPermissionStatus(
         await mobileServices.pushRegistration.getPermissionStatus(),
       );
-      if (attempt !== attemptRef.current) {
+      if (sessionGeneration !== sessionGenerationRef.current) {
         return;
       }
 
@@ -95,7 +112,7 @@ export function usePushNotificationRegistration(
       );
       setOutcome("warning");
     } catch {
-      if (attempt !== attemptRef.current) {
+      if (sessionGeneration !== sessionGenerationRef.current) {
         return;
       }
       setMessage(
@@ -103,18 +120,84 @@ export function usePushNotificationRegistration(
       );
       setOutcome("warning");
     } finally {
-      if (attempt === attemptRef.current) {
+      if (operationId === operationIdRef.current) {
+        busyRef.current = false;
         setBusy(false);
+        setActiveOperation(null);
       }
     }
-  }, [availability, busy, preferences, userId]);
+  }, [availability, preferences, userId]);
+
+  const unregister = useCallback(async () => {
+    if (busyRef.current) {
+      return;
+    }
+    setMessageOperation("unregister");
+    if (!userId) {
+      setMessage("Sign in before unregistering this device.");
+      setOutcome("warning");
+      return;
+    }
+    if (unregistrationAvailability !== PushRegistrationAvailability.Available) {
+      setMessage(
+        "Unregistration requires a supported Android or iOS development build.",
+      );
+      setOutcome("warning");
+      return;
+    }
+
+    busyRef.current = true;
+    setBusy(true);
+    setActiveOperation("unregister");
+    setMessage(null);
+    setOutcome("idle");
+    const sessionGeneration = sessionGenerationRef.current;
+    const operationId = ++operationIdRef.current;
+    try {
+      const result =
+        await mobileServices.pushRegistration.unregisterCurrentInstallation(userId);
+      if (sessionGeneration !== sessionGenerationRef.current) {
+        return;
+      }
+      if (result.status === PushRegistrationStatus.Unregistered) {
+        setMessage(
+          "This installation is no longer registered for remote push delivery.",
+        );
+        setOutcome("success");
+        return;
+      }
+
+      setMessage(
+        "This installation could not be unregistered safely. Try again from a supported build.",
+      );
+      setOutcome("warning");
+    } catch {
+      if (sessionGeneration !== sessionGenerationRef.current) {
+        return;
+      }
+      setMessage(
+        "Device unregistration could not be completed safely.",
+      );
+      setOutcome("warning");
+    } finally {
+      if (operationId === operationIdRef.current) {
+        busyRef.current = false;
+        setBusy(false);
+        setActiveOperation(null);
+      }
+    }
+  }, [unregistrationAvailability, userId]);
 
   return {
     availability,
+    activeOperation,
     busy,
     message,
+    messageOperation,
     outcome,
     permissionStatus,
     register,
+    unregistrationAvailability,
+    unregister,
   };
 }

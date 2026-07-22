@@ -1,5 +1,7 @@
 import {
   PushTokenPersistenceStatus,
+  assertPushRegistrationIdentity,
+  type PushRegistrationIdentity,
   type PushTokenPersistenceResult,
   type PushTokenRepository,
 } from "../../../application/services/PushRegistrationService";
@@ -51,32 +53,21 @@ export class FirebasePushTokenRepository implements PushTokenRepository {
     );
   }
 
-  async remove(token: PushToken): Promise<PushTokenPersistenceResult> {
+  async remove(identity: PushRegistrationIdentity): Promise<PushTokenPersistenceResult> {
     try {
-      assertPushToken(token, token.userId);
+      assertPushRegistrationIdentity(identity, identity.userId);
     } catch {
       return {
-        reason: "Invalid push token details.",
-        status: PushTokenPersistenceStatus.Deferred,
-      };
-    }
-
-    if (
-      token.provider !== "expo" ||
-      (token.platform !== "android" && token.platform !== "ios")
-    ) {
-      return {
-        reason:
-          "Unsupported provider or platform for push token unregistration.",
+        reason: "Invalid push registration identity.",
         status: PushTokenPersistenceStatus.Deferred,
       };
     }
 
     try {
       const res = await this.transport.unregisterPushToken({
-        deviceId: token.deviceId,
+        deviceId: identity.deviceId,
       });
-      if (this.isValidUnregisterResponse(res, token.deviceId)) {
+      if (this.isValidUnregisterResponse(res, identity.deviceId)) {
         return { status: PushTokenPersistenceStatus.Removed };
       }
       return {

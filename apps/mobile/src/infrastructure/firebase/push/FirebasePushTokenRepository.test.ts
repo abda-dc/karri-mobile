@@ -8,13 +8,14 @@ vi.mock("react-native", () => ({
 import { describe, expect, it } from "vitest";
 import {
   PushTokenPersistenceStatus,
+  type PushRegistrationIdentity,
 } from "../../../application/services/PushRegistrationService";
 import { FirebasePushTokenRepository, type PushTokenTransport } from "./FirebasePushTokenRepository";
 import type { PushToken } from "../../../application/notifications/PushToken";
 
 const deviceId = "karri-device-123456789012";
 const userId = "user-abc";
-const tokenVal = "ExpoPushToken[val123]";
+const tokenVal = "opaque-registration-test-value";
 const registeredAt = "2026-07-20T10:00:00.000Z";
 
 const validToken: PushToken = {
@@ -25,6 +26,7 @@ const validToken: PushToken = {
   value: tokenVal,
   registeredAt,
 };
+const validIdentity: PushRegistrationIdentity = { deviceId, userId };
 
 function createHarness(transportOverrides: Partial<PushTokenTransport> = {}) {
   const registerPushToken = vi.fn(async () => ({
@@ -169,7 +171,7 @@ describe("FirebasePushTokenRepository", () => {
     it("sends only deviceId and returns Removed on success", async () => {
       const { repository, unregisterPushToken } = createHarness();
 
-      const result = await repository.remove(validToken);
+      const result = await repository.remove(validIdentity);
       expect(result).toEqual({ status: PushTokenPersistenceStatus.Removed });
 
       expect(unregisterPushToken).toHaveBeenCalledTimes(1);
@@ -179,6 +181,10 @@ describe("FirebasePushTokenRepository", () => {
       expect(Object.keys(callArgs)).toEqual(["deviceId"]);
       expect(callArgs.token).toBeUndefined();
       expect(callArgs.userId).toBeUndefined();
+      expect(callArgs.platform).toBeUndefined();
+      expect(callArgs.provider).toBeUndefined();
+      expect(callArgs.registeredAt).toBeUndefined();
+      expect(callArgs.registrationVersion).toBeUndefined();
     });
 
     it("returns Removed even if device was already inactive", async () => {
@@ -191,54 +197,50 @@ describe("FirebasePushTokenRepository", () => {
         }),
       });
 
-      const result = await repository.remove(validToken);
+      const result = await repository.remove(validIdentity);
       expect(result).toEqual({ status: PushTokenPersistenceStatus.Removed });
     });
 
-    it("returns Deferred with safe reason if invalid token shape without calling transport", async () => {
+    it.each([
+      ["blank device ID", { ...validIdentity, deviceId: "" }],
+      ["malformed device ID", { ...validIdentity, deviceId: "not-an-installation" }],
+      ["blank user ID", { ...validIdentity, userId: "" }],
+      ["untrimmed user ID", { ...validIdentity, userId: ` ${userId}` }],
+    ])("returns Deferred for invalid identity (%s) without calling transport", async (_label, invalidIdentity) => {
       const { repository, unregisterPushToken } = createHarness();
-      const invalidToken = { ...validToken, deviceId: "" };
 
-      const result = (await repository.remove(invalidToken)) as any;
+      const result = await repository.remove(invalidIdentity);
       expect(result.status).toBe(PushTokenPersistenceStatus.Deferred);
-      expect(result.reason).toContain("Invalid push token details");
-      expect(result.reason).not.toContain(tokenVal);
+      expect(result).toEqual({
+        reason: "Invalid push registration identity.",
+        status: PushTokenPersistenceStatus.Deferred,
+      });
       expect(unregisterPushToken).not.toHaveBeenCalled();
     });
 
-    it("returns Deferred with safe reason on unsupported platform without calling transport", async () => {
-      const { repository, unregisterPushToken } = createHarness();
-      const token = { ...validToken, platform: "web" as any };
-
-      const result = (await repository.remove(token)) as any;
-      expect(result.status).toBe(PushTokenPersistenceStatus.Deferred);
-      expect(result.reason).toContain("Unsupported provider or platform");
-      expect(result.reason).not.toContain(tokenVal);
-      expect(unregisterPushToken).not.toHaveBeenCalled();
-    });
-
-    it("returns Deferred with safe reason on unsupported provider without calling transport", async () => {
-      const { repository, unregisterPushToken } = createHarness();
-      const token = { ...validToken, provider: "apns" as any };
-
-      const result = (await repository.remove(token)) as any;
-      expect(result.status).toBe(PushTokenPersistenceStatus.Deferred);
-      expect(result.reason).toContain("Unsupported provider or platform");
-      expect(result.reason).not.toContain(tokenVal);
-      expect(unregisterPushToken).not.toHaveBeenCalled();
-    });
-
-    it("returns Deferred on transport failure", async () => {
+    it("returns Deferred on transport failure without exposing inputs, errors, or console output", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      const privateMarker = "private-removal-error-marker";
+      const failingUnregister = vi.fn(async () => {
+        throw new Error(`Transport failed: ${privateMarker}`);
+      });
       const { repository } = createHarness({
-        unregisterPushToken: async () => {
-          throw new Error(`Timeout for token ${tokenVal}`);
-        },
+        unregisterPushToken: failingUnregister,
       });
 
-      const result = (await repository.remove(validToken)) as any;
-      expect(result.status).toBe(PushTokenPersistenceStatus.Deferred);
-      expect(result.reason).toContain("unregistration could not be completed");
-      expect(result.reason).not.toContain(tokenVal);
+      const result = await repository.remove(validIdentity);
+      expect(result).toEqual({
+        reason: "Trusted server token unregistration could not be completed.",
+        status: PushTokenPersistenceStatus.Deferred,
+      });
+      expect(String(result)).not.toContain(privateMarker);
+      expect(JSON.stringify(result)).not.toContain(privateMarker);
+      expect(JSON.stringify(validIdentity)).not.toContain(tokenVal);
+      expect(failingUnregister).toHaveBeenCalledWith({ deviceId });
+      expect([errorSpy, warnSpy, logSpy].flatMap((spy) => spy.mock.calls.flat()).join(" "))
+        .not.toContain(privateMarker);
     });
 
     it.each([
@@ -263,7 +265,7 @@ describe("FirebasePushTokenRepository", () => {
         unregisterPushToken: async () => responseBody as any,
       });
 
-      const result = await repository.remove(validToken);
+      const result = await repository.remove(validIdentity);
       expect(result).toEqual({
         status: PushTokenPersistenceStatus.Deferred,
         reason: "Push-token unregistration returned an invalid response.",
