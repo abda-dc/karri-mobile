@@ -2,7 +2,7 @@
 
 ## Scope
 
-This remains a development-only test foundation. Local notification-response routing exists, registration occurs only through explicit Profile registration, N3A adds trusted delivery only for a validated `bookings/{bookingId}` `pending` to `accepted` transition, and N3B binds each delivery effect to a server-owned registration generation. N4A adds explicit, user-initiated current-installation unregistration in Profile. No automatic logout, startup, foreground, preference-disable, permission-revocation, or token-change lifecycle is present.
+This remains a development-only test foundation. Local notification-response routing exists, registration occurs only through explicit Profile registration, N3A adds trusted delivery only for a validated `bookings/{bookingId}` `pending` to `accepted` transition, and N3B binds each delivery effect to a server-owned registration generation. N4A adds explicit Profile unregistration. N4B adds bounded sign-out cleanup for the current installation. No startup, foreground, preference-disable, permission-revocation, or token-change reconciliation lifecycle is present.
 
 The following items remain future/unimplemented:
 - server-side deactivation lifecycle
@@ -13,6 +13,8 @@ The following items remain future/unimplemented:
 - monitoring dashboards
 - production enablement and deployment
 - broader device-retention policy, registration pagination, cleanup, and multi-batch fan-out
+
+N4B captures the active user before sign-out, serializes authentication operations, attempts current-installation cleanup before Firebase sign-out, and proceeds after cleanup failure or a three-second timeout. The Firebase adapter signs out only when the current identity still matches that expected user. Push registration/unregistration operations are serialized and generation-fenced; timeout invalidation releases the queue and prevents a late operation from persisting stale state. Duplicate sign-outs coalesce. These are automated source-test claims, not physical-device evidence.
 
 Phase 13 can request permission and obtain an Expo token only after an authenticated user:
 
@@ -141,6 +143,8 @@ For invalid payloads, `validateNotificationPushPayload` returns explicit errors 
 - [ ] Verify first registration creates version `1`, exact active-token registration preserves it, token replacement increments it, inactive reactivation increments it, and a missing legacy value upgrades safely.
 - [ ] Verify malformed or exhausted registration versions fail closed without changing the stored token or generation.
 - [ ] Verify toggling the preference alone never requests permission or token registration.
+- [ ] Start sign-out during an active registration/unregistration and verify cleanup is bounded, the expected user is protected, sign-out completes, and the late operation cannot persist.
+- [ ] Verify duplicate sign-outs coalesce and a later sign-in waits for active sign-out completion.
 
 ## Controlled N3A delivery test checklist
 
@@ -179,7 +183,7 @@ Only an approved, isolated development environment may enable the server kill sw
 
 ## Disable and remove test registrations
 
-Current N2/N3B/N4A foundation:
+Current N2/N3B/N4A/N4B foundation:
 
 - Registration occurs only through explicit Profile registration.
 - **Unregister this device** is a separate authenticated Profile action and does not require the Push preference or granted notification permission.
@@ -189,7 +193,8 @@ Current N2/N3B/N4A foundation:
 - Repeat explicit removal remains safe, and later explicit registration reuses the retained installation identity and server generation behavior.
 - The server maintains `registrationVersion` transactionally for explicit registration, token replacement, and inactive reactivation.
 - Immediate Expo `DeviceNotRegistered` cleanup is generation-safe and preserves a newer registration.
-- No automatic lifecycle trigger connects removal or reconciliation to logout, startup, foreground, preference disabling, permission revocation, or native token-change events.
+- Sign-out attempts current-installation cleanup before session teardown with timeout fencing, expected-user binding, queue serialization, and stale-operation prevention.
+- No automatic reconciliation trigger connects cleanup to startup, foreground, preference disabling, permission revocation, or native token-change events.
 
 Future / unimplemented cleanup:
 

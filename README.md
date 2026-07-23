@@ -8,7 +8,7 @@ This repository is a fresh start. It does not reuse the previous Karri monorepo,
 
 ## Current phase
 
-Foundation and documentation-first setup.
+Karri Mobile is an implemented internal-beta candidate undergoing owner handoff and production-readiness closure. It is not production approved.
 
 ## Core principle
 
@@ -37,11 +37,9 @@ Every product, design, engineering, and operations decision should improve at le
 - EAS Update
 - MkDocs Material for documentation
 
-## Documentation-first workflow
+## Delivery workflow
 
-No feature begins with code.
-
-Every feature follows:
+Changes should remain evidence-led:
 
 1. Vision
 2. Documentation
@@ -51,3 +49,5 @@ Every feature follows:
 6. Implementation
 7. Testing
 8. Deployment
+
+Current operational facts, release gaps, and owner responsibilities are maintained in the [Project Status](docs/project-status.md), [Owner Handoff](docs/owner-handoff.md), and [Release Checklist](docs/release-checklist.md).

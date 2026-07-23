@@ -1,4 +1,4 @@
-# Karri Platform v2
+# Karri Mobile
 
 Karri is a mobile-first peer-to-peer cross-border shipping platform. It helps diaspora senders find travelers already moving along the same corridor, then makes responsibility and package custody visible from request through delivery.
 
@@ -17,9 +17,9 @@ Karri is guided by four operating values:
 
 ## Current product slice
 
-The repository contains an Expo Router mobile app, Firebase/Firestore infrastructure, and portable domain/application architecture. The implemented user-facing slice supports shipment/trip creation, exact-corridor matching, booking requests and decisions, status/custody tracking, in-app notifications, explainable trust summaries, and completed-booking reviews. Provider-neutral push registration, delivery, and routing contracts exist as an inert foundation only.
+The repository contains an Expo Router mobile app, Firebase/Firestore infrastructure, and portable domain/application architecture. The implemented user-facing slice supports shipment/trip creation, exact-corridor matching, booking requests and decisions, status/custody tracking, in-app notifications, explainable trust summaries, and completed-booking reviews. Trusted push-token persistence, explicit registration/unregistration, bounded `booking.accepted` delivery, routing contracts, and N4B bounded sign-out cleanup are implemented in source.
 
-Firebase Auth and participant-scoped Firestore rules are the current MVP policy boundary. A controlled Expo permission/token-registration foundation exists, but trusted token persistence and push delivery do not. Production Cloud Function commands, durable events, emulator coverage, payments, disputes, chat, production push delivery, email, SMS, and AI matching remain out of scope.
+Firebase Auth and participant-scoped Firestore rules are the current MVP policy boundary. Firestore authorization and Firebase Functions test suites exist. Only `submitSafetyReview`, `placeAdministrativeHold`, and `releaseAdministrativeHold` are deployed in development; `registerPushToken`, `unregisterPushToken`, and `onBookingAccepted` are **implemented, not deployed**. Push delivery remains default-off, App Check enforcement remains disabled, and production push is **No-Go**. Durable event queues, payments, disputes, chat, production email/SMS, and AI matching remain out of scope.
 
 ## Platform direction
 
@@ -34,4 +34,4 @@ flowchart LR
     D --> V[Review and trust update]
 ```
 
-Start with the [Executive Summary](strategy/executive-summary.md), then use the [Architecture Overview](architecture/README.md), Product, and Engineering sections as the source of truth for implementation decisions.
+Start with [Project Status](project-status.md) and [Owner Handoff](owner-handoff.md), then use the [Architecture Overview](architecture/README.md), Product, and Engineering sections as implementation references.

@@ -2,11 +2,11 @@
 
 ## Status and guardrails
 
-This document covers the controlled client foundation, trusted persistence backend (N1), mobile repository wiring (N2), bounded trusted `booking.accepted` delivery (N3A), registration-generation binding (N3B), and explicit current-installation unregistration (N4A).
+This document covers the controlled client foundation, trusted persistence backend (N1), mobile repository wiring (N2), bounded trusted `booking.accepted` delivery (N3A), registration-generation binding (N3B), explicit current-installation unregistration (N4A), and bounded sign-out cleanup (N4B).
 
-### Notifications N3A implementation and deployment closure
+### Notifications N3A implementation and CI/web verification closure
 
-Notifications N3A is implemented, committed, pushed, validated, and deployed at exact commit `3107e7e109981b9d70172e46ea44db550c0d78d6` (`Implement trusted booking accepted push delivery`).
+Notifications N3A source was implemented, committed, pushed, and validated at exact commit `3107e7e109981b9d70172e46ea44db550c0d78d6` (`Implement trusted booking accepted push delivery`).
 
 Exact-SHA validation completed successfully:
 
@@ -18,7 +18,9 @@ Exact-SHA validation completed successfully:
 
 Azure Static Web Apps workflow run `29848690113` failed during Azure post-upload processing on attempts 1 through 3 and succeeded on the approved controlled fourth attempt. The default Azure environment subsequently reported `Ready`, and the live Static Web Apps site served the exact commit successfully.
 
-This Azure web deployment verification does not enable push delivery. The server-only `KARRI_PUSH_DELIVERY_ENABLED` kill switch remains default-off, and production push readiness remains governed by the separate No-Go checklist.
+The Firebase Validate result above is source/CI evidence, not proof that the notification Functions were deployed. The Azure result verifies only the Expo web validation surface; it did not deploy or enable notification Cloud Functions.
+
+The current development Firebase inventory contains `submitSafetyReview`, `placeAdministrativeHold`, and `releaseAdministrativeHold`. It does not contain `registerPushToken`, `unregisterPushToken`, or `onBookingAccepted`; those three notification Functions are implemented in source but not currently deployed. The server-only `KARRI_PUSH_DELIVERY_ENABLED` kill switch remains default-off, and production push remains **No-Go**.
 
 ### Notifications N3B registration-generation binding
 
@@ -50,12 +52,10 @@ The following functionality is **deferred**:
 - background workers
 - monitoring dashboards
 - automatic registration at login or startup
-- automatic unregistration at logout
 - startup or foreground reconciliation
 - preference-disable or permission-revocation cleanup
 - automatic token-change detection and startup/foreground rotation reconciliation
-- automatic logout cleanup
-- production enablement and deployment
+- notification Functions deployment and production enablement
 - App Check enforcement
 - scheduled cleanup
 - leases
@@ -64,6 +64,8 @@ The following functionality is **deferred**:
 - broader device-retention policy, registration pagination, cleanup, and multi-batch fan-out
 
 N4A calls `unregisterPushToken` only after the authenticated user explicitly selects **Unregister this device** in Profile. The application reads the existing retained installation ID without creating one, combines it with the active user ID for local validation, and sends only `{ deviceId }` to the trusted callable; backend authentication remains the sole source of registration ownership. Removal never reads, retrieves, stores, returns, or logs a raw push token. Missing local installation state is an idempotent successful no-op, while malformed or unreadable state defers safely. Successful removal disables Expo automatic token updates, deactivates the server registration, deletes its raw token through the unchanged backend, and retains the local installation ID so later explicit registration can reuse the same device document and server-owned generation behavior. No automatic lifecycle caller exists.
+
+N4B connects sign-out to a bounded current-installation cleanup attempt. `AuthSessionService` captures the current user, serializes auth operations, runs cleanup before Firebase sign-out, and proceeds after cleanup failure or a three-second timeout. The Firebase adapter signs out only when the current user still matches the captured expected user. `PushRegistrationService` serializes register/unregister work; generation invalidation releases an abandoned queue after timeout and prevents late persistence. Duplicate sign-outs coalesce. This prevents stale operations from crossing session boundaries without claiming that cleanup always reaches the server.
 
 N3A/N3B deterministically orders one recipient's device subcollection by document ID and examines at most the first 100 registration records. A selected record must contain a valid positive safe-integer `registrationVersion`; legacy records remain ineligible for delivery until the authenticated registration endpoint upgrades them. Registrations beyond the inspection bound are ignored: they are not paged, queued, claimed, or disclosed. After validation and in-memory token deduplication, the service claims and sends no more than 100 delivery effects/messages in one Expo request. This cap is a safety and resource boundary, not a production-scale broadcast design. Broader retention policy, pagination, cleanup, and multi-batch fan-out remain deferred.
 
@@ -77,6 +79,8 @@ The activation order is deliberate:
 4. Require retries, receipts, monitoring, lifecycle reconciliation, and operational approval before any production rollout. Push remains an optional hint, never the only record of a booking, custody, delivery, review, or trust event.
 
 ## Reviewed architecture boundary
+
+The table describes implemented source responsibilities and hard boundaries. It is not a deployed Firebase inventory; the current deployment gap is recorded above.
 
 | Layer | Current responsibility | Hard boundary |
 | --- | --- | --- |
@@ -138,15 +142,18 @@ Ask only after an authenticated user explicitly selects **Enable device notifica
 
 Offer **Not now** and **Continue**. Call the OS request only after **Continue**. Do not prompt during onboarding, sign-in, app launch, or a booking transition. If authorization is denied, preserve the in-app experience, explain how to use system Settings, and do not repeatedly ask. Treat iOS `authorized`, `provisional`, `ephemeral`, `denied`, and `not determined` as distinct states rather than reducing them to a boolean.
 
-### EAS and native credential prerequisites
+### Current EAS and native credential state
 
-Before any runtime code lands:
+The runtime implementation and native build profiles already exist:
 
-- Assign the Expo project an EAS `projectId` and stable Android package/iOS bundle identifiers.
-- Add reviewed development, preview, and production EAS build profiles with separate Firebase projects.
-- Build after every notification config-plugin or native credential change; an over-the-air update cannot add missing native notification capability.
-- Register test devices and keep a paid Apple Developer account available for iOS credentials.
-- Record credential owners, expiry/revocation steps, and an emergency send-disable procedure.
+- EAS project ID `b73a2031-8f5f-4f59-8222-e999d115b6cb` is configured.
+- Stable Android package and iOS bundle identifiers are both `com.karrimobile.app`.
+- Development, preview, and production build profiles, channels, and branches exist.
+- Development contains the native Firebase/App Check variables `FIREBASE_APP_CHECK_DEBUG_TOKEN`, `GOOGLE_SERVICE_INFO_PLIST`, and `GOOGLE_SERVICES_JSON`.
+- Preview and production have no project-scoped EAS variables. Do not claim that matching preview or production Firebase projects exist.
+- Each environment still requires separately verified, matching Firebase/native configuration and credential ownership before use.
+- Rebuild the native application after every notification config-plugin or native credential change; an over-the-air update cannot add missing native notification capability.
+- Registered test devices, Apple Developer access, credential ownership, expiry/revocation procedures, and an emergency send-disable procedure remain release prerequisites.
 
 | Platform | Required material | Storage rule |
 | --- | --- | --- |
@@ -168,15 +175,15 @@ The current explicit Profile registration flow is explicit and authenticated:
 8. The server derives `userId` from verified authentication, validates the installation device ID, platform, Expo provider, token shape, and canonical registration timestamp, and maintains `registrationVersion` transactionally. A new registration starts at `1`; the same active token preserves the version; token replacement or inactive reactivation increments it; a missing legacy field upgrades to `1`; malformed or exhausted state fails closed.
 9. Only after server confirmation may the UI show the device as registered. Permission granted without confirmed registration is a recoverable incomplete state.
 
-Clients must not write token documents directly or provide a registration generation. The backend persistence layer is implemented through authenticated callables (`registerPushToken` and `unregisterPushToken`), and client-side repository wiring is implemented in N2. Android/iOS registration can persist a token after successful permission and Expo token acquisition. N3A/N3B may read only active, bound registrations with a valid server-owned generation after policy gates pass. Queues, receipt polling, retries, monitoring, broad cleanup, and production enablement remain deferred. No permission, token, or delivery behavior should be described as production-complete. App Check remains disabled as an explicit regression-preserved boundary for this package.
+Clients must not write token documents directly or provide a registration generation. The backend persistence layer is implemented in source through authenticated callables (`registerPushToken` and `unregisterPushToken`), and client-side repository wiring is implemented in N2. When those callables are deployed to a matching environment, Android/iOS registration can persist a token after successful permission and Expo token acquisition. The current development inventory lacks those callables and `onBookingAccepted`, so live development registration and trusted delivery cannot be treated as available. N3A/N3B source may read only active, bound registrations with a valid server-owned generation after policy gates pass. Queues, receipt polling, retries, monitoring, broad cleanup, and production enablement remain deferred. No permission, token, or delivery behavior should be described as production-complete. App Check remains disabled as an explicit regression-preserved boundary for this package.
 
-N4A exposes the explicit current-installation removal described above. It does not require the Push preference or notification permission, request permission, create Android channels, obtain a token, generate a new installation ID, remove the retained installation ID, or sign the user out. Automatic logout, startup, foreground, preference-disable, permission-revocation, and token-change cleanup remain deferred. Push notifications are not production-complete.
+N4A exposes the explicit current-installation removal described above. It does not require the Push preference or notification permission, request permission, create Android channels, obtain a token, generate a new installation ID, remove the retained installation ID, or sign the user out. N4B reuses that cleanup during sign-out with bounded, best-effort semantics. Startup, foreground, preference-disable, permission-revocation, and token-change cleanup remain deferred. Push notifications are not production-complete.
 
-### Future / unimplemented: Rotation, sign-out, and broader token cleanup
+### Future / unimplemented: Rotation and broader token cleanup
 
 - Proposed future behavior: Subscribe to the native token-change signal while the authenticated app is running. Upsert the new token for the same installation and deactivate the old token atomically.
 - Proposed future behavior: Reconcile the current token on foreground/startup after permission is granted and refresh server state. Do not fetch or upload a token when permission is absent or push intent is off.
-- Proposed future behavior: On sign-out, call the authenticated unregister endpoint before local session teardown, then continue sign-out even if the network fails.
+- Implemented in N4B: On sign-out, attempt the authenticated unregister path before local session teardown, continue after failure/timeout, and fence stale operations. No durable retry tombstone exists.
 - Implemented in N3A/N3B for Expo only: an immediate `DeviceNotRegistered` ticket deactivates the registration and deletes its token only when the transaction still sees the same active token and `registrationVersion` selected for the send. A newer generation is preserved. Equivalent receipt polling and FCM/APNs handling remain future work.
 - Proposed future behavior: A reinstalled app or changed token creates/reconciles an installation registration; it never silently inherits another user's binding.
 
@@ -213,7 +220,7 @@ Automated checks before activation:
 
 - Unit tests for permission-state orchestration, token validation/rotation, action parsing, category mapping, quiet-hour boundaries (same-day, overnight, DST, invalid zone), and route fallback.
 - Emulator tests proving clients cannot read/write another user's preferences, registrations, delivery effects, or notifications.
-- N3A/N3B Function tests cover duplicate trigger invocation, preference and quiet-hour suppression, bounded token selection, registration-version lifecycle, legacy upgrade, malformed-version failure, delivery-effect generation binding, generation-safe invalid-token cleanup, and immediate transient/permanent provider outcomes. Queued preference changes, retries, receipts, and sign-out cleanup require future tests with those features.
+- N3A/N3B Function tests cover duplicate trigger invocation, preference and quiet-hour suppression, bounded token selection, registration-version lifecycle, legacy upgrade, malformed-version failure, delivery-effect generation binding, generation-safe invalid-token cleanup, and immediate transient/permanent provider outcomes. Mobile tests cover N4B bounded sign-out cleanup, auth serialization, expected-user binding, and stale-operation prevention. Queued preference changes, retries, receipts, and physical-device sign-out behavior require future evidence.
 - Contract tests prove no raw token or private notification content enters logs, events, delivery effects, IDs, responses, or analytics.
 
 Device matrix before rollout:
@@ -317,7 +324,7 @@ The app fetches the recipient-scoped canonical record after open. Notification p
 
 ### Future Cloud Function boundaries
 
-Suggested responsibilities, not deployed functions:
+The following named functions are future proposals, not current deployed functions:
 
 - `materializeNotification`: consume a trusted durable event, validate schema, derive recipient/template/effect ID, and create the canonical notification once.
 - `dispatchNotification`: react to a new canonical record or queued delivery command, evaluate policy, load active registrations, create delivery effects, and send minimal payloads.

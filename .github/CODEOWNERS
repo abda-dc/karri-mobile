@@ -1,0 +1,13 @@
+# Initial ownership remains with the current repository owner until a verified transfer.
+* @abda-dc
+
+/.github/workflows/ @abda-dc
+/apps/mobile/ @abda-dc
+/backend/firebase/functions/ @abda-dc
+/backend/firebase/firestore.rules @abda-dc
+/backend/firebase/storage.rules @abda-dc
+/backend/firebase/firestore.indexes.json @abda-dc
+/docs/ @abda-dc
+/mkdocs.yml @abda-dc
+/apps/mobile/app.json @abda-dc
+/apps/mobile/eas.json @abda-dc

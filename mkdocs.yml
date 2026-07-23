@@ -1,4 +1,4 @@
-site_name: Karri Platform Handbook
+site_name: Karri Mobile Handbook
 site_description: Product and engineering handbook for the Karri mobile-first cross-border shipping platform.
 site_author: Karri
 site_url: https://abda-dc.github.io/karri-mobile/
@@ -53,6 +53,9 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Project Status: project-status.md
+  - Owner Handoff: owner-handoff.md
+  - Release Checklist: release-checklist.md
   - Strategy:
       - Executive Summary: strategy/executive-summary.md
       - Vision and Mission: strategy/vision-and-mission.md
@@ -127,4 +130,9 @@ nav:
       - Push Notification Testing: engineering/push-notification-testing.md
       - CI/CD: engineering/ci-cd.md
   - Operations:
+      - Runbook: operations/runbook.md
+      - Deployment: operations/deployment.md
+      - Rollback: operations/rollback.md
+      - Incident Response: operations/incident-response.md
+      - Backup and Restore: operations/backup-restore.md
       - Push Production Readiness: operations/push-production-readiness.md

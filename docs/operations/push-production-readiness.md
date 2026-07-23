@@ -2,9 +2,9 @@
 
 ## Status
 
-**Production push authorization: Not granted.**
+**Production push authorization: No-Go.**
 
-The current N1-N4A package supplies controlled client registration, trusted token persistence, bounded `booking.accepted` server delivery, registration-generation binding, and explicit current-installation unregistration. It does not supply production credentials, receipt polling, retries, queues, workers, schedulers, automatic lifecycle reconciliation, App Check enforcement changes, monitoring, real-device acceptance evidence, provider enablement, or production approval.
+The current N1-N4B source package supplies controlled client registration, trusted token persistence, bounded `booking.accepted` server delivery, registration-generation binding, explicit current-installation unregistration, and bounded sign-out cleanup with timeout fencing, expected-user binding, queue serialization, and stale-operation prevention. `registerPushToken`, `unregisterPushToken`, and `onBookingAccepted` are implemented but not deployed in development. The package does not supply production credentials, receipt polling, retries, queues, workers, schedulers, broader lifecycle reconciliation, App Check enforcement changes, monitoring, real-device acceptance evidence, provider enablement, or production approval.
 
 Every required checkbox below must have an owner, dated evidence, environment, and reviewer. A build passing TypeScript or Expo Doctor is not production approval.
 
@@ -64,11 +64,14 @@ Every required checkbox below must have an owner, dated evidence, environment, a
 - [x] Expo automatic token-update mode is disabled by the controlled gateway.
 - [x] Profile offers explicit current-installation unregistration using the authenticated user plus the retained installation ID; removal needs no raw token and sends only `deviceId` to the trusted callable.
 - [x] Missing installation state is an idempotent no-op, malformed state fails closed, and successful removal retains the installation ID for later registration reuse.
+- [x] Sign-out captures the expected user, attempts cleanup before Firebase sign-out, and continues after cleanup failure or a three-second timeout.
+- [x] Auth and push operations are serialized; duplicate sign-outs coalesce; timeout invalidation prevents abandoned push work from persisting stale state.
 - [x] The registration endpoint transactionally upserts the installation binding and maintains a server-owned positive `registrationVersion`.
 - [x] First registration starts at `1`; the same active token preserves its version; token replacement and inactive reactivation increment it.
 - [x] A missing legacy version upgrades to `1`; malformed or exhausted version state fails closed without overwriting the registration.
 - [ ] Foreground/token-change reconciliation is designed, user-consented, bounded, and tested before enabling any listener.
-- [ ] Sign-out calls authenticated cleanup before session teardown, continues safely if offline, and records a non-secret retry tombstone.
+- [x] Sign-out calls bounded authenticated cleanup before session teardown and continues safely on failure/timeout.
+- [ ] A reviewed non-secret retry/reconciliation design covers cleanup that times out or fails; none exists today.
 - [ ] Account deletion deactivates every installation.
 - [x] Immediate Expo `DeviceNotRegistered` cleanup requires the current token and captured `registrationVersion` to match, preserving a newer generation.
 - [ ] Receipt-polled `DeviceNotRegistered`, FCM `UNREGISTERED`, and equivalent permanent results use the same generation-safe cleanup rule.

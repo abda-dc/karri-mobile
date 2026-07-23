@@ -28,13 +28,13 @@ Validation snapshot: July 2, 2026.
 ## Security
 
 - [x] Firestore rules load in the local emulator without syntax failure.
-- [ ] Automated emulator allow/deny tests cover users, profiles, shipments, trips, booking requests, bookings, custody events, reviews, notifications, preferences, and identity verification. No rule test suite exists yet.
+- [x] Automated Firestore Emulator allow/deny tests cover the repository authorization surface, including push-token and delivery collections.
 - [ ] Cross-account emulator tests prove shipment/trip ownership, booking participation, custody participant visibility, notification ownership, and private identity/profile boundaries.
 - [x] Static rule review confirms owner-only inactive shipment/trip access, participant-only booking/custody access, recipient-only notification reads, self-only preferences/identity access, deny-all trust-score persistence, and deny-by-default fallback.
 - [x] Repository queries constrain owner, active status, participant field, booking/shipment ID, recipient, review subject, or self document as required by Firestore's non-filtering rules model.
 - [x] Source review found only public `EXPO_PUBLIC_FIREBASE_*` placeholders and no committed service-account, signing, push-provider, webhook, or private API credentials.
 - [x] Other-user trust remains reviews-only; identity verification records are self-readable, metadata-only, and cannot contain uploaded evidence paths.
-- [x] Notification records are recipient-readable and read-state updates are recipient-only; push tokens are not persisted, displayed, or logged.
+- [x] Notification records are recipient-readable and read-state updates are recipient-only; raw push tokens are stored only through trusted server code and are not displayed or logged.
 - [ ] App Check is staged and monitored before broad external exposure.
 
 ## Accessibility
@@ -92,7 +92,8 @@ Validation snapshot: July 2, 2026.
 ### Notifications and identity
 
 - [ ] Save Push/category/quiet-hour preferences; verify Email/SMS remain disabled placeholders.
-- [ ] On a native development build, exercise explicit push registration without displaying/logging/persisting a token; delivery remains deferred.
+- [ ] On a native development build, exercise explicit trusted push registration without displaying/logging the raw token; delivery remains default-off.
+- [ ] Verify N4B sign-out performs bounded current-installation cleanup, continues after cleanup failure/timeout, and prevents a stale operation from affecting a later session.
 - [ ] Mark an unread notification read and verify recipient-only state plus activity-feed reconciliation.
 - [ ] Verify current-user trust summary, verification status, checklist, badge, and timeline.
 - [ ] Verify another user exposes reviews-only trust evidence and no private identity, account-age, cancellation, profile, or notification data.
@@ -109,7 +110,7 @@ Validation snapshot: July 2, 2026.
 - Anonymous Firebase bridge: email delivery and verified account recovery are not implemented; anonymous sign-in must be enabled per beta environment.
 - Identity verification placeholder: metadata and state-machine UI exist, but there is no evidence upload, KYC provider, reviewer console, or retention workflow.
 - Explainable trust MVP: scores are client-calculated, limited-evidence decision support, not safety, identity, authorization, or delivery guarantees.
-- Push registration readiness: explicit native permission/token acquisition exists for development readiness, but trusted token persistence, listeners, delivery, receipts, and server enforcement are deferred.
+- Push source readiness: trusted registration/unregistration and bounded `booking.accepted` delivery are implemented, but those three functions are not deployed; receipts, retries, monitoring, broader lifecycle reconciliation, and production enablement remain deferred.
 - No payments.
 - No disputes.
 - No logistics partners or carrier integrations.
@@ -117,7 +118,7 @@ Validation snapshot: July 2, 2026.
 - No App Check enforcement.
 - Native Firestore caching is memory-only and does not survive process termination.
 - Multi-party booking/custody writes remain client-orchestrated rather than trusted idempotent server commands.
-- No automated mobile unit/component runner or Firestore authorization test suite.
+- Mobile Vitest suites and Firestore authorization tests exist, but current-SHA physical-device acceptance is not complete.
 
 ## Current Decision
 

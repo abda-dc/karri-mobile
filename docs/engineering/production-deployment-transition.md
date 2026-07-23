@@ -2,373 +2,106 @@
 
 ## Purpose
 
-Milestone 12.5 prepares Karri Mobile for production and beta deployment readiness before Milestone 13 device validation.
+This document records the current native-first deployment direction and the remaining transition gates as of July 23, 2026. It is not production approval and does not describe the previous Azure/PostgreSQL web architecture as the target.
 
-This is not a Supabase migration, not a rebuild of the old Karri monorepo, and not a production cutover approval.
+## Target architecture
 
-## Deployment recommendation
+Karri Mobile uses:
 
-Karri Mobile should use a native-first deployment path:
+1. Expo/React Native for Android and iOS.
+2. EAS Build for native binaries.
+3. EAS Update only for runtime-compatible JavaScript/assets after approval.
+4. Firebase Authentication, Firestore, Cloud Functions, and Storage rules as the authoritative backend.
+5. Azure Static Web Apps only for the current Expo web validation surface.
 
-1. Android and iOS builds through EAS Build.
-2. Safe app updates through EAS Update channels.
-3. Firebase Auth, Firestore, Storage rules, and indexes as the mobile backend.
-4. Azure only for a landing page, documentation, redirect page, or optional Expo Web deployment.
+Legacy Azure App Services and PostgreSQL remain review candidates. They must not be modified or deleted without dependency, data, backup, traffic, cost, ownership, and rollback evidence.
 
-Azure should not be placed in the runtime path for the native app unless a future backend/API is introduced.
+## Current Expo/EAS identity
 
-## Current EAS project
+| Item | Value |
+| --- | --- |
+| Account/project | `@abda.dc/mobile` |
+| EAS project ID | `b73a2031-8f5f-4f59-8222-e999d115b6cb` |
+| Display name | `Karri Mobile` |
+| Slug | `mobile` |
+| Version | `1.0.1` |
+| Runtime policy | App version |
+| Android package | `com.karrimobile.app` |
+| iOS bundle identifier | `com.karrimobile.app` |
 
-- Expo owner: abda.dc
-- EAS project: @abda.dc/mobile
-- EAS project ID: b73a2031-8f5f-4f59-8222-e999d115b6cb
-- App display name: Karri Mobile
-- Current Expo slug: mobile
-- Android package: com.karri.mobile
-- iOS bundle identifier: com.karri.mobile
+Development, preview, and production profiles/channels/branches exist. No EAS Update has been published.
 
-The Expo slug remains mobile because EAS was originally linked with that slug. The display name and native identifiers carry the production-facing identity.
+## Environment readiness
 
-## EAS build profiles
-
-The mobile app uses apps/mobile/eas.json with three profiles:
-
-| Profile | Purpose | Distribution | Channel |
-| --- | --- | --- | --- |
-| development | Native development client | Internal | development |
-| preview | Device validation candidate | Internal | preview |
-| production | Store-ready build later | Store/default | production |
-
-First Android validation build command:
-
-    cd apps/mobile
-    npx eas-cli build --platform android --profile preview
-
-Do not run the build until Firebase beta readiness is confirmed.
-
-## Firebase environment strategy
-
-Use separate Firebase projects:
-
-| Environment | Firebase project | Purpose |
+| Environment | Current evidence | Status |
 | --- | --- | --- |
-| Development | karri-mobile-dev | Local and developer testing |
-| Beta / Preview | Not created | Internal device validation |
-| Production | Not created | Future public production |
+| Development | `FIREBASE_APP_CHECK_DEBUG_TOKEN`, `GOOGLE_SERVICE_INFO_PLIST`, and `GOOGLE_SERVICES_JSON` exist as project-scoped EAS variables | **Partially configured** |
+| Preview | No project-scoped EAS variables | **No-Go** |
+| Production | No project-scoped EAS variables | **No-Go** |
 
-Required per environment:
+Never record values in documentation. Preview and production builds must not proceed until matching Firebase projects/apps, native configuration, credential ownership, access, and rollback are verified.
 
-- Firebase Auth configured.
-- Anonymous Auth enabled only while the MVP bridge remains in use.
-- Firestore database created.
-- Firestore rules deployed.
-- Firestore indexes deployed.
-- Storage rules deployed.
-- Storage access remains denied until evidence upload workflow is approved.
-- Firebase CLI aliases configured locally.
-- Callable Functions deployed only after validation, with explicit region/runtime settings.
-- No service-account keys committed.
-- No private credentials in EXPO_PUBLIC values.
+## Firebase development state
 
-The only checked-in Firebase alias is `development`, mapped to `karri-mobile-dev` in `backend/firebase/.firebaserc`. Do not add preview or production aliases until those projects exist.
+The checked-in alias `development` maps to `karri-mobile-dev`. Registered Android, iOS, and web apps exist.
 
-Development Firebase deploy commands:
-
-    npm run firebase:deploy:development:firestore:rules
-    npm run firebase:deploy:development:firestore:indexes
-    npm run firebase:deploy:development:storage
-    npm run firebase:deploy:development:functions
-    npm run firebase:deploy:development
-
-These commands invoke `npx firebase-tools`, pass `--project development`, and run predeploy validation/build hooks from `backend/firebase/firebase.json`.
-
-Development rollback uses the previous reviewed source revision:
-
-    git switch <previous-reviewed-branch-or-tag>
-    npm run firebase:validate
-    npm run firebase:deploy:development
-
-Use the narrow deploy command when only one Firebase surface needs rollback.
-
-## Azure production assessment
-
-Read-only Azure inspection was performed for the current Karri production environment.
-
-### Subscription
-
-| Item | Value |
-| --- | --- |
-| Subscription name | Visual Studio Enterprise Subscription |
-| Tenant ID | 0c8b0fc8-d676-4481-8a82-971b0778bc27 |
-| State | Enabled |
-
-### Karri Azure inventory
-
-| Resource | Name | Resource group | Region | State / Notes |
-| --- | --- | --- | --- | --- |
-| App Service Plan | asp-karri-prod | rg-karri-prod | Central US | Linux plan, hosts 2 apps |
-| Web App | app-karri-web-prod | rg-karri-prod | Central US | Running, Node 22 LTS |
-| API App | app-karri-api-prod | rg-karri-prod | Central US | Running, Node 22 LTS |
-| Static Web App | None found for Karri | n/a | n/a | Karri does not use Azure Static Web Apps today |
-| Key Vault | None found for Karri | n/a | n/a | No Karri Key Vault discovered |
-| Storage Account | None found for Karri | n/a | n/a | No Karri storage account discovered |
-
-### Current production topology
-
-User browser -> app-karri-web-prod.azurewebsites.net -> app-karri-api-prod.azurewebsites.net -> production database
-
-### Web app configuration
-
-| Item | Value |
-| --- | --- |
-| App Service | app-karri-web-prod |
-| Default hostname | app-karri-web-prod.azurewebsites.net |
-| Runtime | NODE\|22-lts |
-| Startup command | node apps/web/server.js |
-| HTTPS only | true |
-| Deployment Center repo | None configured |
-| Deployment slots | None found |
-
-### API app configuration
-
-| Item | Value |
-| --- | --- |
-| App Service | app-karri-api-prod |
-| Default hostname | app-karri-api-prod.azurewebsites.net |
-| Runtime | NODE\|22-lts |
-| Startup command | node dist/main.js |
-| HTTPS only | true |
-| Deployment Center repo | None configured |
-| Deployment slots | None found |
-
-### Domain mapping
-
-| Surface | Current hostname | Custom domain | SSL binding |
-| --- | --- | --- | --- |
-| Karri Web | app-karri-web-prod.azurewebsites.net | None found | Azure default HTTPS |
-| Karri API | app-karri-api-prod.azurewebsites.net | None found | Azure default HTTPS |
-
-### Current deployment source
-
-Azure Deployment Center does not show a GitHub, Azure DevOps, or branch-based deployment source for either Karri App Service.
-
-The App Services expose MSDeploy, FTP/FTPS, and ZipDeploy publishing profiles. The current production deployment was likely published manually, by ZipDeploy, or by an external workflow.
-
-Publishing profile credentials were exposed during local inspection output and should be rotated after this assessment.
-
-## Azure transition decision
-
-Keep Azure resources as-is for now.
-
-- Keep app-karri-api-prod unchanged.
-- Keep current production API hostname: app-karri-api-prod.azurewebsites.net.
-- Only transition or swap the web-facing deployment source/repo when ready.
-- Do not modify DNS, custom domains, SSL, App Service settings, or API resources during Milestone 12.5.
-
-Karri Mobile native runtime should use Firebase directly:
-
-Karri Mobile native app -> Firebase Auth + Firestore + Firebase Storage rules
-
-## Cutover strategy
-
-No production cutover should occur during Milestone 12.5.
-
-Future cutover sequence:
-
-1. Keep app-karri-api-prod unchanged.
-2. Decide whether app-karri-web-prod becomes a landing page, redirect page, Expo Web deployment, or remains unchanged.
-3. Validate replacement web deployment in staging or a temporary App Service.
-4. Preserve the current web artifact for rollback.
-5. Swap only the web deployment/repo after approval.
-6. Verify app-karri-web-prod.azurewebsites.net after deployment.
-
-## Rollback strategy
-
-Current production has no deployment slots, no Azure Deployment Center rollback enabled, and no GitHub source configured.
-
-Rollback must rely on redeploying the previous known-good Karri web artifact or restoring the previous deployment workflow.
-
-## Remaining Azure blockers
-
-- Current production web artifact source is not identified.
-- No staging slot exists.
-- No custom domain is attached.
-- No formal rollback artifact is documented.
-- Publishing profile credentials should be rotated.
-- Final web replacement target is not selected yet.
-
-## Azure inspection checklist
-
-Suggested read-only commands:
-
-    az account show --output table
-    az group list --output table
-    az webapp list --output table
-    az staticwebapp list --output table
-
-Record:
-
-- Subscription
-- Resource group
-- App Service or Static Web App name
-- Current hostname
-- Custom domains
-- Deployment source
-- App settings
-- DNS records
-- Rollback path
-
-## Device validation prerequisites
-
-Milestone 13 should not begin until:
-
-- EAS preview profile exists.
-- Android preview APK build succeeds.
-- Firebase beta project exists and matches app config.
-- Auth provider required by the MVP works.
-- Firestore rules and indexes are deployed to beta.
-- Callable Functions are deployed to the same reviewed Firebase environment, or the client paths that depend on them remain disabled.
-- npm run test:rules passes.
-- npm run test:functions passes.
-- npx expo-doctor passes.
-- npx tsc --noEmit passes.
-- No Azure production cutover is mixed into device validation.
-
-## Known risks
-
-- Anonymous authentication bridge blocks external validation unless enabled or replaced.
-- App Check is not enforced yet.
-- Storage access is intentionally denied.
-- Callable Functions use `us-east1`, bounded instances, and App Check enforcement disabled temporarily for development.
-- Push delivery is not production-complete.
-- Multi-party booking and custody writes remain client-orchestrated.
-- No payments, disputes, admin console, mobile money, GPS, or carrier integrations are included.
-
-## Verification commands
-
-Run before committing:
-
-    cd C:\Users\Kiya\Documents\karri-mobile
-    npm run firebase:validate
-    npm run test:rules
-    npm run test:functions
-
-    cd apps/mobile
-    npx expo-doctor
-    npx tsc --noEmit
-    npx expo config --type public
-
-    cd ..\..
-    .\.venv\Scripts\mkdocs.exe build
-    git diff --check
-    git status --short
-
-## Decision
-
-Milestone 12.5 prepares deployment readiness. It does not perform production replacement.
-
-Recommended next sequence:
-
-1. Finish this documentation/config commit.
-2. Create or confirm karri-mobile-beta.
-3. Deploy Firestore rules and indexes to beta.
-4. Confirm Auth works in beta.
-5. Build Android preview APK through EAS.
-6. Start Milestone 13 real-device validation.
-7. Inspect Azure production resources separately before any public cutover.
-
-## Milestone 12.5 Static Web Apps validation update
-
-Temporary Azure Linux App Service validation was abandoned because Kudu/ZipDeploy extraction produced invalid mixed Linux and Windows paths during deployment. The issue was infrastructure-related, not application-related.
-
-A new temporary Azure Static Web Apps validation environment was created instead:
-
-| Item | Value |
-| --- | --- |
-| Static Web App | swa-karri-mobile-web-test |
-| Resource group | rg-karri-prod |
-| Region | Central US |
-| Validation hostname | https://nice-ground-08f721010.7.azurestaticapps.net |
-| Repository | https://github.com/abda-dc/karri-mobile |
-| Branch | main |
-| App location | apps/mobile |
-| Output location | dist |
-| Build command | npx expo export --platform web |
-
-GitHub Actions now deploys the Expo static web export through:
-
-    .github/workflows/azure-static-web-apps-nice-ground-08f721010.yml
-
-Firebase public web configuration is provided through GitHub Actions secrets. Do not commit `.env.local`, `.env`, Firebase values, or deployment tokens.
-
-Required GitHub Actions secrets:
-
-- EXPO_PUBLIC_FIREBASE_API_KEY
-- EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN
-- EXPO_PUBLIC_FIREBASE_PROJECT_ID
-- EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET
-- EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-- EXPO_PUBLIC_FIREBASE_APP_ID
-- AZURE_STATIC_WEB_APPS_API_TOKEN_NICE_GROUND_08F721010
-
-Validation result:
-
-- Static Web Apps deployment succeeded.
-- Firebase configuration loaded in the deployed Expo web build.
-- The previous "Karri is not configured for this environment" blocker was resolved.
-- Production resources remained untouched.
-
-The old temporary App Service remains non-production and should not be used for further web validation:
-
-    https://app-karri-mobile-web-test.azurewebsites.net
-
-Recommended cleanup after Milestone 12.5 is safely committed:
-
-1. Stop the old temporary App Service.
-2. Keep it briefly as a safety reference.
-3. Delete it later after the Static Web Apps validation path is accepted.
-
-## Azure Static Web Apps deployment incident closure - July 21, 2026
-
-Notifications N3A commit `3107e7e109981b9d70172e46ea44db550c0d78d6` triggered Azure Static Web Apps workflow run `29848690113` for `swa-karri-mobile-web-test`. The Expo/Oryx web build completed successfully on every investigated attempt, but Azure's post-upload deployment pipeline failed or stalled during the first three attempts.
-
-| Attempt | Result | Observed failure mode |
+| Function | Source | Deployed |
 | --- | --- | --- |
-| 1 | Failure | The build completed, but Azure reported problems communicating with its content server. |
-| 2 | Failure | The build completed, but Azure again reported problems communicating with its content server. |
-| 3 | Failure | ZIP creation and upload completed, deployment polling remained `InProgress`, and the action returned `Upload Timed Out. Unsure if deployment was successful or not.` |
-| 4 | Success | The approved controlled rerun completed the Build and Deploy Job successfully. |
+| `submitSafetyReview` | Yes | Yes |
+| `placeAdministrativeHold` | Yes | Yes |
+| `releaseAdministrativeHold` | Yes | Yes |
+| `registerPushToken` | Yes | No |
+| `unregisterPushToken` | Yes | No |
+| `onBookingAccepted` | Yes | No |
 
-Attempt 3 used deployment ID `7cbdcf6d-257c-441e-9175-33545438d4ed`. Its retained investigation log is:
+The final three functions have a deployment gap, not an implementation gap. Any deployment requires validation and separate approval. App Check enforcement remains disabled. Push delivery remains default-off unless `KARRI_PUSH_DELIVERY_ENABLED` is exactly `true`; production push is **No-Go**.
 
-    artifacts/azure-static-web-apps-29848690113-third-attempt-88717137853.log
+Development deployment commands are documented in [Deployment](../operations/deployment.md). Do not run them as part of documentation validation.
 
-The successful fourth attempt used job `88741933918`. It started at `2026-07-21T19:37:59Z` and completed at `2026-07-21T19:40:25Z`.
+## Native release evidence
 
-All failed attempts and the successful attempt used the same deployment components:
+- iOS internal development build: SHA `87c467d9d1ef371a56a2ee9bb1bac84877a467db`.
+- Android internal development build: SHA `592a68925cead24d707fd80434189c1d53b12bc3`.
+- Historical Android manual workflow: run `29647700047`, SHA `e3ed68155b04a342031c813382d46b9e51227eb2`, signed APK/AAB and Google Play testing upload.
+- No native build exists for H1 baseline `dab82705d1f363d1d211905e13ec71af2a80a678`.
+- No iOS store build or App Store/TestFlight submission evidence exists.
 
-| Component | Exact version |
-| --- | --- |
-| `Azure/static-web-apps-deploy` action | `1a947af9992250f3bc2e68ad0754c0b0c11566c9` |
-| StaticSitesClient base image | `sha256:8ed8ea489d04d0636b5c47fbaa44f005975ab0d1f03eddc28014cdf7a061f7f4` |
-| Oryx | `0.2.20260109.4` |
+The Android workflow is manual-only, defaults to `alpha` and `draft`, permits `completed`, and lacks a GitHub environment approval, conditional release guard, and explicit workflow permission block. It must not be treated as unattended production automation.
 
-The investigation found no evidence of a Git checkout failure, Expo export failure, missing `dist` output, ZIP creation failure, initial artifact-upload failure, deployment-token rejection, dependency change, workflow change, Expo configuration change, Static Web Apps configuration change, or deployment-tool version drift. N3A did not modify deployment-sensitive files.
+## Azure inventory and boundary
 
-Azure exposed no deployment-detail read endpoint keyed by the action deployment ID. No Azure Monitor diagnostic setting existed during the incident, and no applicable subscription-level Service Health event was returned.
+Active resources observed in `rg-karri-prod`:
 
-Production verification succeeded after attempt 4:
+- `karri-pg-22107`
+- `asp-karri-prod`
+- `app-karri-api-prod`
+- `app-karri-web-prod`
+- `app-karri-mobile-web-test`
+- `swa-karri-mobile-web-test`
 
-| Verification | Result |
-| --- | --- |
-| Environment | `default` |
-| Source branch | `main` |
-| Azure status | `Ready` |
-| Azure last updated | `2026-07-21T19:40:07.850954+00:00` |
-| Live-site HTTP status | `200` |
-| `Last-Modified` | `Tue, 21 Jul 2026 19:40:07 GMT` |
-| `Content-Length` | `23784` |
+`swa-karri-mobile-web-test` is connected to `abda-dc/karri-mobile` on `main`, reports `Ready`, and serves `nice-ground-08f721010.7.azurestaticapps.net`.
 
-The evidence supports classifying the incident as a probable transient failure or stalled operation within Azure Static Web Apps' post-upload content-processing and distribution pipeline. An application, repository, workflow, deployment-token, or Azure resource defect is not supported by the evidence.
+`app-karri-mobile-web-test` was stopped and had `HttpsOnly=False` during inspection. One inherited subscription Owner was observed, with no separate Contributor, resource locks, or ownership/lifecycle tags. These are governance findings for owner review, not authorization to change resources.
 
-The incident is resolved. No application code, GitHub Actions workflow, secret, Firebase configuration, deployment token, or Azure resource correction was required.
+## Transition gates
+
+Production transition requires:
+
+- verified receiving-owner access for GitHub, Expo/EAS, Firebase/Google Cloud, Apple, Google Play, Azure, and Static Web Apps;
+- preview and production environment completeness;
+- current-SHA Android and iOS builds;
+- physical-device, accessibility, auth/session, offline/reconnect, and notification acceptance evidence;
+- deployed-function/source comparison and approved closure;
+- App Check rollout decision and rollback;
+- push default-off decision and full production push approval;
+- signing/store recovery ownership;
+- incident, monitoring, backup/restore, and rollback evidence;
+- owner/legal approval for privacy, terms, and license.
+
+Until these gates are complete, the decision is **No-Go**.
+
+## Approved next step
+
+After H1A review, proceed only to owner-access verification and controlled development readiness closure. Do not combine that milestone with production deployment, push enablement, App Check enforcement, Azure migration, or legacy-resource decommissioning.
+
+See [Project Status](../project-status.md), [Owner Handoff](../owner-handoff.md), [Deployment](../operations/deployment.md), [Rollback](../operations/rollback.md), and [Release Checklist](../release-checklist.md).
