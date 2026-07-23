@@ -1,0 +1,2318 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="Product and engineering handbook for the Karri mobile-first cross-border shipping platform." name="description"/>
+<meta content="Karri" name="author"/>
+<link href="https://abda-dc.github.io/karri-mobile/architecture/notification-delivery/" rel="canonical"/>
+<link href="../application-services/" rel="prev"/>
+<link href="../error-handling/" rel="next"/>
+<link href="../../assets/images/favicon.png" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.7.6" name="generator"/>
+<title>Notification Delivery - Karri Mobile Handbook</title>
+<link href="../../assets/stylesheets/main.484c7ddc.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.ab4e12ef.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="amber" data-md-color-primary="teal" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#notification-activation-and-delivery-design">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<header class="md-header" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="Karri Mobile Handbook" class="md-header__button md-logo" data-md-component="logo" href="../.." title="Karri Mobile Handbook">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            Karri Mobile Handbook
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Notification Delivery
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="amber" data-md-color-media="(prefers-color-scheme: light)" data-md-color-primary="teal" data-md-color-scheme="default" id="__palette_0" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="amber" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-primary="teal" data-md-color-scheme="slate" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_0" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"></path></svg>
+</label>
+</form>
+<script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+<div class="md-search__suggest" data-md-component="search-suggest"></div>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/abda-dc/karri-mobile" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+</div>
+<div class="md-source__repository">
+    abda-dc/karri-mobile
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<nav aria-label="Tabs" class="md-tabs" data-md-component="tabs">
+<div class="md-grid">
+<ul class="md-tabs__list">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../..">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../project-status/">
+        
+  
+  
+    
+  
+  Project Status
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../owner-handoff/">
+        
+  
+  
+    
+  
+  Owner Handoff
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../release-checklist/">
+        
+  
+  
+    
+  
+  Release Checklist
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../strategy/executive-summary/">
+          
+  
+  
+    
+  
+  Strategy
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../product/product-roadmap/">
+          
+  
+  
+    
+  
+  Product
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../design/brand-guidelines/">
+          
+  
+  
+    
+  
+  Design
+
+        </a>
+</li>
+<li class="md-tabs__item md-tabs__item--active">
+<a class="md-tabs__link" href="../">
+          
+  
+  
+    
+  
+  Architecture
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../engineering/engineering-standards/">
+          
+  
+  
+    
+  
+  Engineering
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../operations/runbook/">
+          
+  
+  
+    
+  
+  Operations
+
+        </a>
+</li>
+</ul>
+</div>
+</nav>
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary md-nav--lifted" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="Karri Mobile Handbook" class="md-nav__button md-logo" data-md-component="logo" href="../.." title="Karri Mobile Handbook">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+    Karri Mobile Handbook
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/abda-dc/karri-mobile" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+</div>
+<div class="md-source__repository">
+    abda-dc/karri-mobile
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../..">
+<span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../project-status/">
+<span class="md-ellipsis">
+    
+  
+    Project Status
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../owner-handoff/">
+<span class="md-ellipsis">
+    
+  
+    Owner Handoff
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../release-checklist/">
+<span class="md-ellipsis">
+    
+  
+    Release Checklist
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Strategy
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Strategy
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../strategy/executive-summary/">
+<span class="md-ellipsis">
+    
+  
+    Executive Summary
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../strategy/vision-and-mission/">
+<span class="md-ellipsis">
+    
+  
+    Vision and Mission
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../strategy/product-constitution/">
+<span class="md-ellipsis">
+    
+  
+    Product Constitution
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../strategy/product-strategy/">
+<span class="md-ellipsis">
+    
+  
+    Product Strategy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../strategy/business-model/">
+<span class="md-ellipsis">
+    
+  
+    Business Model
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Product
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_6_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_6">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Product
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../product/product-roadmap/">
+<span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../product/product-requirements-document/">
+<span class="md-ellipsis">
+    
+  
+    Product Requirements
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../product/personas/">
+<span class="md-ellipsis">
+    
+  
+    Personas
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../product/user-journeys/">
+<span class="md-ellipsis">
+    
+  
+    User Journeys
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../product/activity-feed/">
+<span class="md-ellipsis">
+    
+  
+    Activity Feed
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../product/booking-lifecycle/">
+<span class="md-ellipsis">
+    
+  
+    Booking Lifecycle
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../product/chain-of-custody/">
+<span class="md-ellipsis">
+    
+  
+    Chain of Custody
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../product/matching-engine/">
+<span class="md-ellipsis">
+    
+  
+    Matching Engine
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../product/discovery-experience/">
+<span class="md-ellipsis">
+    
+  
+    Discovery Experience
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../product/notifications/">
+<span class="md-ellipsis">
+    
+  
+    Notifications
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../product/reviews/">
+<span class="md-ellipsis">
+    
+  
+    Reviews
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../product/trust-score/">
+<span class="md-ellipsis">
+    
+  
+    Trust Score
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_7">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Design
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../design/brand-guidelines/">
+<span class="md-ellipsis">
+    
+  
+    Brand Guidelines
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../design/design-system/">
+<span class="md-ellipsis">
+    
+  
+    Design System
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../design/components/">
+<span class="md-ellipsis">
+    
+  
+    Components
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../design/accessibility/">
+<span class="md-ellipsis">
+    
+  
+    Accessibility
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../design/ux-patterns/">
+<span class="md-ellipsis">
+    
+  
+    UX Patterns
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_8" type="checkbox"/>
+<div class="md-nav__link md-nav__container">
+<a class="md-nav__link" href="../">
+<span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+</a>
+<label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="true" aria-labelledby="__nav_8_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_8">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../technical-architecture/">
+<span class="md-ellipsis">
+    
+  
+    Technical Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../platform-services/">
+<span class="md-ellipsis">
+    
+  
+    Platform Services
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../technology-roadmap/">
+<span class="md-ellipsis">
+    
+  
+    Technology Roadmap
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../domain-model/">
+<span class="md-ellipsis">
+    
+  
+    Domain Model
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../repository-pattern/">
+<span class="md-ellipsis">
+    
+  
+    Repository Pattern
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../application-services/">
+<span class="md-ellipsis">
+    
+  
+    Application Services
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+    Notification Delivery
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    
+  
+    Notification Delivery
+  
+
+    
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#status-and-guardrails">
+<span class="md-ellipsis">
+      
+        Status and guardrails
+      
+    </span>
+</a>
+<nav aria-label="Status and guardrails" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#notifications-n3a-implementation-and-ciweb-verification-closure">
+<span class="md-ellipsis">
+      
+        Notifications N3A implementation and CI/web verification closure
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#notifications-n3b-registration-generation-binding">
+<span class="md-ellipsis">
+      
+        Notifications N3B registration-generation binding
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#reviewed-architecture-boundary">
+<span class="md-ellipsis">
+      
+        Reviewed architecture boundary
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#native-push-activation-plan">
+<span class="md-ellipsis">
+      
+        Native push activation plan
+      
+    </span>
+</a>
+<nav aria-label="Native push activation plan" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#package-and-provider-strategy">
+<span class="md-ellipsis">
+      
+        Package and provider strategy
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#android-notification-channels">
+<span class="md-ellipsis">
+      
+        Android notification channels
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ios-permission-copy-and-timing">
+<span class="md-ellipsis">
+      
+        iOS permission copy and timing
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#current-eas-and-native-credential-state">
+<span class="md-ellipsis">
+      
+        Current EAS and native credential state
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#token-registration-flow">
+<span class="md-ellipsis">
+      
+        Token registration flow
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#future-unimplemented-rotation-and-broader-token-cleanup">
+<span class="md-ellipsis">
+      
+        Future / unimplemented: Rotation and broader token cleanup
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#preferences-and-quiet-hours">
+<span class="md-ellipsis">
+      
+        Preferences and quiet hours
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#deep-link-authorization">
+<span class="md-ellipsis">
+      
+        Deep-link authorization
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#test-checklist">
+<span class="md-ellipsis">
+      
+        Test checklist
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#rollout-and-rollback">
+<span class="md-ellipsis">
+      
+        Rollout and rollback
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#trusted-server-side-delivery">
+<span class="md-ellipsis">
+      
+        Trusted server-side delivery
+      
+    </span>
+</a>
+<nav aria-label="Trusted server-side delivery" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#delivery-flow">
+<span class="md-ellipsis">
+      
+        Delivery flow
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#idempotency-and-effect-ids">
+<span class="md-ellipsis">
+      
+        Idempotency and effect IDs
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#current-and-proposed-data-boundaries">
+<span class="md-ellipsis">
+      
+        Current and proposed data boundaries
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#future-policy-expansion-beyond-n3a">
+<span class="md-ellipsis">
+      
+        Future policy expansion beyond N3A
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#token-privacy-and-retention">
+<span class="md-ellipsis">
+      
+        Token privacy and retention
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#delivery-results-retry-and-cleanup">
+<span class="md-ellipsis">
+      
+        Delivery results, retry, and cleanup
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#payload-privacy">
+<span class="md-ellipsis">
+      
+        Payload privacy
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#future-cloud-function-boundaries">
+<span class="md-ellipsis">
+      
+        Future Cloud Function boundaries
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#monitoring-and-launch-gates">
+<span class="md-ellipsis">
+      
+        Monitoring and launch gates
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#official-implementation-references">
+<span class="md-ellipsis">
+      
+        Official implementation references
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../error-handling/">
+<span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../event-bus/">
+<span class="md-ellipsis">
+    
+  
+    Event Bus
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../booking-state-machine/">
+<span class="md-ellipsis">
+    
+  
+    Booking State Machine
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../shipment-timeline/">
+<span class="md-ellipsis">
+    
+  
+    Shipment Timeline
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../matching-engine/">
+<span class="md-ellipsis">
+    
+  
+    Matching Engine
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../custody-model/">
+<span class="md-ellipsis">
+    
+  
+    Custody Model
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../trust-engine/">
+<span class="md-ellipsis">
+    
+  
+    Trust Engine
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../identity-verification/">
+<span class="md-ellipsis">
+    
+  
+    Identity Verification
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../offline-strategy/">
+<span class="md-ellipsis">
+    
+  
+    Offline Strategy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../remote-config/">
+<span class="md-ellipsis">
+    
+  
+    Remote Configuration
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--section md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_8_19" type="checkbox"/>
+<div class="md-nav__link md-nav__container">
+<a class="md-nav__link" href="../../adr/">
+<span class="md-ellipsis">
+    
+  
+    ADRs
+  
+
+    
+  </span>
+</a>
+<label class="md-nav__link" for="__nav_8_19" id="__nav_8_19_label" tabindex="">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_8_19_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_8_19">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    ADRs
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adr/adr-0001-why-expo/">
+<span class="md-ellipsis">
+    
+  
+    ADR-0001 - Expo
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adr/adr-0002-why-firebase/">
+<span class="md-ellipsis">
+    
+  
+    ADR-0002 - Firebase
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adr/adr-0003-why-cloud-functions/">
+<span class="md-ellipsis">
+    
+  
+    ADR-0003 - Cloud Functions
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adr/adr-0004-why-event-architecture/">
+<span class="md-ellipsis">
+    
+  
+    ADR-0004 - Event Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adr/adr-0005-why-trust-score/">
+<span class="md-ellipsis">
+    
+  
+    ADR-0005 - Trust Score
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adr/adr-0006-why-chain-of-custody/">
+<span class="md-ellipsis">
+    
+  
+    ADR-0006 - Chain of Custody
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adr/adr-0007-why-feature-flags/">
+<span class="md-ellipsis">
+    
+  
+    ADR-0007 - Feature Flags
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adr/adr-0008-why-remote-configuration/">
+<span class="md-ellipsis">
+    
+  
+    ADR-0008 - Remote Configuration
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adr/adr-0009-hybrid-app-check-callable-transport/">
+<span class="md-ellipsis">
+    
+  
+    ADR-0009 - Hybrid App Check Transport
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Engineering
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Engineering
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/engineering-standards/">
+<span class="md-ellipsis">
+    
+  
+    Standards
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/system-architecture/">
+<span class="md-ellipsis">
+    
+  
+    System Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/mobile-architecture/">
+<span class="md-ellipsis">
+    
+  
+    Mobile Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/backend-architecture/">
+<span class="md-ellipsis">
+    
+  
+    Backend Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/database-design/">
+<span class="md-ellipsis">
+    
+  
+    Database Design
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/authentication/">
+<span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/authorization/">
+<span class="md-ellipsis">
+    
+  
+    Authorization
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/security/">
+<span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/security-review/">
+<span class="md-ellipsis">
+    
+  
+    Security Review
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/firestore-security-testing/">
+<span class="md-ellipsis">
+    
+  
+    Firestore Security Testing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/release-hardening/">
+<span class="md-ellipsis">
+    
+  
+    Release Hardening
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/beta-readiness-checklist/">
+<span class="md-ellipsis">
+    
+  
+    Beta Readiness Checklist
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/production-deployment-transition/">
+<span class="md-ellipsis">
+    
+  
+    Production Deployment Transition
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/api-design/">
+<span class="md-ellipsis">
+    
+  
+    API Design
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/event-architecture/">
+<span class="md-ellipsis">
+    
+  
+    Event Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/push-notification-testing/">
+<span class="md-ellipsis">
+    
+  
+    Push Notification Testing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../engineering/ci-cd/">
+<span class="md-ellipsis">
+    
+  
+    CI/CD
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_10_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_10">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../operations/runbook/">
+<span class="md-ellipsis">
+    
+  
+    Runbook
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../operations/deployment/">
+<span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../operations/rollback/">
+<span class="md-ellipsis">
+    
+  
+    Rollback
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../operations/incident-response/">
+<span class="md-ellipsis">
+    
+  
+    Incident Response
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../operations/backup-restore/">
+<span class="md-ellipsis">
+    
+  
+    Backup and Restore
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../operations/push-production-readiness/">
+<span class="md-ellipsis">
+    
+  
+    Push Production Readiness
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#status-and-guardrails">
+<span class="md-ellipsis">
+      
+        Status and guardrails
+      
+    </span>
+</a>
+<nav aria-label="Status and guardrails" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#notifications-n3a-implementation-and-ciweb-verification-closure">
+<span class="md-ellipsis">
+      
+        Notifications N3A implementation and CI/web verification closure
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#notifications-n3b-registration-generation-binding">
+<span class="md-ellipsis">
+      
+        Notifications N3B registration-generation binding
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#reviewed-architecture-boundary">
+<span class="md-ellipsis">
+      
+        Reviewed architecture boundary
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#native-push-activation-plan">
+<span class="md-ellipsis">
+      
+        Native push activation plan
+      
+    </span>
+</a>
+<nav aria-label="Native push activation plan" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#package-and-provider-strategy">
+<span class="md-ellipsis">
+      
+        Package and provider strategy
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#android-notification-channels">
+<span class="md-ellipsis">
+      
+        Android notification channels
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ios-permission-copy-and-timing">
+<span class="md-ellipsis">
+      
+        iOS permission copy and timing
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#current-eas-and-native-credential-state">
+<span class="md-ellipsis">
+      
+        Current EAS and native credential state
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#token-registration-flow">
+<span class="md-ellipsis">
+      
+        Token registration flow
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#future-unimplemented-rotation-and-broader-token-cleanup">
+<span class="md-ellipsis">
+      
+        Future / unimplemented: Rotation and broader token cleanup
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#preferences-and-quiet-hours">
+<span class="md-ellipsis">
+      
+        Preferences and quiet hours
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#deep-link-authorization">
+<span class="md-ellipsis">
+      
+        Deep-link authorization
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#test-checklist">
+<span class="md-ellipsis">
+      
+        Test checklist
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#rollout-and-rollback">
+<span class="md-ellipsis">
+      
+        Rollout and rollback
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#trusted-server-side-delivery">
+<span class="md-ellipsis">
+      
+        Trusted server-side delivery
+      
+    </span>
+</a>
+<nav aria-label="Trusted server-side delivery" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#delivery-flow">
+<span class="md-ellipsis">
+      
+        Delivery flow
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#idempotency-and-effect-ids">
+<span class="md-ellipsis">
+      
+        Idempotency and effect IDs
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#current-and-proposed-data-boundaries">
+<span class="md-ellipsis">
+      
+        Current and proposed data boundaries
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#future-policy-expansion-beyond-n3a">
+<span class="md-ellipsis">
+      
+        Future policy expansion beyond N3A
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#token-privacy-and-retention">
+<span class="md-ellipsis">
+      
+        Token privacy and retention
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#delivery-results-retry-and-cleanup">
+<span class="md-ellipsis">
+      
+        Delivery results, retry, and cleanup
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#payload-privacy">
+<span class="md-ellipsis">
+      
+        Payload privacy
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#future-cloud-function-boundaries">
+<span class="md-ellipsis">
+      
+        Future Cloud Function boundaries
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#monitoring-and-launch-gates">
+<span class="md-ellipsis">
+      
+        Monitoring and launch gates
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#official-implementation-references">
+<span class="md-ellipsis">
+      
+        Official implementation references
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="notification-activation-and-delivery-design">Notification Activation and Delivery Design<a class="headerlink" href="#notification-activation-and-delivery-design" title="Permanent link">¶</a></h1>
+<h2 id="status-and-guardrails">Status and guardrails<a class="headerlink" href="#status-and-guardrails" title="Permanent link">¶</a></h2>
+<p>This document covers the controlled client foundation, trusted persistence backend (N1), mobile repository wiring (N2), bounded trusted <code>booking.accepted</code> delivery (N3A), registration-generation binding (N3B), explicit current-installation unregistration (N4A), and bounded sign-out cleanup (N4B).</p>
+<h3 id="notifications-n3a-implementation-and-ciweb-verification-closure">Notifications N3A implementation and CI/web verification closure<a class="headerlink" href="#notifications-n3a-implementation-and-ciweb-verification-closure" title="Permanent link">¶</a></h3>
+<p>Notifications N3A source was implemented, committed, pushed, and validated at exact commit <code>3107e7e109981b9d70172e46ea44db550c0d78d6</code> (<code>Implement trusted booking accepted push delivery</code>).</p>
+<p>Exact-SHA validation completed successfully:</p>
+<table>
+<thead>
+<tr>
+<th>Workflow</th>
+<th>Run</th>
+<th>Conclusion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Firebase Validate</td>
+<td><code>29848690515</code></td>
+<td>Success</td>
+</tr>
+<tr>
+<td>Mobile Validate</td>
+<td><code>29848690285</code></td>
+<td>Success</td>
+</tr>
+<tr>
+<td>Publish Docs</td>
+<td><code>29848690492</code></td>
+<td>Success</td>
+</tr>
+</tbody>
+</table>
+<p>Azure Static Web Apps workflow run <code>29848690113</code> failed during Azure post-upload processing on attempts 1 through 3 and succeeded on the approved controlled fourth attempt. The default Azure environment subsequently reported <code>Ready</code>, and the live Static Web Apps site served the exact commit successfully.</p>
+<p>The Firebase Validate result above is source/CI evidence, not proof that the notification Functions were deployed. The Azure result verifies only the Expo web validation surface; it did not deploy or enable notification Cloud Functions.</p>
+<p>The current development Firebase inventory contains <code>submitSafetyReview</code>, <code>placeAdministrativeHold</code>, and <code>releaseAdministrativeHold</code>. It does not contain <code>registerPushToken</code>, <code>unregisterPushToken</code>, or <code>onBookingAccepted</code>; those three notification Functions are implemented in source but not currently deployed. The server-only <code>KARRI_PUSH_DELIVERY_ENABLED</code> kill switch remains default-off, and production push remains <strong>No-Go</strong>.</p>
+<h3 id="notifications-n3b-registration-generation-binding">Notifications N3B registration-generation binding<a class="headerlink" href="#notifications-n3b-registration-generation-binding" title="Permanent link">¶</a></h3>
+<p>N3B adds a server-owned registration generation to bind each delivery effect and permanent-token cleanup decision to the exact registration state selected for that send. N3B does not add receipt polling, retries, queues, workers, token hashes, lifecycle listeners, or production enablement.</p>
+<p>The following functionality is <strong>implemented</strong>:
+- N1 trusted push-token persistence
+- N2 FirebasePushTokenRepository wiring for Android/iOS Expo tokens
+- N3A trusted <code>bookings/{bookingId}</code> <code>pending</code> to <code>accepted</code> Firestore trigger in <code>us-east1</code>
+- server-derived sender recipient and traveler actor with immutable-core and append-only-history validation
+- deterministic server-owned canonical <code>booking.accepted</code> notification
+- exact complete-schema preference validation with fail-closed partial/malformed-record handling and DST-aware quiet-hours suppression
+- deterministic document-ID inspection of at most 100 active, bound Expo Android/iOS registration records with in-memory token deduplication
+- at most 100 deterministic per-device delivery claims and one immediate Expo provider request containing at most 100 messages
+- generic schema-v1 <code>open_notifications</code> payload on <code>karri_activity_v1</code>
+- server-owned positive integer <code>registrationVersion</code> on each registration: the first registration starts at <code>1</code>, the same active token preserves its version, token replacement or inactive reactivation increments it, a legacy record without the field upgrades to <code>1</code>, and malformed or exhausted version state fails closed
+- delivery effects capture the selected <code>registrationVersion</code> without copying raw token values
+- immediate <code>DeviceNotRegistered</code> deactivation and token deletion only when the still-current token and registration generation both match the attempted send
+- default-off server delivery kill switch (<code>KARRI_PUSH_DELIVERY_ENABLED</code>)
+- explicit Profile registration
+- explicit, user-initiated Profile unregistration for the current installation without reading or retaining the raw token
+- existing local notification-response listening and route resolution</p>
+<p>The following functionality is <strong>deferred</strong>:
+- other notification events
+- receipt polling
+- automatic retries
+- queues and scheduled quiet-hours delivery
+- background workers
+- monitoring dashboards
+- automatic registration at login or startup
+- startup or foreground reconciliation
+- preference-disable or permission-revocation cleanup
+- automatic token-change detection and startup/foreground rotation reconciliation
+- notification Functions deployment and production enablement
+- App Check enforcement
+- scheduled cleanup
+- leases
+- keyed token hashes for future retention/deduplication work
+- lastSeenAt
+- broader device-retention policy, registration pagination, cleanup, and multi-batch fan-out</p>
+<p>N4A calls <code>unregisterPushToken</code> only after the authenticated user explicitly selects <strong>Unregister this device</strong> in Profile. The application reads the existing retained installation ID without creating one, combines it with the active user ID for local validation, and sends only <code>{ deviceId }</code> to the trusted callable; backend authentication remains the sole source of registration ownership. Removal never reads, retrieves, stores, returns, or logs a raw push token. Missing local installation state is an idempotent successful no-op, while malformed or unreadable state defers safely. Successful removal disables Expo automatic token updates, deactivates the server registration, deletes its raw token through the unchanged backend, and retains the local installation ID so later explicit registration can reuse the same device document and server-owned generation behavior. No automatic lifecycle caller exists.</p>
+<p>N4B connects sign-out to a bounded current-installation cleanup attempt. <code>AuthSessionService</code> captures the current user, serializes auth operations, runs cleanup before Firebase sign-out, and proceeds after cleanup failure or a three-second timeout. The Firebase adapter signs out only when the current user still matches the captured expected user. <code>PushRegistrationService</code> serializes register/unregister work; generation invalidation releases an abandoned queue after timeout and prevents late persistence. Duplicate sign-outs coalesce. This prevents stale operations from crossing session boundaries without claiming that cleanup always reaches the server.</p>
+<p>N3A/N3B deterministically orders one recipient's device subcollection by document ID and examines at most the first 100 registration records. A selected record must contain a valid positive safe-integer <code>registrationVersion</code>; legacy records remain ineligible for delivery until the authenticated registration endpoint upgrades them. Registrations beyond the inspection bound are ignored: they are not paged, queued, claimed, or disclosed. After validation and in-memory token deduplication, the service claims and sends no more than 100 delivery effects/messages in one Expo request. This cap is a safety and resource boundary, not a production-scale broadcast design. Broader retention policy, pagination, cleanup, and multi-batch fan-out remain deferred.</p>
+<p>Creation of the deterministic canonical notification is N3A's event-level dispatch claim. Only the invocation that creates it may read the kill switch or preferences, evaluate quiet hours, inspect registrations, claim device effects, call Expo, or clean up an invalid registration. Each claimed effect records the selected registration generation, while the raw token remains only in transient provider-send memory. Immediate invalid-registration cleanup re-reads the registration transactionally and stops if either the token or <code>registrationVersion</code> has changed. A matching duplicate returns <code>event_replay</code> without reevaluating changed policy, time, or token state, so every first-invocation suppression is terminal for that event. A conflicting deterministic notification still fails closed. A crash after canonical creation but before device claiming can lose the optional push; this is an accepted at-most-one-attempt tradeoff because the in-app notification remains authoritative. No retry, queue, delayed delivery, receipt reconciliation, or historical catch-up behavior is added.</p>
+<p>The activation order is deliberate:</p>
+<ol>
+<li>Keep an in-app notification record as the canonical user-visible fact.</li>
+<li>Keep native permission/token acquisition behind explicit user intent.</li>
+<li>Keep N3A bounded to one validated event, fail-closed policy, deterministic one-attempt effects, and a default-off server kill switch.</li>
+<li>Require retries, receipts, monitoring, lifecycle reconciliation, and operational approval before any production rollout. Push remains an optional hint, never the only record of a booking, custody, delivery, review, or trust event.</li>
+</ol>
+<h2 id="reviewed-architecture-boundary">Reviewed architecture boundary<a class="headerlink" href="#reviewed-architecture-boundary" title="Permanent link">¶</a></h2>
+<p>The table describes implemented source responsibilities and hard boundaries. It is not a deployed Firebase inventory; the current deployment gap is recorded above.</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Current responsibility</th>
+<th>Hard boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Domain</td>
+<td>Notification records, preference rules, categories, channels, and quiet-hours values</td>
+<td>No Firebase, Expo, FCM, APNs, permission, token, or navigation APIs</td>
+</tr>
+<tr>
+<td>Application</td>
+<td>In-app notification orchestration for non-migrated events, push registration contracts, and semantic action routing</td>
+<td><code>booking.accepted</code> materialization is no longer owned by the mobile event bus</td>
+</tr>
+<tr>
+<td>Infrastructure</td>
+<td>Firestore repositories, implemented token persistence and repository wiring, validated payload routing, and explicit Expo native registration adapter</td>
+<td>Mobile delivery remains inert; permission/token acquisition is user-initiated and N3A provider access exists only on the trusted server</td>
+</tr>
+<tr>
+<td>Presentation</td>
+<td>Profile notification/preference UI, availability hook, Expo Router target adapter, composition root, explicit Profile permission/token orchestration, and existing notification-response listener and route resolution</td>
+<td>Screens/components do not call Firebase directly; no permission prompt, token effect, or automatic navigation outside explicit Profile interaction</td>
+</tr>
+<tr>
+<td>Trusted server (N1/N3B persistence)</td>
+<td>Authenticated token registration/unregistration callables, token deletion, inactive-record reconciliation, and server-owned registration-generation maintenance</td>
+<td>Direct client access to the <code>pushTokenRegistrations</code> collection is denied; only <code>us-east1</code> server callables run Firestore transactions; malformed generation state fails closed</td>
+</tr>
+<tr>
+<td>Trusted server delivery (N3A/N3B)</td>
+<td>Validate one authoritative booking transition, create its canonical notification, enforce push policy, select a valid registration generation, claim per-device effects, and make one immediate Expo attempt</td>
+<td>No client delivery endpoint; recipient/content/route/token are never client inputs; effects contain the generation but never the raw token; broader delivery, retries, receipts, and production rollout remain deferred</td>
+</tr>
+</tbody>
+</table>
+<p>The current <code>notificationPreferences/{userId}</code> record stores user intent only. <code>channels.push == true</code> does not prove OS authorization, create a token, or authorize delivery. Category defaults also do not opt a user into push because every channel defaults off. The inert <code>PushNotificationRequest</code> carries notification/recipient identity and a semantic action, but deliberately excludes canonical title/body content.</p>
+<p>The current route chain is:</p>
+<div class="highlight"><pre><span></span><code>untrusted provider payload
+  -&gt; FirebaseNotificationRoutingSource
+  -&gt; NotificationAction
+  -&gt; NotificationRouter
+  -&gt; NotificationRoute
+  -&gt; notificationRouteAdapter
+  -&gt; Expo Router target
+</code></pre></div>
+<p><code>open_notifications</code> and <code>open_profile</code> currently target the Profile tab because that is where the notification list lives. <code>open_booking</code> and <code>open_tracking</code> target Tracking and may carry a bounded booking ID separately from the route path. A future tap handler must authenticate the user, load the canonical notification, verify recipient and booking participation, and only then navigate or select a booking. A payload action is a hint, never authorization.</p>
+<h2 id="native-push-activation-plan">Native push activation plan<a class="headerlink" href="#native-push-activation-plan" title="Permanent link">¶</a></h2>
+<h3 id="package-and-provider-strategy">Package and provider strategy<a class="headerlink" href="#package-and-provider-strategy" title="Permanent link">¶</a></h3>
+<p>Phase 13 uses <code>expo-notifications</code> as the native client adapter. It can obtain an <code>ExpoPushToken</code>; N3A uses Expo Push Service for its bounded server-side provider boundary while preserving provider-neutral contracts and the option to move to direct FCM/APNs later.</p>
+<p>Current controlled foundation:</p>
+<ul>
+<li>The SDK-compatible <code>expo-notifications</code> package and config plugin are present; <code>expo-constants</code> supplies an EAS project ID when configured.</li>
+<li>Background remote notifications are explicitly disabled in plugin configuration.</li>
+<li>Use a development build or signed EAS build. Expo Go is not an acceptance-test environment for remote push.</li>
+<li>Keep the client <code>FirebasePushNotificationGateway</code> deferred; N3A has no client-callable delivery endpoint.</li>
+<li>Do not add local notifications, background notification tasks, exact alarms, rich media, or interactive actions in the first activation.</li>
+</ul>
+<h3 id="android-notification-channels">Android notification channels<a class="headerlink" href="#android-notification-channels" title="Permanent link">¶</a></h3>
+<p>Create stable, versioned channels before requesting permission or obtaining a token on Android 13+:</p>
+<table>
+<thead>
+<tr>
+<th>Channel ID</th>
+<th>Intended content</th>
+<th>Initial behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>karri_activity_v1</code></td>
+<td>Booking, custody, delivery, review, and trust/profile updates</td>
+<td>Default importance, default sound, no vibration customization</td>
+</tr>
+<tr>
+<td><code>karri_announcements_v1</code></td>
+<td>General platform announcements</td>
+<td>Low importance, no custom sound</td>
+</tr>
+</tbody>
+</table>
+<p>Channel IDs are an OS-visible contract. Do not delete and recreate a channel to override a user's settings. Introduce a new versioned ID only for a reviewed semantic change. Application category preferences and Android channel settings are independent gates; a server must enforce the former, while Android enforces the latter.</p>
+<h3 id="ios-permission-copy-and-timing">iOS permission copy and timing<a class="headerlink" href="#ios-permission-copy-and-timing" title="Permanent link">¶</a></h3>
+<p>Ask only after an authenticated user explicitly selects <strong>Enable device notifications</strong> from the Profile notification settings. Saving category preferences must not trigger the prompt. Show one in-app explanation first:</p>
+<blockquote>
+<p><strong>Stay updated on your Karri activity</strong></p>
+<p>Get a brief alert when a booking, custody, delivery, review, or trust update needs your attention. Details stay inside Karri. You can change this anytime.</p>
+</blockquote>
+<p>Offer <strong>Not now</strong> and <strong>Continue</strong>. Call the OS request only after <strong>Continue</strong>. Do not prompt during onboarding, sign-in, app launch, or a booking transition. If authorization is denied, preserve the in-app experience, explain how to use system Settings, and do not repeatedly ask. Treat iOS <code>authorized</code>, <code>provisional</code>, <code>ephemeral</code>, <code>denied</code>, and <code>not determined</code> as distinct states rather than reducing them to a boolean.</p>
+<h3 id="current-eas-and-native-credential-state">Current EAS and native credential state<a class="headerlink" href="#current-eas-and-native-credential-state" title="Permanent link">¶</a></h3>
+<p>The runtime implementation and native build profiles already exist:</p>
+<ul>
+<li>EAS project ID <code>b73a2031-8f5f-4f59-8222-e999d115b6cb</code> is configured.</li>
+<li>Stable Android package and iOS bundle identifiers are both <code>com.karrimobile.app</code>.</li>
+<li>Development, preview, and production build profiles, channels, and branches exist.</li>
+<li>Development contains the native Firebase/App Check variables <code>FIREBASE_APP_CHECK_DEBUG_TOKEN</code>, <code>GOOGLE_SERVICE_INFO_PLIST</code>, and <code>GOOGLE_SERVICES_JSON</code>.</li>
+<li>Preview and production have no project-scoped EAS variables. Do not claim that matching preview or production Firebase projects exist.</li>
+<li>Each environment still requires separately verified, matching Firebase/native configuration and credential ownership before use.</li>
+<li>Rebuild the native application after every notification config-plugin or native credential change; an over-the-air update cannot add missing native notification capability.</li>
+<li>Registered test devices, Apple Developer access, credential ownership, expiry/revocation procedures, and an emergency send-disable procedure remain release prerequisites.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Required material</th>
+<th>Storage rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Android</td>
+<td>Firebase Android app, matching <code>google-services.json</code>, enabled FCM HTTP v1 API, and a least-privilege FCM v1 service-account key uploaded to EAS</td>
+<td><code>google-services.json</code> is reviewed public project metadata; the service-account JSON is a secret and must never be committed or bundled</td>
+</tr>
+<tr>
+<td>iOS</td>
+<td>Registered bundle ID, push capability, provisioning profile, and APNs authentication key managed through EAS credentials</td>
+<td>APNs private key material stays in the credential manager, never in the repository or app bundle</td>
+</tr>
+<tr>
+<td>Server</td>
+<td>Expo Push Service access token if enhanced push security is enabled</td>
+<td>Secret manager/runtime environment only; never <code>EXPO_PUBLIC_*</code>, Firestore, logs, or mobile configuration</td>
+</tr>
+</tbody>
+</table>
+<h3 id="token-registration-flow">Token registration flow<a class="headerlink" href="#token-registration-flow" title="Permanent link">¶</a></h3>
+<p>The current explicit Profile registration flow is explicit and authenticated:</p>
+<ol>
+<li>User selects <strong>Enable device notifications</strong>.</li>
+<li>Presentation reads current OS authorization; if needed, it shows the approved explanation and requests permission once.</li>
+<li>Android creates the reviewed channels before token acquisition.</li>
+<li>The native adapter obtains the Expo push token using the configured EAS project ID.</li>
+<li>The adapter associates it with a random app-installation ID, platform (<code>android</code> | <code>ios</code>), and provider (<code>expo</code>). The callable payload contains only <code>deviceId</code>, <code>platform</code>, <code>provider</code>, <code>token</code>, and <code>registeredAt</code>; <code>userId</code> and <code>registrationVersion</code> are server-owned. Do not use a hardware identifier or claim local metadata is persisted on the server.</li>
+<li><code>PushRegistrationService</code> validates ownership/token shape and passes it to the token repository port.</li>
+<li>The mobile repository (implemented in N2) forwards registration to the trusted persistence callable (<code>registerPushToken</code>).</li>
+<li>The server derives <code>userId</code> from verified authentication, validates the installation device ID, platform, Expo provider, token shape, and canonical registration timestamp, and maintains <code>registrationVersion</code> transactionally. A new registration starts at <code>1</code>; the same active token preserves the version; token replacement or inactive reactivation increments it; a missing legacy field upgrades to <code>1</code>; malformed or exhausted state fails closed.</li>
+<li>Only after server confirmation may the UI show the device as registered. Permission granted without confirmed registration is a recoverable incomplete state.</li>
+</ol>
+<p>Clients must not write token documents directly or provide a registration generation. The backend persistence layer is implemented in source through authenticated callables (<code>registerPushToken</code> and <code>unregisterPushToken</code>), and client-side repository wiring is implemented in N2. When those callables are deployed to a matching environment, Android/iOS registration can persist a token after successful permission and Expo token acquisition. The current development inventory lacks those callables and <code>onBookingAccepted</code>, so live development registration and trusted delivery cannot be treated as available. N3A/N3B source may read only active, bound registrations with a valid server-owned generation after policy gates pass. Queues, receipt polling, retries, monitoring, broad cleanup, and production enablement remain deferred. No permission, token, or delivery behavior should be described as production-complete. App Check remains disabled as an explicit regression-preserved boundary for this package.</p>
+<p>N4A exposes the explicit current-installation removal described above. It does not require the Push preference or notification permission, request permission, create Android channels, obtain a token, generate a new installation ID, remove the retained installation ID, or sign the user out. N4B reuses that cleanup during sign-out with bounded, best-effort semantics. Startup, foreground, preference-disable, permission-revocation, and token-change cleanup remain deferred. Push notifications are not production-complete.</p>
+<h3 id="future-unimplemented-rotation-and-broader-token-cleanup">Future / unimplemented: Rotation and broader token cleanup<a class="headerlink" href="#future-unimplemented-rotation-and-broader-token-cleanup" title="Permanent link">¶</a></h3>
+<ul>
+<li>Proposed future behavior: Subscribe to the native token-change signal while the authenticated app is running. Upsert the new token for the same installation and deactivate the old token atomically.</li>
+<li>Proposed future behavior: Reconcile the current token on foreground/startup after permission is granted and refresh server state. Do not fetch or upload a token when permission is absent or push intent is off.</li>
+<li>Implemented in N4B: On sign-out, attempt the authenticated unregister path before local session teardown, continue after failure/timeout, and fence stale operations. No durable retry tombstone exists.</li>
+<li>Implemented in N3A/N3B for Expo only: an immediate <code>DeviceNotRegistered</code> ticket deactivates the registration and deletes its token only when the transaction still sees the same active token and <code>registrationVersion</code> selected for the send. A newer generation is preserved. Equivalent receipt polling and FCM/APNs handling remain future work.</li>
+<li>Proposed future behavior: A reinstalled app or changed token creates/reconciles an installation registration; it never silently inherits another user's binding.</li>
+</ul>
+<h3 id="preferences-and-quiet-hours">Preferences and quiet hours<a class="headerlink" href="#preferences-and-quiet-hours" title="Permanent link">¶</a></h3>
+<p>Delivery requires all of the following at send time:</p>
+<ul>
+<li>an active, non-expired device registration for the recipient;</li>
+<li>push channel enabled in the latest preference record;</li>
+<li>the versioned event-to-category mapping enabled;</li>
+<li>a valid IANA time zone and a time outside quiet hours, unless a separately approved critical-event policy applies;</li>
+<li>a deliverable canonical notification and an authorized recipient.</li>
+</ul>
+<p>Missing, malformed, incomplete, mismatched, or unreadable preferences fail closed for push. Before sending, N3A requires the complete stored preference schema: the exact top-level fields, all three boolean channel fields with email/SMS disabled, all seven boolean category fields, matching ownership, Firestore creation/update timestamps, and either null or the exact quiet-hours shape. Partial records and records with unknown fields suppress push without backend repair. There is no critical-event exception today. N3A retains the canonical in-app record and permanently suppresses the optional push when the current instant is inside quiet hours; it does not schedule or queue a deferred send.</p>
+<h3 id="deep-link-authorization">Deep-link authorization<a class="headerlink" href="#deep-link-authorization" title="Permanent link">¶</a></h3>
+<p>The first payload shape should contain only a schema version, canonical notification ID, and a coarse action such as <code>open_notifications</code>. Do not trust a payload-supplied user ID, booking ID, role, status, URL, or route.</p>
+<p>On tap, the app must:</p>
+<ol>
+<li>require an authenticated session;</li>
+<li>read <code>notifications/{notificationId}</code> through the recipient-scoped path;</li>
+<li>confirm the record belongs to the signed-in user;</li>
+<li>resolve any related booking/review from canonical data and re-check participant authorization;</li>
+<li>map the resulting semantic action through <code>NotificationRouter</code> and <code>notificationRouteAdapter</code>;</li>
+<li>fall back to the Profile notification list if the record is missing, stale, malformed, or no longer authorized.</li>
+</ol>
+<h3 id="test-checklist">Test checklist<a class="headerlink" href="#test-checklist" title="Permanent link">¶</a></h3>
+<p>The executable payload contract, typed examples, expected routes/failures, and manual device procedure are maintained in <a href="../../engineering/push-notification-testing/">Controlled Push Notification Testing</a>.</p>
+<p>Automated checks before activation:</p>
+<ul>
+<li>Unit tests for permission-state orchestration, token validation/rotation, action parsing, category mapping, quiet-hour boundaries (same-day, overnight, DST, invalid zone), and route fallback.</li>
+<li>Emulator tests proving clients cannot read/write another user's preferences, registrations, delivery effects, or notifications.</li>
+<li>N3A/N3B Function tests cover duplicate trigger invocation, preference and quiet-hour suppression, bounded token selection, registration-version lifecycle, legacy upgrade, malformed-version failure, delivery-effect generation binding, generation-safe invalid-token cleanup, and immediate transient/permanent provider outcomes. Mobile tests cover N4B bounded sign-out cleanup, auth serialization, expected-user binding, and stale-operation prevention. Queued preference changes, retries, receipts, and physical-device sign-out behavior require future evidence.</li>
+<li>Contract tests prove no raw token or private notification content enters logs, events, delivery effects, IDs, responses, or analytics.</li>
+</ul>
+<p>Device matrix before rollout:</p>
+<ul>
+<li>Android emulator with Google Play services plus at least one real Android device; test fresh allow, deny, disabled OS channel, killed app, background, foreground, token rotation/reinstall, and both channel IDs.</li>
+<li>iOS simulator where supported plus at least one registered real iPhone; test <code>not determined</code>, allow, deny, provisional if intentionally used, system-settings changes, killed app, background, foreground, and reinstall.</li>
+<li>Development, preview, and production credentials tested only against their matching Firebase/EAS project.</li>
+<li>Tap tests for signed out, wrong user, removed booking access, deleted notification, malformed payload, and valid authorized notification.</li>
+<li>Receipt tests that distinguish provider acceptance from device/user receipt and deactivate confirmed invalid registrations.</li>
+</ul>
+<h3 id="rollout-and-rollback">Rollout and rollback<a class="headerlink" href="#rollout-and-rollback" title="Permanent link">¶</a></h3>
+<ol>
+<li>Land server data/rules and delivery code with sending disabled.</li>
+<li>Ship native registration UI behind a remote kill switch to internal development builds.</li>
+<li>Enable token registration for staff, then preview testers, without enabling sends.</li>
+<li>Enable one low-volume event category and inspect registration, suppression, receipt, retry, and invalid-token metrics.</li>
+<li>Expand by category and cohort; keep announcements disabled until separately reviewed.</li>
+<li>Roll back by disabling server dispatch and client registration independently. In-app records continue working throughout.</li>
+</ol>
+<h2 id="trusted-server-side-delivery">Trusted server-side delivery<a class="headerlink" href="#trusted-server-side-delivery" title="Permanent link">¶</a></h2>
+<p>N3A/N3B implement the bounded <code>booking.accepted</code> subset described above: canonical creation is the event-level claim, matching replays stop before optional delivery policy, quiet hours and other suppression decisions are terminal, and deterministic device effects permit at most one provider attempt. Each effect binds to the selected server-owned <code>registrationVersion</code>, and immediate permanent-token cleanup cannot deactivate a newer generation. There are no retries, receipt polling, queues, delayed sends, historical catch-up, or workers. A timeout/abort or Node/undici network failure while reading the Expo response body is recorded as a safe temporary outcome; invalid or structurally malformed JSON is recorded as a permanent malformed-response outcome. These classifications do not add retry behavior. The remaining sections describe the broader future target and must not be read as current behavior.</p>
+<h3 id="delivery-flow">Delivery flow<a class="headerlink" href="#delivery-flow" title="Permanent link">¶</a></h3>
+<pre class="mermaid"><code>flowchart TD
+  Event["Booking pending to accepted update"] --&gt; Validate["Validate IDs, immutable core, and history append"]
+  Validate --&gt; Canonical["Canonical sender notification"]
+  Canonical --&gt; Switch["Default-off delivery kill switch"]
+  Switch --&gt; Policy["Preferences and quiet-hours evaluation"]
+  Policy --&gt; Registrations["Active bound Expo device lookup"]
+  Registrations --&gt; Claim["Deterministic per-device claim"]
+  Claim --&gt; Provider["One immediate Expo ticket attempt"]
+  Provider --&gt; Result["Persist classified ticket outcome"]
+  Result --&gt; Invalid["Deactivate only DeviceNotRegistered"]
+</code></pre>
+<p>Client-side push delivery is not trusted because a modified client could choose another recipient, bypass preferences/quiet hours, expose token values, alter templates, replay sends, or use bundled credentials. Firestore rules cannot safely grant a mobile client provider credentials or cross-user token lookup. The mobile <code>PushNotificationService</code> therefore remains an inert contract/composition seam; a real delivery gateway belongs in trusted server code.</p>
+<p>The in-app record remains canonical because push is best-effort, may be delayed, may be suppressed by user/OS policy, and may never reach a device. Product UI, unread state, authorization, and audit/support behavior read the canonical record, not a provider receipt.</p>
+<h3 id="idempotency-and-effect-ids">Idempotency and effect IDs<a class="headerlink" href="#idempotency-and-effect-ids" title="Permanent link">¶</a></h3>
+<p>Assume at-least-once event and worker execution:</p>
+<ul>
+<li>N3A derives its canonical ID from <code>booking.accepted:v1:{bookingId}:{senderId}</code> and its device effect ID from <code>push:v1:{notificationId}:{deviceId}</code>, both through SHA-256 with non-secret prefixes.</li>
+<li>Give each durable domain event an immutable <code>eventId</code> and schema version.</li>
+<li>Derive <code>notificationEffectId</code> from a digest of <code>notification:v1:{eventId}:{recipientId}</code>. Preserve the existing deterministic notification IDs during migration or map them explicitly; do not silently duplicate current records.</li>
+<li>Derive one <code>deliveryEffectId</code> from a digest of <code>push:v1:{notificationId}:{registrationId}:{projectionVersion}</code>.</li>
+<li>Never place a raw token, title/body, email, phone number, or unrestricted route in an ID.</li>
+<li>Create/read the notification and delivery effect transactionally. A terminal delivery effect is a no-op on replay; a retryable effect resumes from its persisted attempt state.</li>
+<li>Use <code>notificationId</code> as the provider collapse/deduplication hint where supported. Exactly-once device display cannot be promised if a worker crashes after provider acceptance but before persisting the result.</li>
+</ul>
+<h3 id="current-and-proposed-data-boundaries">Current and proposed data boundaries<a class="headerlink" href="#current-and-proposed-data-boundaries" title="Permanent link">¶</a></h3>
+<p>N3A/N3B use the existing <code>notifications</code>, <code>notificationPreferences</code>, and <code>pushTokenRegistrations/{userId}/devices</code> collections plus server-only <code>notificationDeliveries</code>. <code>domainEvents</code> and the broader registration/delivery schema below remain proposals.</p>
+<table>
+<thead>
+<tr>
+<th>Collection</th>
+<th>Purpose</th>
+<th>Client access</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>domainEvents/{eventId}</code></td>
+<td>Durable, versioned completed facts written with trusted business transitions</td>
+<td>Deny direct mobile read/write unless a later projection has an explicit need</td>
+</tr>
+<tr>
+<td><code>notifications/{notificationEffectId}</code></td>
+<td>Existing canonical user-visible notification projection; N3A server-materializes <code>booking.accepted</code></td>
+<td>Recipient read and constrained read-state update; client creation of <code>booking.accepted</code> is denied</td>
+</tr>
+<tr>
+<td><code>pushTokenRegistrations/{userId}/devices/{deviceId}</code></td>
+<td>Installation binding, provider, raw sender-required token, platform, active/revoked state, and server-owned <code>registrationVersion</code></td>
+<td>No direct read/write; authenticated server endpoints return only non-secret status and never accept the generation from clients</td>
+</tr>
+<tr>
+<td><code>notificationDeliveries/{deliveryEffectId}</code></td>
+<td>Deterministic claim and immediate outcome bound to <code>registrationId</code> plus <code>registrationVersion</code>; future versions may add attempts, scheduling, and receipts</td>
+<td>No direct mobile access; raw token values are forbidden</td>
+</tr>
+</tbody>
+</table>
+<p>N3A/N3B store only safe claim/outcome metadata and rely on the existing deny-by-default catch-all rule. A future receipt reconciler must compare the effect's captured <code>registrationVersion</code> with the current registration before deactivation or token deletion. A future retry design may add terminal <code>dead_letter</code> state and indexes only after separate review and Emulator Suite tests.</p>
+<h3 id="future-policy-expansion-beyond-n3a">Future policy expansion beyond N3A<a class="headerlink" href="#future-policy-expansion-beyond-n3a" title="Permanent link">¶</a></h3>
+<ul>
+<li>Maintain one versioned map from domain event type to notification category, template, channel ID, default priority, and maximum delivery age.</li>
+<li>Load preferences after the canonical record exists and again immediately before provider send. Missing/invalid records, push disabled, or category disabled produce a terminal <code>suppressed_preference</code> effect without token lookup.</li>
+<li>Interpret quiet hours using the stored IANA zone and DST-aware time APIs. Start is inclusive and end is exclusive; an end earlier than start is an overnight interval.</li>
+<li>A future queued design may produce <code>deferred_quiet_hours</code> with <code>nextAttemptAt</code>; N3A instead suppresses permanently without creating a delivery effect.</li>
+<li>No current category bypasses quiet hours. Any future safety exception requires a product, legal/privacy, and abuse review plus explicit schema versioning.</li>
+</ul>
+<h3 id="token-privacy-and-retention">Token privacy and retention<a class="headerlink" href="#token-privacy-and-retention" title="Permanent link">¶</a></h3>
+<ul>
+<li>Treat tokens as authentication-adjacent secrets. Restrict them to the registration and dispatch service accounts, redact them from logs/errors/traces, and never copy them into domain events, notification records, delivery IDs, analytics, or support exports.</li>
+<li>Store a keyed hash for equality/deduplication and the recoverable token only where the sender requires it. Use managed encryption at rest and evaluate application-level encryption/KMS before production.</li>
+<li>Scope each registration to one environment, app identifier, provider, installation, and current user binding. Reject cross-project tokens.</li>
+<li>Immediately deactivate on sign-out, permission revocation reported by the client, account deletion, or confirmed permanent provider response.</li>
+<li>Proposed baseline: require a successful registration heartbeat within 30 days; stop sending to stale registrations, remove recoverable token values after 30 additional inactive days, and keep only a non-secret tombstone long enough to prevent replay. Final periods require the data-retention/privacy review.</li>
+<li>Retain successful delivery metadata for 30 days and failure/dead-letter metadata for 90 days unless incident/legal requirements approve a different period. Store outcome codes, not message bodies.</li>
+</ul>
+<h3 id="delivery-results-retry-and-cleanup">Delivery results, retry, and cleanup<a class="headerlink" href="#delivery-results-retry-and-cleanup" title="Permanent link">¶</a></h3>
+<p>Use explicit states such as <code>queued</code>, <code>suppressed_preference</code>, <code>deferred_quiet_hours</code>, <code>sending</code>, <code>provider_accepted</code>, <code>retry_wait</code>, <code>invalid_registration</code>, <code>permanent_failure</code>, and <code>dead_letter</code>. Provider acceptance means only that Expo/FCM/APNs accepted the message, not that a user saw it.</p>
+<ul>
+<li>Retry only transient network failures, timeouts, HTTP 429, HTTP 5xx, and provider rate limits.</li>
+<li>Use exponential backoff with full jitter, for example 1, 2, 4, 8, 16, 32, then 60 minutes, capped at eight attempts and the event's 24-hour delivery age.</li>
+<li>Do not blindly retry invalid credentials, malformed/oversized payloads, project/sender mismatch, unauthorized requests, or deterministic policy/schema errors. Mark them permanent and alert.</li>
+<li>Deactivate confirmed unregistered tokens. When using Expo Push Service, persist ticket IDs and reconcile receipts; a successful ticket is not final delivery status.</li>
+<li>Keep retries idempotent. Built-in Cloud Function retry may be used only for transient failures after duplicate invocation has been pressure-tested; quiet-hour scheduling and bounded retry state must be persisted rather than simulated by throwing indefinitely.</li>
+<li>Move exhausted transient failures to <code>dead_letter</code>, increment a monitored counter, and provide an operator-safe replay that revalidates preference, quiet hours, token, event age, and idempotency first.</li>
+</ul>
+<h3 id="payload-privacy">Payload privacy<a class="headerlink" href="#payload-privacy" title="Permanent link">¶</a></h3>
+<p>The initial visible alert should be generic, for example <strong>Karri update</strong> / <strong>Open Karri to view your latest activity</strong>. Data should contain only <code>schemaVersion</code>, <code>notificationId</code>, and an allowlisted coarse action. Exclude names, package descriptions, routes/corridors, contact details, prices, trust details, evidence URLs, free-form notes, user IDs, token values, and authoritative booking state.</p>
+<p>The app fetches the recipient-scoped canonical record after open. Notification previews on a locked device therefore reveal no transaction detail. Payloads remain below provider limits and are rejected against an allowlisted schema before send and after receipt.</p>
+<h3 id="future-cloud-function-boundaries">Future Cloud Function boundaries<a class="headerlink" href="#future-cloud-function-boundaries" title="Permanent link">¶</a></h3>
+<p>The following named functions are future proposals, not current deployed functions:</p>
+<ul>
+<li><code>materializeNotification</code>: consume a trusted durable event, validate schema, derive recipient/template/effect ID, and create the canonical notification once.</li>
+<li><code>dispatchNotification</code>: react to a new canonical record or queued delivery command, evaluate policy, load active registrations, create delivery effects, and send minimal payloads.</li>
+<li><code>reconcilePushReceipts</code>: collect provider receipts, mark accepted/permanent/retry outcomes, and deactivate invalid registrations.</li>
+<li><code>prunePushRegistrations</code>: expire stale/inactive registrations and enforce token retention.</li>
+<li><code>resumeDeferredDeliveries</code>: select due quiet-hour/retry effects, re-evaluate every gate, and dispatch within rate limits.</li>
+</ul>
+<p>Co-locate functions with Firestore where supported, use least-privilege service accounts, validate App Check/authentication on callable registration endpoints, and keep provider secrets in managed secret storage. Materialization failure must alert because it affects the canonical record; push dispatch failure must never roll back or delete that record.</p>
+<h3 id="monitoring-and-launch-gates">Monitoring and launch gates<a class="headerlink" href="#monitoring-and-launch-gates" title="Permanent link">¶</a></h3>
+<p>Monitor counts and age by event category and environment: canonical materialization lag/failures, active/stale registrations, preference suppression, quiet-hour deferral, provider acceptance, missing receipts, retry attempts, invalid registrations, permanent failures, and dead letters. Logs use effect IDs and outcome codes only.</p>
+<p>Production send remains blocked until:</p>
+<ul>
+<li>rules and Function tests cover allow/deny, duplicate, retry, and cleanup cases;</li>
+<li>credential rotation and emergency send-disable are rehearsed;</li>
+<li>token/payload logging is proven redacted;</li>
+<li>real-device permission, background/terminated delivery, and authorization tests pass;</li>
+<li>dashboards/alerts and an operator runbook exist;</li>
+<li>privacy, retention, copy, and rollout owners approve activation.</li>
+</ul>
+<p>The evidence-bearing production decision is tracked in <a href="../../operations/push-production-readiness/">Production Push Readiness</a>. Its current status is No-Go.</p>
+<h2 id="official-implementation-references">Official implementation references<a class="headerlink" href="#official-implementation-references" title="Permanent link">¶</a></h2>
+<ul>
+<li><a href="https://docs.expo.dev/push-notifications/push-notifications-setup/">Expo push notification setup</a></li>
+<li><a href="https://docs.expo.dev/versions/v56.0.0/sdk/notifications/">Expo Notifications SDK 56 reference</a></li>
+<li><a href="https://docs.expo.dev/push-notifications/fcm-credentials/">Expo FCM v1 credential setup</a></li>
+<li><a href="https://docs.expo.dev/push-notifications/sending-notifications/">Expo Push Service delivery, receipts, and errors</a></li>
+<li><a href="https://firebase.google.com/docs/cloud-messaging/manage-tokens">Firebase registration lifecycle guidance</a></li>
+<li><a href="https://firebase.google.com/docs/functions/firestore-events">Cloud Firestore function triggers</a></li>
+<li><a href="https://firebase.google.com/docs/functions/retries">Cloud Functions retry guidance</a></li>
+</ul>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "search.suggest", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+<script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+<script type="module">import mermaid from "https://unpkg.com/mermaid@10.4.0/dist/mermaid.esm.min.mjs";
+window.mermaidConfig = {default: {
+    startOnLoad: false
+}};</script></body>
+</html>
