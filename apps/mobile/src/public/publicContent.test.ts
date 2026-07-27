@@ -1,4 +1,13 @@
 import { describe, expect, it } from "vitest";
+import {
+  FAQ_PREVIEW,
+  HOW_KARRI_WORKS,
+  KARRI_MOBILE_DESCRIPTION,
+  KARRI_MOBILE_PATH,
+  KARRI_MOBILE_REQUIRED_LINKS,
+  KARRI_MOBILE_TITLE,
+  SAFETY_REMINDERS,
+} from "./karriMobileContent";
 import { publicPages, publicRouteLabels } from "./publicContent";
 
 const requestedRoutes = [
@@ -47,5 +56,30 @@ describe("public website content", () => {
     expect(copy).toContain("audit");
     expect(page.related).toContain("/privacy-policy");
     expect(page.related).toContain("/support");
+  });
+
+  it("defines the Karri Mobile marketing route and required MVP guidance", () => {
+    expect(KARRI_MOBILE_PATH).toBe("/karri-mobile");
+    expect(KARRI_MOBILE_TITLE).toBe(
+      "Karri Mobile | Community Shipping for Senders and Travelers",
+    );
+    expect(KARRI_MOBILE_DESCRIPTION).toContain("custody expectations");
+    expect(HOW_KARRI_WORKS).toHaveLength(5);
+    expect(SAFETY_REMINDERS.join(" ")).toContain("customs requirements");
+    expect(FAQ_PREVIEW.find((item) => item.question === "Does Karri process payments?")?.answer)
+      .toBe("No. Karri does not currently process payments.");
+    expect(FAQ_PREVIEW.find((item) => item.question === "Does Karri guarantee delivery?")?.answer)
+      .toContain("does not guarantee delivery");
+    expect(KARRI_MOBILE_REQUIRED_LINKS).toEqual([
+      "/about",
+      "/safety",
+      "/trust-center",
+      "/faq",
+      "/support",
+      "/contact",
+      "/privacy-policy",
+      "/terms-of-service",
+      "/delete-account",
+    ]);
   });
 });

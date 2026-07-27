@@ -19,6 +19,12 @@ const footerGroups: { title: string; links: { href: PublicRoute; label: string }
   { title: "Company", links: [{ href: "/careers", label: "Careers" }, { href: "/press", label: "Press" }] },
 ];
 
+const marketingFooterGroups: typeof footerGroups = [
+  { title: "Explore", links: [{ href: "/about", label: "About" }, { href: "/safety", label: "Safety" }, { href: "/trust-center", label: "Trust Center" }, { href: "/faq", label: "FAQ" }] },
+  { title: "Get help", links: [{ href: "/support", label: "Support" }, { href: "/contact", label: "Contact" }] },
+  { title: "Legal", links: [{ href: "/privacy-policy", label: "Privacy Policy" }, { href: "/terms-of-service", label: "Terms of Service" }, { href: "/delete-account", label: "Delete Account" }] },
+];
+
 function PublicLink({ href, children, style }: { href: PublicRoute; children: ReactNode; style?: object }) {
   return (
     <Link accessibilityRole="link" href={href as never} style={style}>
@@ -27,16 +33,16 @@ function PublicLink({ href, children, style }: { href: PublicRoute; children: Re
   );
 }
 
-export function PageMetadata({ title, description, path }: Pick<PublicPageContent, "title" | "description" | "path">) {
+export function PageMetadata({ title, description, path, fullTitle }: Pick<PublicPageContent, "title" | "description"> & { path: string; fullTitle?: string }) {
   const canonical = `${PUBLIC_SITE_URL}${path === "/" ? "" : path}`;
-  const fullTitle = title === "Karri" ? "Karri — Community shipping with clarity" : `${title} | Karri`;
+  const resolvedTitle = fullTitle ?? (title === "Karri" ? "Karri — Community shipping with clarity" : `${title} | Karri`);
   return (
     <Head>
-      <title>{fullTitle}</title>
+      <title>{resolvedTitle}</title>
       <meta name="description" content={description} />
       <meta property="og:type" content="website" />
       <meta property="og:site_name" content="Karri" />
-      <meta property="og:title" content={fullTitle} />
+      <meta property="og:title" content={resolvedTitle} />
       <meta property="og:description" content={description} />
       <meta property="og:url" content={canonical} />
       <link rel="canonical" href={canonical} />
@@ -44,7 +50,7 @@ export function PageMetadata({ title, description, path }: Pick<PublicPageConten
   );
 }
 
-export function PublicHeader() {
+export function PublicHeader({ marketing = false }: { marketing?: boolean }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const { width } = useWindowDimensions();
@@ -52,11 +58,11 @@ export function PublicHeader() {
   return (
     <View role="banner" style={styles.header}>
       <View style={styles.headerInner}>
-        <Link asChild href="/">
+        <Link asChild href={marketing ? "/karri-mobile" : "/"}>
           <Pressable accessibilityRole="link" style={styles.brandLink}>
           <View style={styles.brandRow}>
-            <Image accessibilityLabel="Karri home" source={require("../../assets/karri-logo.jpeg")} style={styles.logo} />
-            <Text style={styles.brandText}>Karri</Text>
+            <Image accessibilityLabel={marketing ? "Karri Mobile home" : "Karri home"} source={require("../../assets/karri-logo.jpeg")} style={styles.logo} />
+            <Text style={styles.brandText}>{marketing ? "Karri Mobile" : "Karri"}</Text>
           </View>
           </Pressable>
         </Link>
@@ -64,6 +70,7 @@ export function PublicHeader() {
           {primaryNavigation.map((item) => (
             <PublicLink href={item.href} key={item.href} style={[styles.navLink, pathname === item.href && styles.navLinkActive]}>{item.label}</PublicLink>
           ))}
+          {marketing ? <Link accessibilityRole="link" href="/karri-mobile#how-it-works" style={styles.headerCta}>Learn how Karri works</Link> : null}
         </View>
         <Pressable
           accessibilityRole="button"
@@ -80,13 +87,15 @@ export function PublicHeader() {
           {primaryNavigation.map((item) => (
             <PublicLink href={item.href} key={item.href} style={[styles.mobileNavLink, pathname === item.href && styles.mobileNavLinkActive]}>{item.label}</PublicLink>
           ))}
+          {marketing ? <Link accessibilityRole="link" href="/karri-mobile#how-it-works" style={styles.mobileHeaderCta}>Learn how Karri works</Link> : null}
         </View>
       ) : null}
     </View>
   );
 }
 
-export function PublicFooter() {
+export function PublicFooter({ marketing = false }: { marketing?: boolean }) {
+  const groups = marketing ? marketingFooterGroups : footerGroups;
   return (
     <View role="contentinfo" style={styles.footer}>
       <View style={styles.footerInner}>
@@ -95,7 +104,7 @@ export function PublicFooter() {
           <Text style={styles.footerDescription}>Trusted community shipping between travelers and senders.</Text>
         </View>
         <View style={styles.footerLinks}>
-          {footerGroups.map((group) => (
+          {groups.map((group) => (
             <View key={group.title} style={styles.footerGroup}>
               <Text accessibilityRole="header" aria-level={2} style={styles.footerHeading}>{group.title}</Text>
               {group.links.map((item) => <PublicLink href={item.href} key={item.href} style={styles.footerLink}>{item.label}</PublicLink>)}
@@ -104,20 +113,20 @@ export function PublicFooter() {
         </View>
       </View>
       <View style={styles.copyrightRow}>
-        <Text style={styles.copyright}>© 2026 M7SK Technologies</Text>
+        <Text style={styles.copyright}>{marketing ? "© 2026 Mohammed Abda" : "© 2026 M7SK Technologies"}</Text>
         <Text style={styles.copyright}>Community-first. Built with care.</Text>
       </View>
     </View>
   );
 }
 
-export function PublicPageLayout({ children }: { children: ReactNode }) {
+export function PublicPageLayout({ children, marketing = false }: { children: ReactNode; marketing?: boolean }) {
   return (
     <View style={styles.pageShell}>
-      <PublicHeader />
+      <PublicHeader marketing={marketing} />
       <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
         <View role="main" style={styles.main}>{children}</View>
-        <PublicFooter />
+        <PublicFooter marketing={marketing} />
       </ScrollView>
     </View>
   );
@@ -256,12 +265,14 @@ const styles = StyleSheet.create({
   desktopNav: { alignItems: "center", flexDirection: "row", gap: spacing.xs },
   navLink: { borderRadius: radii.pill, color: colors.textSecondary, fontSize: 15, fontWeight: "700", paddingHorizontal: spacing.md, paddingVertical: spacing.sm, textDecorationLine: "none" },
   navLinkActive: { backgroundColor: colors.primarySoft, color: colors.primaryDark },
+  headerCta: { backgroundColor: colors.primary, borderRadius: radii.md, color: colors.white, fontSize: 14, fontWeight: "800", marginLeft: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, textDecorationLine: "none" },
   menuButton: { alignItems: "center", borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, height: 44, justifyContent: "center", width: 44 },
   hidden: { display: "none" },
   pressed: { opacity: 0.7 },
   mobileNav: { borderTopColor: colors.border, borderTopWidth: 1, gap: spacing.xs, padding: spacing.md },
   mobileNavLink: { borderRadius: radii.md, color: colors.text, fontSize: 16, fontWeight: "700", padding: spacing.md, textDecorationLine: "none" },
   mobileNavLinkActive: { backgroundColor: colors.primarySoft, color: colors.primaryDark },
+  mobileHeaderCta: { backgroundColor: colors.primary, borderRadius: radii.md, color: colors.white, fontSize: 16, fontWeight: "800", marginTop: spacing.xs, padding: spacing.md, textAlign: "center", textDecorationLine: "none" },
   main: { flexGrow: 1 },
   contentContainer: { alignSelf: "center", maxWidth: 1180, paddingBottom: spacing.huge, paddingHorizontal: spacing.lg, width: "100%" },
   breadcrumbs: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, paddingTop: spacing.xl },
