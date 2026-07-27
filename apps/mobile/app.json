@@ -9,7 +9,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.karrimobile.app",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.karrimobile.app",
