@@ -1,5 +1,7 @@
 import { ConfigContext, ExpoConfig } from "expo/config";
 
+const { validateProductionFirebaseIdentity } = require("./src/infrastructure/firebase/productionFirebaseIdentity.js");
+
 declare const require: any;
 declare const process: any;
 declare const __dirname: string;
@@ -29,6 +31,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
   if (
     isProductionEasBuild &&
+    easBuildPlatform !== "android" &&
+    easBuildPlatform !== "ios"
+  ) {
+    throw new Error(
+      "Production EAS builds require EAS_BUILD_PLATFORM to be android or ios.",
+    );
+  }
+
+  if (
+    isProductionEasBuild &&
     easBuildPlatform === "android" &&
     !googleServicesJsonEnv
   ) {
@@ -46,6 +58,35 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       "Production iOS builds require GOOGLE_SERVICE_INFO_PLIST.",
     );
   }
+
+  if (isProductionEasBuild) {
+    const platform = easBuildPlatform as "android" | "ios";
+    const nativeConfigPath =
+      platform === "android"
+        ? googleServicesJsonEnv
+        : googleServiceInfoPlistEnv;
+
+    if (!nativeConfigPath || !fs.existsSync(nativeConfigPath)) {
+      throw new Error(
+        `Production ${platform} Firebase configuration file is unavailable.`,
+      );
+    }
+
+    validateProductionFirebaseIdentity({
+      platform,
+      nativeConfigText: fs.readFileSync(nativeConfigPath, "utf8"),
+      publicConfig: {
+        apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+        appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+        authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+        messagingSenderId:
+          process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+        projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+        storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      },
+    });
+  }
+
   const localGoogleServiceInfoPlist = path.join(
     projectRoot,
     "GoogleService-Info.plist",
