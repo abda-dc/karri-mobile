@@ -132,6 +132,7 @@ nav:
   - Operations:
       - Runbook: operations/runbook.md
       - Deployment: operations/deployment.md
+      - Admin Console Deployment: operations/admin-console-deployment.md
       - Rollback: operations/rollback.md
       - Incident Response: operations/incident-response.md
       - Backup and Restore: operations/backup-restore.md

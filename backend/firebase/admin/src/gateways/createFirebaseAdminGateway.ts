@@ -1,9 +1,10 @@
 import admin from "firebase-admin";
-import type { FirebaseAdminGateway } from "./FirebaseAdminGateway.js";
+import type { FirebaseAdminConsoleGateway } from "./FirebaseAdminGateway.js";
 
-export function createFirebaseAdminGateway(): FirebaseAdminGateway {
+export function createFirebaseAdminGateway(explicitProjectId?: string): FirebaseAdminConsoleGateway {
   if (admin.apps.length === 0) {
     const projectId =
+      explicitProjectId ||
       process.env.FIREBASE_PROJECT_ID ||
       process.env.GCLOUD_PROJECT ||
       process.env.GOOGLE_CLOUD_PROJECT ||
@@ -31,6 +32,17 @@ export function createFirebaseAdminGateway(): FirebaseAdminGateway {
       const userRecord = await admin.auth().getUser(uid);
       return {
         uid: userRecord.uid,
+        email: userRecord.email ?? null,
+        providerIds: userRecord.providerData.map((provider) => provider.providerId),
+        customClaims: userRecord.customClaims,
+      };
+    },
+    async getUserByEmail(email: string) {
+      const userRecord = await admin.auth().getUserByEmail(email);
+      return {
+        uid: userRecord.uid,
+        email: userRecord.email ?? null,
+        providerIds: userRecord.providerData.map((provider) => provider.providerId),
         customClaims: userRecord.customClaims,
       };
     },

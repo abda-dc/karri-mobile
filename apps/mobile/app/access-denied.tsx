@@ -1,4 +1,4 @@
-import { Redirect, router } from "expo-router";
+import { router } from "expo-router";
 import { useState, useRef } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Banner } from "../src/components/Banner";
@@ -6,12 +6,10 @@ import { Card } from "../src/components/Card";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
 import { SectionHeader } from "../src/components/SectionHeader";
-import { useAuthSession } from "../src/presentation/hooks/useAuthSession";
 import { mobileServices } from "../src/presentation/services/mobileServices";
 import { colors, spacing, typography } from "../src/theme/tokens";
 
 export default function AccessDeniedScreen() {
-  const { authorizationRole } = useAuthSession();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const signingOutRef = useRef(false);
@@ -43,7 +41,7 @@ export default function AccessDeniedScreen() {
 
       <Card variant="elevated">
         <Banner
-          message={`Your account role is currently: '${authorizationRole}'. Administrative operations and safety panels require higher security permissions.`}
+          message="This authenticated account does not have an approved administrator role."
           title="Insufficient Permissions"
           variant="error"
         />
@@ -60,7 +58,7 @@ export default function AccessDeniedScreen() {
 
         <View style={styles.details}>
           <Text style={styles.detailText}>
-            If you believe this is an error, please ask your systems administrator or operator to update your account claims using the Firebase Admin CLI.
+            If you believe this is an error, contact an authorized Karri owner. Sign out before trying another account.
           </Text>
         </View>
 

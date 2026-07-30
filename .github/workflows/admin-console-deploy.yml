@@ -1,0 +1,65 @@
+name: Deploy Production Admin Console
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-admin-console
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build and deploy isolated admin web target
+    runs-on: ubuntu-latest
+    environment: production-admin
+
+    env:
+      EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
+      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+      EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
+      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+      EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}
+      EXPO_PUBLIC_FIREBASE_APP_CHECK_RECAPTCHA_ENTERPRISE_SITE_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_APP_CHECK_RECAPTCHA_ENTERPRISE_SITE_KEY }}
+      EXPO_PUBLIC_ALLOW_LOCAL_APP_CHECK_BYPASS: "false"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        run: npm ci
+        working-directory: apps/mobile
+
+      - name: Validate mobile TypeScript
+        run: npm run typecheck
+        working-directory: apps/mobile
+
+      - name: Run focused administrator authorization tests
+        run: npx vitest run src/domain/authorization/authorization.test.ts src/infrastructure/firebase/auth.test.ts src/presentation/hooks/useAuthSession.test.ts src/presentation/hooks/useAdminLayoutController.test.ts
+        working-directory: apps/mobile
+
+      - name: Build isolated admin web artifact
+        shell: pwsh
+        run: ./scripts/build-admin-web.ps1
+        working-directory: apps/mobile
+
+      - name: Deploy isolated Azure Static Web App
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_ADMIN }}
+          action: upload
+          app_location: apps/mobile/dist
+          api_location: ""
+          output_location: ""
+          skip_app_build: true
