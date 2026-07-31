@@ -15,6 +15,7 @@ import { colors, layout } from "../theme/tokens";
 type ScreenProps = {
   children: ReactNode;
   centered?: boolean;
+  contentMaxWidth?: number;
   contentStyle?: StyleProp<ViewStyle>;
   scroll?: boolean;
   withTabBar?: boolean;
@@ -23,6 +24,7 @@ type ScreenProps = {
 export function Screen({
   children,
   centered = false,
+  contentMaxWidth,
   contentStyle,
   scroll = true,
   withTabBar = false,
@@ -50,14 +52,14 @@ export function Screen({
             showsVerticalScrollIndicator={false}
             style={styles.screen}
           >
-            <View style={styles.inner}>
+            <View style={[styles.inner, contentMaxWidth !== undefined && { maxWidth: contentMaxWidth }]}>
               <OfflineStatusBanner />
               {children}
             </View>
           </ScrollView>
         ) : (
           <View style={contentStyles}>
-            <View style={styles.inner}>
+            <View style={[styles.inner, contentMaxWidth !== undefined && { maxWidth: contentMaxWidth }]}>
               <OfflineStatusBanner />
               {children}
             </View>
