@@ -19,6 +19,7 @@ import { TrustService } from "../../application/services/TrustService";
 import { EventBus } from "../../domain/events/EventBus";
 import { FirebaseAuthSessionGateway } from "../../infrastructure/firebase/auth";
 import {
+  FirebaseAdminOperationsRepository,
   FirebaseBookingRepository,
   FirebaseCustodyRepository,
   FirebaseNotificationRepository,
@@ -45,6 +46,7 @@ import { PrivilegedCallableTransport } from "../../infrastructure/firebase/privi
 import { PlatformAppCheckTokenProvider } from "../../infrastructure/firebase/appCheckTokenProvider";
 
 const eventBus = new EventBus();
+const adminOperationsRepository = new FirebaseAdminOperationsRepository();
 const bookingRepository = new FirebaseBookingRepository();
 const custodyRepository = new FirebaseCustodyRepository();
 const notificationRepository = new FirebaseNotificationRepository();
@@ -106,6 +108,7 @@ const notificationService = new NotificationService(
 notificationService.start();
 
 export const mobileServices = {
+  adminOperations: adminOperationsRepository,
   auth: new AuthSessionService(
     new FirebaseAuthSessionGateway(),
     pushRegistrationService,
