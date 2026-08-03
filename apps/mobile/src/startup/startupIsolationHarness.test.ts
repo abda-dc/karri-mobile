@@ -18,6 +18,7 @@ vi.mock("react", async () => {
   const actual = await vi.importActual<typeof React>("react");
   const mocked = {
     ...actual,
+    useEffect: vi.fn(),
     useRef: <T,>(initialValue: T) => ({ current: initialValue }),
     useState: <T,>(initialValue: T) => [initialValue, vi.fn()] as const,
   };
@@ -38,6 +39,7 @@ vi.mock("react-native", async () => {
       actualReact.createElement(tag, { disabled }, children);
 
   return {
+    Button: element("button"),
     Pressable: element("button"),
     ScrollView: element("main"),
     StyleSheet: { create: (styles: unknown) => styles },

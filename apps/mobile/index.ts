@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import { registerRootComponent } from "expo";
+import { RouterIsolationApp } from "./src/startup/routerIsolationHarness";
 
 declare const require: (moduleName: string) => unknown;
 
@@ -410,4 +411,4 @@ const styles = StyleSheet.create({
   logText: { color: "#dbeafe", fontFamily: "monospace", fontSize: 12, lineHeight: 18, marginBottom: 6 },
 });
 
-registerRootComponent(StartupIsolationApp);
+registerRootComponent(RouterIsolationApp);
