@@ -19,7 +19,112 @@ export type PrivilegedCallableName =
   | "releaseAdministrativeHold"
   | "submitSafetyReview"
   | "registerPushToken"
-  | "unregisterPushToken";
+  | "unregisterPushToken"
+  | "acceptBooking"
+  | "issueHandoffVerificationCode"
+  | "verifyPickupHandoff"
+  | "verifyDeliveryHandoff"
+  | "regenerateHandoffCode"
+  | "confirmPickupCustody"
+  | "confirmDeliveryCustody"
+  | "completeBookingCustody"
+  | "recordTravelCustodyEvent";
+
+export interface ConfirmPickupCustodyPayload {
+  readonly bookingId: string;
+  readonly location?: string | null;
+  readonly note?: string | null;
+  readonly custodyAcceptance: unknown;
+  readonly idempotencyKey?: string | null;
+}
+
+export interface ConfirmDeliveryCustodyPayload {
+  readonly bookingId: string;
+  readonly location?: string | null;
+  readonly note?: string | null;
+  readonly idempotencyKey?: string | null;
+}
+
+export interface CompleteBookingCustodyPayload {
+  readonly bookingId: string;
+  readonly idempotencyKey?: string | null;
+}
+
+export interface RecordTravelCustodyEventPayload {
+  readonly bookingId: string;
+  readonly eventType: "airport_departure" | "airport_arrival";
+  readonly location?: string | null;
+  readonly note?: string | null;
+}
+
+export interface CustodyTransitionCallableResult {
+  readonly success: boolean;
+  readonly bookingId: string;
+  readonly status: string;
+  readonly eventId?: string;
+  readonly alreadyTransitioned: boolean;
+}
+
+export interface IssueHandoffVerificationCodePayload {
+  readonly bookingId: string;
+  readonly codeType: "pickup" | "delivery";
+}
+
+export interface IssueHandoffVerificationCodeResult {
+  readonly success: boolean;
+  readonly bookingId: string;
+  readonly codeType: "pickup" | "delivery";
+  readonly code: string;
+}
+
+export interface VerifyPickupHandoffPayload {
+  readonly bookingId: string;
+  readonly code: string;
+}
+
+export interface VerifyPickupHandoffResult {
+  readonly success: boolean;
+  readonly verified: boolean;
+  readonly alreadyVerified?: boolean;
+}
+
+export interface VerifyDeliveryHandoffPayload {
+  readonly bookingId: string;
+  readonly code: string;
+}
+
+export interface VerifyDeliveryHandoffResult {
+  readonly success: boolean;
+  readonly verified: boolean;
+  readonly alreadyVerified?: boolean;
+}
+
+export interface RegenerateHandoffCodePayload {
+  readonly bookingId: string;
+  readonly codeType: "pickup" | "delivery";
+}
+
+export interface RegenerateHandoffCodeResult {
+  readonly success: boolean;
+  readonly codeType: "pickup" | "delivery";
+  readonly newCode: string;
+}
+
+export interface AcceptBookingPayload {
+  readonly bookingId: string;
+  readonly location?: string | null;
+  readonly note?: string | null;
+  readonly idempotencyKey?: string | null;
+}
+
+export interface AcceptBookingCallableResult {
+  readonly success: boolean;
+  readonly bookingId: string;
+  readonly alreadyAccepted: boolean;
+  readonly tripId: string;
+  readonly shipmentId: string;
+  readonly reservedWeightKg: number;
+}
 
 export interface RegisterPushTokenPayload {
   readonly deviceId: string;
@@ -228,6 +333,114 @@ export class PrivilegedCallableTransport {
   ): Promise<UnregisterPushTokenResult> {
     return this.invoke(
       "unregisterPushToken",
+      payload,
+      [],
+      expectedUserId,
+    );
+  }
+
+  acceptBooking(
+    payload: AcceptBookingPayload,
+    expectedUserId?: string,
+  ): Promise<AcceptBookingCallableResult> {
+    return this.invoke(
+      "acceptBooking",
+      payload,
+      [],
+      expectedUserId,
+    );
+  }
+
+  issueHandoffVerificationCode(
+    payload: IssueHandoffVerificationCodePayload,
+    expectedUserId?: string,
+  ): Promise<IssueHandoffVerificationCodeResult> {
+    return this.invoke(
+      "issueHandoffVerificationCode",
+      payload,
+      [],
+      expectedUserId,
+    );
+  }
+
+  verifyPickupHandoff(
+    payload: VerifyPickupHandoffPayload,
+    expectedUserId?: string,
+  ): Promise<VerifyPickupHandoffResult> {
+    return this.invoke(
+      "verifyPickupHandoff",
+      payload,
+      [payload.code],
+      expectedUserId,
+    );
+  }
+
+  verifyDeliveryHandoff(
+    payload: VerifyDeliveryHandoffPayload,
+    expectedUserId?: string,
+  ): Promise<VerifyDeliveryHandoffResult> {
+    return this.invoke(
+      "verifyDeliveryHandoff",
+      payload,
+      [payload.code],
+      expectedUserId,
+    );
+  }
+
+  regenerateHandoffCode(
+    payload: RegenerateHandoffCodePayload,
+    expectedUserId?: string,
+  ): Promise<RegenerateHandoffCodeResult> {
+    return this.invoke(
+      "regenerateHandoffCode",
+      payload,
+      [],
+      expectedUserId,
+    );
+  }
+
+  confirmPickupCustody(
+    payload: ConfirmPickupCustodyPayload,
+    expectedUserId?: string,
+  ): Promise<CustodyTransitionCallableResult> {
+    return this.invoke(
+      "confirmPickupCustody",
+      payload,
+      [],
+      expectedUserId,
+    );
+  }
+
+  confirmDeliveryCustody(
+    payload: ConfirmDeliveryCustodyPayload,
+    expectedUserId?: string,
+  ): Promise<CustodyTransitionCallableResult> {
+    return this.invoke(
+      "confirmDeliveryCustody",
+      payload,
+      [],
+      expectedUserId,
+    );
+  }
+
+  completeBookingCustody(
+    payload: CompleteBookingCustodyPayload,
+    expectedUserId?: string,
+  ): Promise<CustodyTransitionCallableResult> {
+    return this.invoke(
+      "completeBookingCustody",
+      payload,
+      [],
+      expectedUserId,
+    );
+  }
+
+  recordTravelCustodyEvent(
+    payload: RecordTravelCustodyEventPayload,
+    expectedUserId?: string,
+  ): Promise<CustodyTransitionCallableResult> {
+    return this.invoke(
+      "recordTravelCustodyEvent",
       payload,
       [],
       expectedUserId,

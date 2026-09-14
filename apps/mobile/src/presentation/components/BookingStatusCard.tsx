@@ -14,6 +14,8 @@ interface BookingStatusCardProps {
   readonly currentUserId: string;
   readonly identityStatus: VerificationStatus;
   readonly pendingStatus?: Booking["status"] | null;
+  readonly senderName?: string | null;
+  readonly travelerName?: string | null;
 }
 
 function statusTone(status: Booking["status"]): "active" | "neutral" | "success" | "warning" {
@@ -35,6 +37,8 @@ export function BookingStatusCard({
   currentUserId,
   identityStatus,
   pendingStatus,
+  senderName,
+  travelerName,
 }: BookingStatusCardProps) {
   const currentRole = booking.senderId === currentUserId ? "Sender" : "Traveler";
 
@@ -57,13 +61,17 @@ export function BookingStatusCard({
         <View style={styles.participant}>
           <Text style={styles.label}>Sender</Text>
           <Text style={styles.muted}>
-            {booking.senderId === currentUserId ? "You" : shortId(booking.senderId)}
+            {booking.senderId === currentUserId
+              ? "You"
+              : (senderName && senderName.trim().length > 0 ? senderName : shortId(booking.senderId))}
           </Text>
         </View>
         <View style={styles.participant}>
           <Text style={styles.label}>Traveler</Text>
           <Text style={styles.muted}>
-            {booking.travelerId === currentUserId ? "You" : shortId(booking.travelerId)}
+            {booking.travelerId === currentUserId
+              ? "You"
+              : (travelerName && travelerName.trim().length > 0 ? travelerName : shortId(booking.travelerId))}
           </Text>
         </View>
       </View>

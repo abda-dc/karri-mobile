@@ -13,6 +13,9 @@
     "auth:admin-console": "tsx src/adminConsoleClaimsCli.ts",
     "smoke:development:operational-readiness": "tsx src/liveSmoke/runPlaceAdministrativeHoldSmoke.ts",
     "smoke:development:callable": "tsx src/liveSmoke/runPlaceAdministrativeHoldSmoke.ts",
+    "reconcile:legacy": "tsx src/reconcileLegacyReservations.ts",
+    "reconcile:custody": "tsx src/reconcileLegacyCustody.ts",
+    "reconcile:snapshots": "tsx src/reconcileSafetySnapshots.ts",
     "test": "vitest run"
   },
   "dependencies": {

@@ -1,7 +1,7 @@
 {
   "name": "mobile",
   "version": "1.0.0",
-  "main": "./index.ts",
+  "main": "expo-router/entry",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -36,6 +36,9 @@
   },
   "scripts": {
     "start": "expo start",
+    "start:diagnostics": "node scripts/start-diagnostics.js phase2",
+    "start:diagnostics:phase1": "node scripts/start-diagnostics.js phase1",
+    "start:diagnostics:phase2": "node scripts/start-diagnostics.js phase2",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",

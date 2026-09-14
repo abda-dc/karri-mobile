@@ -238,3 +238,84 @@ export function custodyEventFixture(
     ...overrides,
   };
 }
+
+export function handoffAgreementFixture(overrides: Overrides = {}) {
+  return {
+    bookingId,
+    senderContact: {
+      name: "Sender User",
+      phone: "+251911223344",
+      email: "sender@example.com",
+      notes: "Call me when approaching the meeting point.",
+    },
+    travelerContact: {
+      name: "Traveler User",
+      phone: "+251922334455",
+      email: "traveler@example.com",
+      notes: "I will be wearing a blue jacket.",
+    },
+    receiver: {
+      name: "Destination Recipient",
+      phone: "+12025550199",
+      email: "receiver@example.com",
+      label: "Cousin",
+      isSenderReceiver: false,
+    },
+    pickup: {
+      meetingPoint: "Bole Airport Terminal 2 Departures Area B",
+      scheduledAt: "2026-02-01T14:00:00Z",
+      notes: "Meet near the information desk.",
+    },
+    dropoff: {
+      meetingPoint: "Dulles Airport Arrivals Level 1",
+      scheduledAt: "2026-02-02T10:00:00Z",
+      notes: "Meet outside baggage claim 4.",
+    },
+    confirmation: {
+      status: "confirmed",
+      proposedBy: senderUid,
+      confirmedBy: travelerUid,
+      confirmedAt: fixtureTime,
+    },
+    pickupVerification: {
+      verified: false,
+      verifiedAt: null,
+      verifiedBy: null,
+      failedAttempts: 0,
+    },
+    deliveryVerification: {
+      verified: false,
+      verifiedAt: null,
+      verifiedBy: null,
+      failedAttempts: 0,
+    },
+    createdAt: fixtureTime,
+    updatedAt: fixtureTime,
+    ...overrides,
+  };
+}
+
+export function handoffSecretsFixture(overrides: Overrides = {}) {
+  return {
+    bookingId,
+    senderId: senderUid,
+    travelerId: travelerUid,
+    pickupCodeHash: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+    pickupSalt: "fedcba9876543210fedcba9876543210",
+    pickupIssued: true,
+    pickupAttempts: 0,
+    pickupMaxAttempts: 5,
+    pickupVerified: false,
+    pickupGeneratedAt: fixtureTime,
+    deliveryCodeHash: "f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5",
+    deliverySalt: "0123456789abcdef0123456789abcdef",
+    deliveryIssued: true,
+    deliveryAttempts: 0,
+    deliveryMaxAttempts: 5,
+    deliveryVerified: false,
+    deliveryGeneratedAt: fixtureTime,
+    createdAt: fixtureTime,
+    updatedAt: fixtureTime,
+    ...overrides,
+  };
+}

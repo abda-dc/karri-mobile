@@ -305,3 +305,331 @@ describe("BookingService - Traveler Custody Acceptance", () => {
     );
   });
 });
+
+describe("BookingService - Atomic Booking Acceptance Gateway", () => {
+  const mockBookingRepository = {
+    findById: vi.fn(),
+    findRequestById: vi.fn(),
+    createRequest: vi.fn(),
+    listByParticipant: vi.fn(),
+    saveTransition: vi.fn(),
+  } as unknown as BookingRepository;
+
+  const mockShipmentRepository = {
+    findById: vi.fn(),
+  } as unknown as ShipmentRepository;
+
+  const mockTripRepository = {} as unknown as TripRepository;
+  const mockEvents = { publish: vi.fn() } as unknown as EventPublisher;
+  const mockAcceptanceGateway = {
+    acceptBooking: vi.fn(),
+  };
+
+  const clock = { now: () => "2026-07-11T12:00:00Z" };
+
+  const serviceWithGateway = new BookingService(
+    mockBookingRepository,
+    mockShipmentRepository,
+    mockTripRepository,
+    mockEvents,
+    clock,
+    mockAcceptanceGateway as any
+  );
+
+  const pendingBooking = {
+    id: "booking-pending",
+    shipmentId: "ship-1",
+    tripId: "trip-1",
+    bookingRequestId: "req-1",
+    travelerId: "traveler-1",
+    senderId: "sender-1",
+    status: BookingStatus.Pending,
+    statusHistory: [],
+    createdAt: "2026-07-10T10:00:00Z",
+    updatedAt: "2026-07-10T10:00:00Z",
+  };
+
+  const acceptedBooking = {
+    ...pendingBooking,
+    status: BookingStatus.Accepted,
+    reservedWeightKg: 5,
+    updatedAt: "2026-07-11T12:00:00Z",
+  };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("delegates acceptance to BookingAcceptanceGateway and publishes event", async () => {
+    vi.mocked(mockBookingRepository.findById)
+      .mockResolvedValueOnce(pendingBooking as any)
+      .mockResolvedValueOnce(acceptedBooking as any);
+
+    mockAcceptanceGateway.acceptBooking.mockResolvedValueOnce({
+      bookingId: "booking-pending",
+      status: "accepted",
+      reservedWeightKg: 5,
+      acceptedAt: "2026-07-11T12:00:00Z",
+    });
+
+    const result = await serviceWithGateway.transition({
+      bookingId: "booking-pending",
+      actorId: "traveler-1",
+      nextStatus: BookingStatus.Accepted,
+      note: "Ready to pick up",
+    });
+
+    expect(mockAcceptanceGateway.acceptBooking).toHaveBeenCalledWith({
+      bookingId: "booking-pending",
+      actorId: "traveler-1",
+      note: "Ready to pick up",
+      location: undefined,
+    });
+    expect(mockBookingRepository.saveTransition).not.toHaveBeenCalled();
+    expect(mockEvents.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "booking.accepted",
+        aggregateId: "booking-pending",
+      })
+    );
+    expect(result.status).toBe(BookingStatus.Accepted);
+  });
+
+  it("propagates capacity conflict error from BookingAcceptanceGateway without publishing", async () => {
+    vi.mocked(mockBookingRepository.findById).mockResolvedValueOnce(pendingBooking as any);
+    mockAcceptanceGateway.acceptBooking.mockRejectedValueOnce(
+      new Error("This trip no longer has enough available capacity.")
+    );
+
+    await expect(
+      serviceWithGateway.transition({
+        bookingId: "booking-pending",
+        actorId: "traveler-1",
+        nextStatus: BookingStatus.Accepted,
+      })
+    ).rejects.toThrow("This trip no longer has enough available capacity.");
+
+    expect(mockEvents.publish).not.toHaveBeenCalled();
+    expect(mockBookingRepository.saveTransition).not.toHaveBeenCalled();
+  });
+
+  it("propagates shipment exclusivity collision error without publishing", async () => {
+    vi.mocked(mockBookingRepository.findById).mockResolvedValueOnce(pendingBooking as any);
+    mockAcceptanceGateway.acceptBooking.mockRejectedValueOnce(
+      new Error("This shipment has already been accepted by another traveler.")
+    );
+
+    await expect(
+      serviceWithGateway.transition({
+        bookingId: "booking-pending",
+        actorId: "traveler-1",
+        nextStatus: BookingStatus.Accepted,
+      })
+    ).rejects.toThrow("This shipment has already been accepted by another traveler.");
+
+    expect(mockEvents.publish).not.toHaveBeenCalled();
+    expect(mockBookingRepository.saveTransition).not.toHaveBeenCalled();
+  });
+
+  it("does not call acceptanceGateway when transitioning to non-accepted status (e.g. declined)", async () => {
+    vi.mocked(mockBookingRepository.findById).mockResolvedValueOnce(pendingBooking as any);
+    vi.mocked(mockBookingRepository.findRequestById).mockResolvedValueOnce({
+      id: "req-1",
+      status: "pending",
+    } as any);
+    vi.mocked(mockBookingRepository.saveTransition).mockResolvedValueOnce({
+      booking: { ...pendingBooking, status: BookingStatus.Declined },
+      request: { id: "req-1", status: "declined" },
+    } as any);
+
+    const result = await serviceWithGateway.transition({
+      bookingId: "booking-pending",
+      actorId: "traveler-1",
+      nextStatus: BookingStatus.Declined,
+      note: "Not enough space",
+    });
+
+    expect(mockAcceptanceGateway.acceptBooking).not.toHaveBeenCalled();
+    expect(mockBookingRepository.saveTransition).toHaveBeenCalled();
+    expect(result.status).toBe(BookingStatus.Declined);
+  });
+});
+
+describe("BookingService - Custody Transition Gateway (R05)", () => {
+  const mockBookingRepository = {
+    findById: vi.fn(),
+    findRequestById: vi.fn(),
+    createRequest: vi.fn(),
+    listByParticipant: vi.fn(),
+    saveTransition: vi.fn(),
+  } as unknown as BookingRepository;
+
+  const mockShipmentRepository = {
+    findById: vi.fn(),
+  } as unknown as ShipmentRepository;
+
+  const mockTripRepository = {} as unknown as TripRepository;
+  const mockEvents = { publish: vi.fn() } as unknown as EventPublisher;
+  const clock = { now: () => "2026-07-11T12:00:00Z" };
+
+  const mockCustodyGateway = {
+    confirmPickup: vi.fn(),
+    confirmDelivery: vi.fn(),
+    completeBooking: vi.fn(),
+    recordTravelEvent: vi.fn(),
+  };
+
+  const serviceWithCustody = new BookingService(
+    mockBookingRepository,
+    mockShipmentRepository,
+    mockTripRepository,
+    mockEvents,
+    clock,
+    undefined,
+    mockCustodyGateway as any,
+  );
+
+  const acceptedBooking = {
+    id: "booking-accepted-1",
+    shipmentId: "ship-1",
+    tripId: "trip-1",
+    travelerId: "traveler-1",
+    senderId: "sender-1",
+    status: BookingStatus.Accepted,
+    statusHistory: [],
+  };
+
+  const inTransitBooking = {
+    ...acceptedBooking,
+    status: BookingStatus.InTransit,
+  };
+
+  const deliveredBooking = {
+    ...acceptedBooking,
+    status: BookingStatus.Delivered,
+  };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("delegates InTransit transition to custodyGateway.confirmPickup", async () => {
+    vi.mocked(mockBookingRepository.findById)
+      .mockResolvedValueOnce(acceptedBooking as any)
+      .mockResolvedValueOnce(inTransitBooking as any);
+
+    mockCustodyGateway.confirmPickup.mockResolvedValueOnce({
+      success: true,
+      bookingId: acceptedBooking.id,
+      status: "in_transit",
+      eventId: "booking-accepted-1__pickup_confirmed",
+      alreadyTransitioned: false,
+    });
+
+    const dummyAcceptance = {
+      bookingId: acceptedBooking.id,
+      shipmentId: acceptedBooking.shipmentId,
+      acceptedByUserId: "traveler-1",
+      custodyVersion: 1,
+      custodyPolicyVersion: "2026-07-v1",
+      declarationVersion: "v1",
+      packageContentVersion: 1,
+      senderDeclarationVersion: "v1",
+      inspection: {} as any,
+      acknowledgements: {} as any,
+    };
+
+    const result = await serviceWithCustody.transition({
+      bookingId: acceptedBooking.id,
+      actorId: "traveler-1",
+      nextStatus: BookingStatus.InTransit,
+      location: "Addis Ababa",
+      note: "Picked up package",
+      custodyAcceptance: dummyAcceptance,
+    });
+
+    expect(mockCustodyGateway.confirmPickup).toHaveBeenCalledWith({
+      bookingId: acceptedBooking.id,
+      actorId: "traveler-1",
+      location: "Addis Ababa",
+      note: "Picked up package",
+      custodyAcceptance: dummyAcceptance,
+    });
+
+    expect(mockEvents.publish).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "package.picked_up" }),
+    );
+    expect(mockBookingRepository.saveTransition).not.toHaveBeenCalled();
+    expect(result.status).toBe(BookingStatus.InTransit);
+  });
+
+  it("delegates Delivered transition to custodyGateway.confirmDelivery", async () => {
+    vi.mocked(mockBookingRepository.findById)
+      .mockResolvedValueOnce(inTransitBooking as any)
+      .mockResolvedValueOnce(deliveredBooking as any);
+
+    mockCustodyGateway.confirmDelivery.mockResolvedValueOnce({
+      success: true,
+      bookingId: inTransitBooking.id,
+      status: "delivered",
+      eventId: "booking-accepted-1__delivery_confirmed",
+      alreadyTransitioned: false,
+    });
+
+    const result = await serviceWithCustody.transition({
+      bookingId: inTransitBooking.id,
+      actorId: "traveler-1",
+      nextStatus: BookingStatus.Delivered,
+      location: "Washington Dulles",
+      note: "Delivered to receiver",
+    });
+
+    expect(mockCustodyGateway.confirmDelivery).toHaveBeenCalledWith({
+      bookingId: inTransitBooking.id,
+      actorId: "traveler-1",
+      location: "Washington Dulles",
+      note: "Delivered to receiver",
+    });
+
+    expect(mockEvents.publish).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "package.delivered" }),
+    );
+    expect(mockBookingRepository.saveTransition).not.toHaveBeenCalled();
+    expect(result.status).toBe(BookingStatus.Delivered);
+  });
+
+  it("delegates Completed transition to custodyGateway.completeBooking", async () => {
+    const completedBooking = {
+      ...deliveredBooking,
+      status: BookingStatus.Completed,
+    };
+
+    vi.mocked(mockBookingRepository.findById)
+      .mockResolvedValueOnce(deliveredBooking as any)
+      .mockResolvedValueOnce(completedBooking as any);
+
+    mockCustodyGateway.completeBooking.mockResolvedValueOnce({
+      success: true,
+      bookingId: deliveredBooking.id,
+      status: "completed",
+      alreadyTransitioned: false,
+    });
+
+    const result = await serviceWithCustody.transition({
+      bookingId: deliveredBooking.id,
+      actorId: "sender-1",
+      nextStatus: BookingStatus.Completed,
+    });
+
+    expect(mockCustodyGateway.completeBooking).toHaveBeenCalledWith({
+      bookingId: deliveredBooking.id,
+      actorId: "sender-1",
+    });
+
+    expect(mockEvents.publish).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "shipment.completed" }),
+    );
+    expect(mockBookingRepository.saveTransition).not.toHaveBeenCalled();
+    expect(result.status).toBe(BookingStatus.Completed);
+  });
+});

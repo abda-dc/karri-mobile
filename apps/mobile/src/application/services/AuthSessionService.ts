@@ -18,12 +18,22 @@ export interface AuthenticatedSession {
   readonly authorization: AuthorizationSession;
 }
 
+export interface EmailLinkSignInResult {
+  readonly session: AuthenticatedSession;
+  readonly isUpgrade: boolean;
+}
+
 export interface AuthSessionGateway {
   readonly configured: boolean;
   getCurrentUserId(): string | null;
   signOut(expectedUserId: string | null): Promise<void>;
   startMvpSession(): Promise<AuthenticatedSession>;
   signInWithEmail(email: string, password: string): Promise<AuthenticatedSession>;
+  sendSignInLinkToEmail(email: string): Promise<void>;
+  isSignInWithEmailLink(link: string): boolean;
+  completeEmailLinkSignIn(link: string, emailConfirm?: string): Promise<EmailLinkSignInResult>;
+  getPendingEmail(): Promise<string | null>;
+  clearPendingEmail(): Promise<void>;
   refreshAuthorization(): Promise<{ readonly uid: string; readonly role: AuthorizationRole } | null>;
   subscribe(
     onChange: (session: AuthenticatedSession | null) => void,
@@ -86,6 +96,31 @@ export class AuthSessionService {
     return this.runExclusive(() =>
       this.gateway.signInWithEmail(email, password),
     );
+  }
+
+  sendSignInLinkToEmail(email: string): Promise<void> {
+    return this.runExclusive(() => this.gateway.sendSignInLinkToEmail(email));
+  }
+
+  isSignInWithEmailLink(link: string): boolean {
+    return this.gateway.isSignInWithEmailLink(link);
+  }
+
+  completeEmailLinkSignIn(
+    link: string,
+    emailConfirm?: string,
+  ): Promise<EmailLinkSignInResult> {
+    return this.runExclusive(() =>
+      this.gateway.completeEmailLinkSignIn(link, emailConfirm),
+    );
+  }
+
+  getPendingEmail(): Promise<string | null> {
+    return this.gateway.getPendingEmail();
+  }
+
+  clearPendingEmail(): Promise<void> {
+    return this.gateway.clearPendingEmail();
   }
 
   refreshAuthorization(): Promise<{ readonly uid: string; readonly role: AuthorizationRole } | null> {

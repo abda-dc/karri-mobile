@@ -50,6 +50,11 @@ function createHarness(signOutCleanupTimeoutMs = 3_000) {
     signInWithEmail: vi.fn(),
     signOut: vi.fn(),
     startMvpSession: vi.fn(),
+    sendSignInLinkToEmail: vi.fn(),
+    isSignInWithEmailLink: vi.fn(),
+    completeEmailLinkSignIn: vi.fn(),
+    getPendingEmail: vi.fn(),
+    clearPendingEmail: vi.fn(),
     subscribe: vi.fn(),
   };
 
@@ -296,5 +301,44 @@ describe("AuthSessionService", () => {
 
     expect(service.subscribe(onChange, onError)).toBe(unsubscribe);
     expect(gateway.subscribe).toHaveBeenCalledWith(onChange, onError);
+  });
+
+  it("delegates sendSignInLinkToEmail and serializes exclusively", async () => {
+    const { gateway, service } = createHarness();
+    vi.mocked(gateway.sendSignInLinkToEmail).mockResolvedValue();
+
+    await service.sendSignInLinkToEmail("customer@karri.com");
+    expect(gateway.sendSignInLinkToEmail).toHaveBeenCalledWith("customer@karri.com");
+  });
+
+  it("delegates isSignInWithEmailLink synchronously", () => {
+    const { gateway, service } = createHarness();
+    vi.mocked(gateway.isSignInWithEmailLink).mockReturnValue(true);
+
+    expect(service.isSignInWithEmailLink("https://karri.firebaseapp.com/__/auth/action?apiKey=test")).toBe(true);
+    expect(gateway.isSignInWithEmailLink).toHaveBeenCalledWith("https://karri.firebaseapp.com/__/auth/action?apiKey=test");
+  });
+
+  it("delegates completeEmailLinkSignIn and returns result", async () => {
+    const { gateway, service } = createHarness();
+    const mockResult = {
+      session: userSession,
+      isUpgrade: true,
+    };
+    vi.mocked(gateway.completeEmailLinkSignIn).mockResolvedValue(mockResult);
+
+    const result = await service.completeEmailLinkSignIn("https://karri.app/link", "customer@karri.com");
+    expect(result).toEqual(mockResult);
+    expect(gateway.completeEmailLinkSignIn).toHaveBeenCalledWith("https://karri.app/link", "customer@karri.com");
+  });
+
+  it("delegates getPendingEmail and clearPendingEmail", async () => {
+    const { gateway, service } = createHarness();
+    vi.mocked(gateway.getPendingEmail).mockResolvedValue("pending@karri.com");
+
+    await expect(service.getPendingEmail()).resolves.toBe("pending@karri.com");
+
+    await service.clearPendingEmail();
+    expect(gateway.clearPendingEmail).toHaveBeenCalledOnce();
   });
 });

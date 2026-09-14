@@ -2,7 +2,6 @@ import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const entryMocks = vi.hoisted(() => ({
-  registeredComponent: undefined as React.ComponentType | undefined,
   riskyModuleLoads: {
     asyncStorage: 0,
     firebaseAuthPersistence: 0,
@@ -25,12 +24,6 @@ vi.mock("react", async () => {
 
   return { ...mocked, default: mocked };
 });
-
-vi.mock("expo", () => ({
-  registerRootComponent: vi.fn((component: React.ComponentType) => {
-    entryMocks.registeredComponent = component;
-  }),
-}));
 
 vi.mock("react-native", async () => {
   const actualReact = await vi.importActual<typeof React>("react");
@@ -79,8 +72,9 @@ vi.mock("expo-router/entry", () => {
 
 import {
   createStartupIsolationController,
+  StartupIsolationApp,
   type IsolationProbeDependencies,
-} from "../../index";
+} from "./startupIsolationHarness";
 
 function passingDependencies(
   overrides: Partial<IsolationProbeDependencies> = {},
@@ -117,12 +111,8 @@ afterEach(() => {
 });
 
 describe("on-device startup isolation harness", () => {
-  it("registers and initially renders without loading any risky module", () => {
-    expect(entryMocks.registeredComponent).toBeTypeOf("function");
-
-    const rootElement = (
-      entryMocks.registeredComponent as () => React.ReactElement
-    )();
+  it("initially renders without loading any risky module", () => {
+    const rootElement = StartupIsolationApp();
     const renderedText = JSON.stringify(rootElement);
 
     expect(renderedText).toContain("Karri Startup Isolation");

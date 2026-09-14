@@ -93,6 +93,19 @@ service cloud.firestore {
         && oldData.customsDeclarationRequired == newData.customsDeclarationRequired;
     }
 
+    function agreementCriticalShipmentFieldsUnchanged(oldData, newData) {
+      return safetyContentUnchanged(oldData, newData)
+        && oldData.originCountry == newData.originCountry
+        && oldData.originCity == newData.originCity
+        && oldData.destinationCountry == newData.destinationCountry
+        && oldData.destinationCity == newData.destinationCity
+        && oldData.deliveryWindow == newData.deliveryWindow
+        && oldData.rewardAmount == newData.rewardAmount
+        && oldData.rewardCurrency == newData.rewardCurrency
+        && oldData.packageContentVersion == newData.packageContentVersion
+        && oldData.safetyDeclaration == newData.safetyDeclaration;
+    }
+
     function validShipmentBase(data) {
       return data.keys().hasOnly([
           'ownerId',
@@ -116,7 +129,10 @@ service cloud.firestore {
           'containsMedicine',
           'customsDeclarationRequired',
           'packageContentVersion',
-          'safetyDeclaration'
+          'safetyDeclaration',
+          'activeBookingId',
+          'activeCarrierId',
+          'activeTripId'
         ])
         && data.ownerId is string
         && data.originCountry is string && data.originCountry.size() > 0 && data.originCountry.size() <= 80
@@ -136,7 +152,10 @@ service cloud.firestore {
         && data.containsFoodOrAgri is bool
         && data.containsMedicine is bool
         && data.customsDeclarationRequired is bool
-        && data.packageContentVersion is int && data.packageContentVersion >= 1;
+        && data.packageContentVersion is int && data.packageContentVersion >= 1
+        && (!('activeBookingId' in data) || data.activeBookingId == null || (data.activeBookingId is string && data.activeBookingId.size() <= 128))
+        && (!('activeCarrierId' in data) || data.activeCarrierId == null || (data.activeCarrierId is string && data.activeCarrierId.size() <= 128))
+        && (!('activeTripId' in data) || data.activeTripId == null || (data.activeTripId is string && data.activeTripId.size() <= 128));
     }
 
     function validShipmentOnCreate(data) {
@@ -213,6 +232,8 @@ service cloud.firestore {
           'departureDate',
           'arrivalDate',
           'availableCapacityKg',
+          'totalCapacityKg',
+          'reservedCapacityKg',
           'notes',
           'status',
           'createdAt',
@@ -225,7 +246,9 @@ service cloud.firestore {
         && data.destinationCity is string && data.destinationCity.size() > 0 && data.destinationCity.size() <= 120
         && data.departureDate is string && data.departureDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
         && data.arrivalDate is string && data.arrivalDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
-        && isNumber(data.availableCapacityKg) && data.availableCapacityKg > 0 && data.availableCapacityKg <= 100
+        && isNumber(data.availableCapacityKg) && data.availableCapacityKg >= 0 && data.availableCapacityKg <= 100
+        && (!('totalCapacityKg' in data) || (isNumber(data.totalCapacityKg) && data.totalCapacityKg > 0 && data.totalCapacityKg <= 100))
+        && (!('reservedCapacityKg' in data) || (isNumber(data.reservedCapacityKg) && data.reservedCapacityKg >= 0 && data.reservedCapacityKg <= 100))
         && data.notes is string && data.notes.size() <= 500
         && validListingStatus(data.status);
     }
@@ -281,6 +304,7 @@ service cloud.firestore {
           'travelerId',
           'status',
           'statusHistory',
+          'reservedWeightKg',
           'createdAt',
           'updatedAt'
         ])
@@ -294,6 +318,7 @@ service cloud.firestore {
         && data.statusHistory is list
         && data.statusHistory.size() > 0
         && data.statusHistory.size() <= 8
+        && (!('reservedWeightKg' in data) || (isNumber(data.reservedWeightKg) && data.reservedWeightKg > 0 && data.reservedWeightKg <= 100))
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -598,23 +623,11 @@ service cloud.firestore {
     function validBookingTransition() {
       return (
           resource.data.status == 'pending'
-          && request.resource.data.status in ['accepted', 'declined']
+          && request.resource.data.status == 'declined'
           && request.auth.uid == resource.data.travelerId
         ) || (
           resource.data.status == 'pending'
           && request.resource.data.status == 'cancelled'
-          && request.auth.uid == resource.data.senderId
-        ) || (
-          resource.data.status == 'accepted'
-          && request.resource.data.status == 'in_transit'
-          && request.auth.uid == resource.data.travelerId
-        ) || (
-          resource.data.status == 'in_transit'
-          && request.resource.data.status == 'delivered'
-          && request.auth.uid == resource.data.travelerId
-        ) || (
-          resource.data.status == 'delivered'
-          && request.resource.data.status == 'completed'
           && request.auth.uid == resource.data.senderId
         );
     }
@@ -654,7 +667,7 @@ service cloud.firestore {
     function validBookingRequestTransition() {
       return resource.data.status == 'pending'
         && (
-          (request.resource.data.status in ['accepted', 'declined']
+          (request.resource.data.status == 'declined'
             && request.auth.uid == resource.data.travelerId)
           || (request.resource.data.status == 'cancelled'
             && request.auth.uid == resource.data.senderId)
@@ -707,6 +720,99 @@ service cloud.firestore {
           && custodyEventExists(data.bookingId, 'delivery_confirmed'));
     }
 
+    function validHandoffContact(contact) {
+      return contact is map
+        && contact.keys().hasOnly(['name', 'phone', 'email', 'notes'])
+        && contact.name is string && contact.name.size() <= 120
+        && (contact.phone == null || (contact.phone is string && contact.phone.size() <= 32))
+        && (contact.email == null || (contact.email is string && contact.email.size() <= 120))
+        && (contact.notes == null || (contact.notes is string && contact.notes.size() <= 300));
+    }
+
+    function validHandoffReceiver(receiver) {
+      return receiver is map
+        && receiver.keys().hasOnly(['name', 'phone', 'email', 'label', 'isSenderReceiver'])
+        && receiver.name is string && receiver.name.size() > 0 && receiver.name.size() <= 120
+        && receiver.phone is string && receiver.phone.size() <= 32
+        && (receiver.email == null || (receiver.email is string && receiver.email.size() <= 120))
+        && (receiver.label == null || (receiver.label is string && receiver.label.size() <= 60))
+        && receiver.isSenderReceiver is bool;
+    }
+
+    function validHandoffAppointment(apt) {
+      return apt is map
+        && apt.keys().hasOnly(['meetingPoint', 'scheduledAt', 'notes'])
+        && apt.meetingPoint is string && apt.meetingPoint.size() <= 160
+        && (apt.scheduledAt == null || (apt.scheduledAt is string && apt.scheduledAt.size() <= 80))
+        && (apt.notes == null || (apt.notes is string && apt.notes.size() <= 300));
+    }
+
+    function validHandoffConfirmation(confirmation) {
+      return confirmation is map
+        && confirmation.keys().hasOnly(['status', 'proposedBy', 'confirmedBy', 'confirmedAt'])
+        && confirmation.status in ['needs_confirmation', 'proposed', 'confirmed']
+        && (confirmation.proposedBy == null || (confirmation.proposedBy is string && confirmation.proposedBy.size() <= 128))
+        && (confirmation.confirmedBy == null || (confirmation.confirmedBy is string && confirmation.confirmedBy.size() <= 128))
+        && (confirmation.confirmedAt == null || confirmation.confirmedAt is timestamp);
+    }
+
+    function validHandoffVerificationState(v) {
+      return v is map
+        && v.keys().hasOnly(['verified', 'verifiedAt', 'verifiedBy', 'failedAttempts'])
+        && v.verified is bool
+        && (v.verifiedAt == null || v.verifiedAt is timestamp)
+        && (v.verifiedBy == null || (v.verifiedBy is string && v.verifiedBy.size() <= 128))
+        && isNumber(v.failedAttempts) && v.failedAttempts >= 0;
+    }
+
+    function validHandoffAgreementBase(data, bookingId) {
+      return data.keys().hasOnly([
+          'bookingId', 'senderContact', 'travelerContact', 'receiver',
+          'pickup', 'dropoff', 'confirmation', 'pickupVerification',
+          'deliveryVerification', 'createdAt', 'updatedAt'
+        ])
+        && data.bookingId == bookingId
+        && validHandoffContact(data.senderContact)
+        && validHandoffContact(data.travelerContact)
+        && validHandoffReceiver(data.receiver)
+        && validHandoffAppointment(data.pickup)
+        && validHandoffAppointment(data.dropoff)
+        && validHandoffConfirmation(data.confirmation)
+        && validHandoffVerificationState(data.pickupVerification)
+        && validHandoffVerificationState(data.deliveryVerification)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function validHandoffAgreementOnCreate(data, bookingId) {
+      return validHandoffAgreementBase(data, bookingId)
+        && data.pickupVerification.verified == false
+        && data.deliveryVerification.verified == false
+        && data.pickupVerification.failedAttempts == 0
+        && data.deliveryVerification.failedAttempts == 0
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function validHandoffAgreementOnUpdate(oldData, newData, bookingId, bSnap) {
+      return validHandoffAgreementBase(newData, bookingId)
+        && oldData.bookingId == newData.bookingId
+        && oldData.createdAt == newData.createdAt
+        && newData.updatedAt == request.time
+        && newData.pickupVerification == oldData.pickupVerification
+        && newData.deliveryVerification == oldData.deliveryVerification
+        && (
+          (request.auth.uid == bSnap.senderId && newData.travelerContact == oldData.travelerContact)
+          || (request.auth.uid == bSnap.travelerId
+              && newData.senderContact == oldData.senderContact
+              && newData.receiver == oldData.receiver)
+        );
+    }
+
+    function isHandoffVisibleStatus(status) {
+      return status in ['accepted', 'in_transit', 'delivered', 'completed'];
+    }
+
     match /users/{userId} {
       allow read: if signedIn() && request.auth.uid == userId;
       allow create: if signedIn()
@@ -739,19 +845,31 @@ service cloud.firestore {
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
-        && validShipmentOnCreate(request.resource.data);
+        && validShipmentOnCreate(request.resource.data)
+        && request.resource.data.get('activeBookingId', null) == null
+        && request.resource.data.get('activeCarrierId', null) == null
+        && request.resource.data.get('activeTripId', null) == null;
       allow update: if owns(resource.data)
         && request.resource.data.ownerId == resource.data.ownerId
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.updatedAt == request.time
         && validShipmentOnUpdate(resource.data, request.resource.data)
+        && request.resource.data.get('activeBookingId', null) == resource.data.get('activeBookingId', null)
+        && request.resource.data.get('activeCarrierId', null) == resource.data.get('activeCarrierId', null)
+        && request.resource.data.get('activeTripId', null) == resource.data.get('activeTripId', null)
         && (
-          (safetyContentUnchanged(resource.data, request.resource.data)
-            && request.resource.data.packageContentVersion == resource.data.packageContentVersion
-            && request.resource.data.safetyDeclaration == resource.data.safetyDeclaration)
-          ||
-          (!safetyContentUnchanged(resource.data, request.resource.data)
-            && request.resource.data.packageContentVersion == resource.data.packageContentVersion + 1)
+          resource.data.get('activeBookingId', null) != null
+          ? (agreementCriticalShipmentFieldsUnchanged(resource.data, request.resource.data)
+              && request.resource.data.packageContentVersion == resource.data.packageContentVersion
+              && request.resource.data.safetyDeclaration == resource.data.safetyDeclaration)
+          : (
+              (safetyContentUnchanged(resource.data, request.resource.data)
+                && request.resource.data.packageContentVersion == resource.data.packageContentVersion
+                && request.resource.data.safetyDeclaration == resource.data.safetyDeclaration)
+              ||
+              (!safetyContentUnchanged(resource.data, request.resource.data)
+                && request.resource.data.packageContentVersion == resource.data.packageContentVersion + 1)
+            )
         );
       allow delete: if false;
     }
@@ -762,12 +880,15 @@ service cloud.firestore {
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
-        && validTrip(request.resource.data);
+        && validTrip(request.resource.data)
+        && request.resource.data.get('reservedCapacityKg', 0) == 0;
       allow update: if owns(resource.data)
         && request.resource.data.ownerId == resource.data.ownerId
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.updatedAt == request.time
-        && validTrip(request.resource.data);
+        && validTrip(request.resource.data)
+        && request.resource.data.get('reservedCapacityKg', 0) == resource.data.get('reservedCapacityKg', 0)
+        && request.resource.data.get('totalCapacityKg', resource.data.get('totalCapacityKg', resource.data.availableCapacityKg)) == resource.data.get('totalCapacityKg', resource.data.availableCapacityKg);
       allow delete: if false;
     }
 
@@ -804,6 +925,7 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
         && validBooking(request.resource.data)
+        && !('reservedWeightKg' in request.resource.data)
         && validBookingListings(request.resource.data)
         && linkedRequestMatchesBooking(bookingId, request.resource.data);
       allow update: if isBookingParticipant(resource.data)
@@ -811,116 +933,24 @@ service cloud.firestore {
         && validBooking(request.resource.data)
         && validBookingTransition()
         && validAppendedBookingHistory()
+        && request.resource.data.get('reservedWeightKg', null) == resource.data.get('reservedWeightKg', null)
         && (resource.data.status != 'pending'
           || getAfter(
             /databases/$(database)/documents/bookingRequests/$(resource.data.bookingRequestId)
           ).data.status == request.resource.data.status)
-        && (request.resource.data.status != 'in_transit'
-          || (
-            !exists(/databases/$(database)/documents/travelerCustodyAcceptances/$(bookingId))
-            && existsAfter(/databases/$(database)/documents/travelerCustodyAcceptances/$(bookingId))
-            && validTravelerCustodyAcceptance(
-              getAfter(/databases/$(database)/documents/travelerCustodyAcceptances/$(bookingId)).data,
-              bookingId
-            )
-          )
-        )
         && request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
 
     match /custodyEvents/{eventId} {
-      allow read: if isBookingParticipant(
-        get(/databases/$(database)/documents/bookings/$(resource.data.bookingId)).data
-      );
-      allow create: if signedIn()
-        && request.resource.data.keys().hasOnly([
-          'bookingId',
-          'shipmentId',
-          'eventType',
-          'performedBy',
-          'location',
-          'note',
-          'metadata',
-          'timestamp'
-        ])
-        && request.resource.data.bookingId is string
-        && request.resource.data.bookingId.size() > 0
-        && request.resource.data.bookingId.size() <= 128
-        && request.resource.data.shipmentId is string
-        && request.resource.data.shipmentId.size() > 0
-        && request.resource.data.shipmentId.size() <= 128
-        && request.resource.data.eventType in [
-          'shipment_created',
-          'traveler_accepted',
-          'pickup_confirmed',
-          'airport_departure',
-          'airport_arrival',
-          'delivery_confirmed',
-          'completed'
-        ]
-        && request.resource.data.performedBy == request.auth.uid
-        && (request.resource.data.location == null
-          || (request.resource.data.location is string
-            && request.resource.data.location.size() <= 160))
-        && (request.resource.data.note == null
-          || (request.resource.data.note is string
-            && request.resource.data.note.size() <= 500))
-        && request.resource.data.metadata is map
-        && request.resource.data.metadata.keys().hasOnly(['bookingStatus'])
-        && validBookingStatus(request.resource.data.metadata.bookingStatus)
-        && request.resource.data.timestamp == request.time
-        && eventId == request.resource.data.bookingId + '__' + request.resource.data.eventType
-        && isBookingParticipant(
-          getAfter(
-            /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
-          ).data
+      allow read: if signedIn() && (
+        canViewOperations()
+        || (
+          exists(/databases/$(database)/documents/bookings/$(resource.data.bookingId))
+          && isBookingParticipant(get(/databases/$(database)/documents/bookings/$(resource.data.bookingId)).data)
         )
-        && request.resource.data.shipmentId == getAfter(
-          /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
-        ).data.shipmentId
-        && request.resource.data.metadata.bookingStatus == getAfter(
-          /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
-        ).data.status
-        && validCustodySequence(request.resource.data)
-        && (
-          (request.resource.data.eventType == 'shipment_created'
-            && request.auth.uid == getAfter(
-              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
-            ).data.senderId
-            && getAfter(
-              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
-            ).data.status == 'pending')
-          || (request.resource.data.eventType == 'traveler_accepted'
-            && request.auth.uid == getAfter(
-              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
-            ).data.travelerId
-            && getAfter(
-              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
-            ).data.status == 'accepted')
-          || (request.resource.data.eventType in ['pickup_confirmed', 'airport_departure', 'airport_arrival']
-            && request.auth.uid == getAfter(
-              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
-            ).data.travelerId
-            && getAfter(
-              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
-            ).data.status == 'in_transit')
-          || (request.resource.data.eventType == 'delivery_confirmed'
-            && request.auth.uid == getAfter(
-              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
-            ).data.travelerId
-            && getAfter(
-              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
-            ).data.status == 'delivered')
-          || (request.resource.data.eventType == 'completed'
-            && request.auth.uid == getAfter(
-              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
-            ).data.senderId
-            && getAfter(
-              /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
-            ).data.status == 'completed')
-        );
-      allow update, delete: if false;
+      );
+      allow write: if false;
     }
 
     match /reviews/{reviewId} {
@@ -980,12 +1010,49 @@ service cloud.firestore {
         || request.auth.uid == get(/databases/$(database)/documents/bookings/$(bookingId)).data.travelerId
         || canViewSafetyDeclarations()
       );
+      allow write: if false;
+    }
+
+    match /bookingHandoffAgreements/{bookingId} {
+      allow read: if signedIn() && (
+        canViewOperations()
+        || (
+          isBookingParticipant(get(/databases/$(database)/documents/bookings/$(bookingId)).data)
+          && isHandoffVisibleStatus(get(/databases/$(database)/documents/bookings/$(bookingId)).data.status)
+        )
+      );
       allow create: if signedIn()
-        && !exists(/databases/$(database)/documents/travelerCustodyAcceptances/$(bookingId))
-        && get(/databases/$(database)/documents/bookings/$(bookingId)).data.status == 'accepted'
-        && getAfter(/databases/$(database)/documents/bookings/$(bookingId)).data.status == 'in_transit'
-        && validTravelerCustodyAcceptance(request.resource.data, bookingId);
-      allow update, delete: if false;
+        && isBookingParticipant(get(/databases/$(database)/documents/bookings/$(bookingId)).data)
+        && isHandoffVisibleStatus(get(/databases/$(database)/documents/bookings/$(bookingId)).data.status)
+        && validHandoffAgreementOnCreate(request.resource.data, bookingId);
+      allow update: if signedIn()
+        && isBookingParticipant(get(/databases/$(database)/documents/bookings/$(bookingId)).data)
+        && isHandoffVisibleStatus(get(/databases/$(database)/documents/bookings/$(bookingId)).data.status)
+        && validHandoffAgreementOnUpdate(
+          resource.data,
+          request.resource.data,
+          bookingId,
+          get(/databases/$(database)/documents/bookings/$(bookingId)).data
+        );
+      allow delete: if false;
+    }
+
+    match /bookingHandoffSecrets/{bookingId} {
+      allow read, write: if false;
+    }
+
+    match /bookingAgreementSnapshots/{bookingId} {
+      allow read: if signedIn() && (
+        canViewOperations()
+        || canViewSafetyDeclarations()
+        || request.auth.uid == resource.data.senderId
+        || request.auth.uid == resource.data.travelerId
+        || (
+          exists(/databases/$(database)/documents/bookings/$(bookingId))
+          && isBookingParticipant(get(/databases/$(database)/documents/bookings/$(bookingId)).data)
+        )
+      );
+      allow write: if false;
     }
 
     match /notifications/{notificationId} {

@@ -328,9 +328,34 @@ export default function ProfileScreen() {
             </PrimaryButton>
           </Card>
 
+          {auth.user.isAnonymous ? (
+            <Card variant="elevated">
+              <SectionHeader
+                subtitle="Link your email to keep your shipments, trips, and bookings recoverable across devices and after signing out."
+                title="Save your Karri account"
+              />
+              <Banner
+                compact
+                message="You are currently using a temporary session. Upgrading keeps your existing activity attached to the same account."
+                title="Temporary session"
+                variant="info"
+              />
+              <PrimaryButton
+                accessibilityHint="Opens the screen to link your email address to this account."
+                onPress={() => router.push("/login")}
+              >
+                Upgrade to permanent account
+              </PrimaryButton>
+            </Card>
+          ) : null}
+
           <Card variant="outlined">
             <SectionHeader
-              subtitle="This ends the current anonymous MVP session on this device."
+              subtitle={
+                auth.user.isAnonymous
+                  ? "This ends the current temporary session on this device."
+                  : `Signed in as ${auth.user.email ?? "verified customer"}.`
+              }
               title="Session"
             />
             {sessionError ? (

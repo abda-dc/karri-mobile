@@ -39,6 +39,8 @@ import {
   tripFixture,
   tripId,
   verificationEvent,
+  handoffAgreementFixture,
+  handoffSecretsFixture,
 } from "./fixtures";
 
 const projectId = "demo-karri-mobile";
@@ -354,7 +356,7 @@ describe("traveler custody acceptances", () => {
     );
   });
 
-  it("allows traveler to atomically confirm pickup and submit custody acceptance", async () => {
+  it("denies direct client attempt to confirm pickup and submit custody acceptance (R05 invariant)", async () => {
     const db = userDb(travelerUid);
     const batch = writeBatch(db);
 
@@ -385,7 +387,7 @@ describe("traveler custody acceptances", () => {
       timestamp: serverTimestamp(),
     });
 
-    await assertSucceeds(batch.commit());
+    await assertFails(batch.commit());
   });
 
   it("denies independent custody acceptance creation without booking transition", async () => {
@@ -603,14 +605,10 @@ describe("booking requests and bookings", () => {
   });
 
   it.each([
-    ["pending", "accepted", travelerUid, true],
     ["pending", "declined", travelerUid, true],
     ["pending", "cancelled", senderUid, true],
-    ["accepted", "in_transit", travelerUid, false],
-    ["in_transit", "delivered", travelerUid, false],
-    ["delivered", "completed", senderUid, false],
   ])(
-    "allows the %s -> %s transition by its authorized actor",
+    "allows client write for the %s -> %s transition by its authorized actor",
     async (fromStatus, toStatus, actorUid, updateRequest) => {
       await seedBookingState(fromStatus);
       const db = userDb(actorUid);
@@ -630,15 +628,90 @@ describe("booking requests and bookings", () => {
         updatedAt: serverTimestamp(),
       });
 
-      if (toStatus === "in_transit") {
-        await seedDoc(`shipments/${shipmentId}`, shipmentFixture({ packageContentVersion: 1 }));
-        const acceptanceRef = doc(db, `travelerCustodyAcceptances/${bookingId}`);
-        batch.set(acceptanceRef, clientTravelerCustodyAcceptance());
-      }
-
       await assertSucceeds(batch.commit());
     },
   );
+
+  it.each([
+    ["accepted", "in_transit", travelerUid],
+    ["in_transit", "delivered", travelerUid],
+    ["delivered", "completed", senderUid],
+  ])(
+    "denies direct client write transitioning booking from %s to %s (R05 invariant)",
+    async (fromStatus, toStatus, actorUid) => {
+      await seedBookingState(fromStatus);
+      const db = userDb(actorUid);
+      const batch = writeBatch(db);
+      batch.update(doc(db, `bookings/${bookingId}`), {
+        status: toStatus,
+        statusHistory: [
+          bookingHistoryEntry(fromStatus, historyActorForStatus(fromStatus)),
+          bookingHistoryEntry(toStatus, actorUid),
+        ],
+        updatedAt: serverTimestamp(),
+      });
+
+      await assertFails(batch.commit());
+    },
+  );
+
+  it("denies direct client write transitioning booking to accepted (R03 invariant)", async () => {
+    await seedBookingState("pending");
+    const db = userDb(travelerUid);
+    const batch = writeBatch(db);
+    batch.update(doc(db, `bookingRequests/${bookingRequestId}`), {
+      status: "accepted",
+      updatedAt: serverTimestamp(),
+    });
+    batch.update(doc(db, `bookings/${bookingId}`), {
+      status: "accepted",
+      statusHistory: [
+        bookingHistoryEntry("pending"),
+        bookingHistoryEntry("accepted", travelerUid),
+      ],
+      updatedAt: serverTimestamp(),
+    });
+    await assertFails(batch.commit());
+  });
+
+  it("denies direct client write altering reservedCapacityKg on trips (R03 invariant)", async () => {
+    const tripPath = `trips/${tripId}`;
+    await seedDoc(tripPath, tripFixture({ ownerId: travelerUid, availableCapacityKg: 10, reservedCapacityKg: 0 }));
+
+    const db = userDb(travelerUid);
+    // Attempt to directly change or decrease reservedCapacityKg
+    await assertFails(
+      updateDoc(doc(db, tripPath), {
+        reservedCapacityKg: 5,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it("denies direct client write claiming activeBookingId or activeCarrierId on shipments (R03 invariant)", async () => {
+    const shipmentPath = `shipments/${shipmentId}`;
+    await seedDoc(shipmentPath, shipmentFixture({ ownerId: senderUid }));
+
+    const db = userDb(senderUid);
+    await assertFails(
+      updateDoc(doc(db, shipmentPath), {
+        activeBookingId: "malicious-booking",
+        activeCarrierId: "malicious-carrier",
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it("denies direct client write setting reservedWeightKg on bookings (R03 invariant)", async () => {
+    await seedBookingState("pending");
+    const db = userDb(senderUid);
+    await assertFails(
+      updateDoc(doc(db, `bookings/${bookingId}`), {
+        reservedWeightKg: 5,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
 
   it("denies unauthorized and invalid transitions", async () => {
     await seedBookingState("pending");
@@ -1172,35 +1245,32 @@ describe("custody events", () => {
     );
   }
 
-  it("allows the full valid participant/sequence progression", async () => {
+  it("denies direct client writes (creates) to custodyEvents for any actor (R05 invariant)", async () => {
     await seedBookingState("pending");
-    await assertSucceeds(
+    await assertFails(
       createCustodyEvent(senderUid, "shipment_created", "pending"),
     );
 
     await setBookingStatusAsAdmin("accepted");
-    await assertSucceeds(
+    await assertFails(
       createCustodyEvent(travelerUid, "traveler_accepted", "accepted"),
     );
 
     await setBookingStatusAsAdmin("in_transit");
-    for (const eventType of [
-      "pickup_confirmed",
-      "airport_departure",
-      "airport_arrival",
-    ]) {
-      await assertSucceeds(
-        createCustodyEvent(travelerUid, eventType, "in_transit"),
-      );
-    }
+    await assertFails(
+      createCustodyEvent(travelerUid, "pickup_confirmed", "in_transit"),
+    );
+    await assertFails(
+      createCustodyEvent(travelerUid, "airport_departure", "in_transit"),
+    );
 
     await setBookingStatusAsAdmin("delivered");
-    await assertSucceeds(
+    await assertFails(
       createCustodyEvent(travelerUid, "delivery_confirmed", "delivered"),
     );
 
     await setBookingStatusAsAdmin("completed");
-    await assertSucceeds(
+    await assertFails(
       createCustodyEvent(senderUid, "completed", "completed"),
     );
   });
@@ -1217,22 +1287,15 @@ describe("custody events", () => {
     await assertFails(getDoc(doc(userDb(otherUid), path)));
   });
 
-  it("denies an invalid sequence", async () => {
-    await seedBookingState("in_transit");
-    await assertFails(
-      createCustodyEvent(travelerUid, "airport_departure", "in_transit"),
-    );
-  });
-
-  it("denies the wrong performer", async () => {
-    await seedBookingState("in_transit");
+  it("allows operations admin to read custody events", async () => {
+    await seedBookingState("pending");
     await seedDoc(
-      `custodyEvents/${bookingId}__traveler_accepted`,
-      custodyEventFixture("traveler_accepted", travelerUid, "accepted"),
+      `custodyEvents/${bookingId}__shipment_created`,
+      custodyEventFixture("shipment_created", senderUid, "pending"),
     );
-    await assertFails(
-      createCustodyEvent(senderUid, "pickup_confirmed", "in_transit"),
-    );
+    const path = `custodyEvents/${bookingId}__shipment_created`;
+    const opsDb = testEnv.authenticatedContext("ops-user", { role: "operations_admin" }).firestore();
+    await assertSucceeds(getDoc(doc(opsDb, path)));
   });
 
   it("denies event updates and deletes", async () => {
@@ -1523,6 +1586,426 @@ describe("Milestone 31 - Coarse Admin Roles and Multi-Role Access Control Bounda
       await assertFails(deleteDoc(doc(superAdminDb, path)));
       await assertFails(deleteDoc(doc(userDbInstance, path)));
       await assertFails(deleteDoc(doc(unauthDb, path)));
+    });
+  });
+
+  describe("Booking Handoff Coordination & Receiver Verification Rules (R04)", () => {
+    it("allows sender and traveler to read handoff agreement when booking is accepted", async () => {
+      await seedBookingState("accepted");
+      await seedDoc(
+        `bookingHandoffAgreements/${bookingId}`,
+        handoffAgreementFixture(),
+      );
+
+      await assertSucceeds(
+        getDoc(doc(userDb(senderUid), `bookingHandoffAgreements/${bookingId}`)),
+      );
+      await assertSucceeds(
+        getDoc(doc(userDb(travelerUid), `bookingHandoffAgreements/${bookingId}`)),
+      );
+    });
+
+    it("allows operations admin to read handoff agreement", async () => {
+      await seedBookingState("accepted");
+      await seedDoc(
+        `bookingHandoffAgreements/${bookingId}`,
+        handoffAgreementFixture(),
+      );
+
+      const opsDb = roleDb("admin-ops", "operations_admin");
+      await assertSucceeds(
+        getDoc(doc(opsDb, `bookingHandoffAgreements/${bookingId}`)),
+      );
+    });
+
+    it("denies unrelated user and unauthenticated access to handoff agreement", async () => {
+      await seedBookingState("accepted");
+      await seedDoc(
+        `bookingHandoffAgreements/${bookingId}`,
+        handoffAgreementFixture(),
+      );
+
+      await assertFails(
+        getDoc(doc(userDb(otherUid), `bookingHandoffAgreements/${bookingId}`)),
+      );
+      await assertFails(
+        getDoc(doc(testEnv.unauthenticatedContext().firestore(), `bookingHandoffAgreements/${bookingId}`)),
+      );
+    });
+
+    it("denies participant access before booking is accepted (pending state)", async () => {
+      await seedBookingState("pending");
+      await seedDoc(
+        `bookingHandoffAgreements/${bookingId}`,
+        handoffAgreementFixture(),
+      );
+
+      await assertFails(
+        getDoc(doc(userDb(senderUid), `bookingHandoffAgreements/${bookingId}`)),
+      );
+      await assertFails(
+        getDoc(doc(userDb(travelerUid), `bookingHandoffAgreements/${bookingId}`)),
+      );
+    });
+
+    it("denies participant access when booking is declined, cancelled, or expired", async () => {
+      const nonHandoffStatuses = ["declined", "cancelled", "expired"];
+      for (const status of nonHandoffStatuses) {
+        await seedBookingState(status);
+        await seedDoc(
+          `bookingHandoffAgreements/${bookingId}`,
+          handoffAgreementFixture(),
+        );
+
+        await assertFails(
+          getDoc(doc(userDb(senderUid), `bookingHandoffAgreements/${bookingId}`)),
+        );
+        await assertFails(
+          getDoc(doc(userDb(travelerUid), `bookingHandoffAgreements/${bookingId}`)),
+        );
+      }
+    });
+
+    it("allows participants to read agreement in all post-acceptance states (in_transit, delivered, completed)", async () => {
+      const postAcceptanceStatuses = ["in_transit", "delivered", "completed"];
+      for (const status of postAcceptanceStatuses) {
+        await seedBookingState(status);
+        await seedDoc(
+          `bookingHandoffAgreements/${bookingId}`,
+          handoffAgreementFixture(),
+        );
+
+        await assertSucceeds(
+          getDoc(doc(userDb(senderUid), `bookingHandoffAgreements/${bookingId}`)),
+        );
+        await assertSucceeds(
+          getDoc(doc(userDb(travelerUid), `bookingHandoffAgreements/${bookingId}`)),
+        );
+        // Third-party is always denied
+        await assertFails(
+          getDoc(doc(userDb(otherUid), `bookingHandoffAgreements/${bookingId}`)),
+        );
+      }
+    });
+
+    it("strictly denies all client reads and writes to bookingHandoffSecrets", async () => {
+      await seedBookingState("accepted");
+      await seedDoc(
+        `bookingHandoffSecrets/${bookingId}`,
+        handoffSecretsFixture(),
+      );
+
+      // Deny reads to sender, traveler, third party, and super admin
+      await assertFails(
+        getDoc(doc(userDb(senderUid), `bookingHandoffSecrets/${bookingId}`)),
+      );
+      await assertFails(
+        getDoc(doc(userDb(travelerUid), `bookingHandoffSecrets/${bookingId}`)),
+      );
+      await assertFails(
+        getDoc(doc(userDb(otherUid), `bookingHandoffSecrets/${bookingId}`)),
+      );
+      await assertFails(
+        getDoc(doc(roleDb("admin-super", "super_admin"), `bookingHandoffSecrets/${bookingId}`)),
+      );
+
+      // Deny client writes
+      await assertFails(
+        setDoc(
+          doc(userDb(senderUid), `bookingHandoffSecrets/${bookingId}`),
+          handoffSecretsFixture(),
+        ),
+      );
+      await assertFails(
+        updateDoc(
+          doc(userDb(travelerUid), `bookingHandoffSecrets/${bookingId}`),
+          { pickupVerified: true },
+        ),
+      );
+    });
+
+    it("allows sender to update pickup details and sender contact on accepted booking", async () => {
+      await seedBookingState("accepted");
+      await seedDoc(
+        `bookingHandoffAgreements/${bookingId}`,
+        handoffAgreementFixture(),
+      );
+
+      const base = handoffAgreementFixture();
+      await assertSucceeds(
+        updateDoc(
+          doc(userDb(senderUid), `bookingHandoffAgreements/${bookingId}`),
+          {
+            pickup: {
+              meetingPoint: "Updated Bole Terminal 2 Departure Gate 3",
+              scheduledAt: "2026-02-01T15:00:00Z",
+              notes: "Updated note",
+            },
+            senderContact: {
+              name: "Sender User",
+              phone: "+251911999888",
+              email: "sender@example.com",
+              notes: "New contact notes",
+            },
+            updatedAt: serverTimestamp(),
+          },
+        ),
+      );
+    });
+
+    it("allows traveler to update dropoff details and traveler contact on accepted booking", async () => {
+      await seedBookingState("accepted");
+      await seedDoc(
+        `bookingHandoffAgreements/${bookingId}`,
+        handoffAgreementFixture(),
+      );
+
+      await assertSucceeds(
+        updateDoc(
+          doc(userDb(travelerUid), `bookingHandoffAgreements/${bookingId}`),
+          {
+            dropoff: {
+              meetingPoint: "Dulles Airport Baggage Claim 2",
+              scheduledAt: "2026-02-02T11:00:00Z",
+              notes: "Will wait at baggage claim",
+            },
+            travelerContact: {
+              name: "Traveler User",
+              phone: "+251922888777",
+              email: "traveler@example.com",
+              notes: "Updated traveler note",
+            },
+            updatedAt: serverTimestamp(),
+          },
+        ),
+      );
+    });
+
+    it("denies traveler attempting to edit receiver details", async () => {
+      await seedBookingState("accepted");
+      await seedDoc(
+        `bookingHandoffAgreements/${bookingId}`,
+        handoffAgreementFixture(),
+      );
+
+      await assertFails(
+        updateDoc(
+          doc(userDb(travelerUid), `bookingHandoffAgreements/${bookingId}`),
+          {
+            receiver: {
+              name: "Unauthorized Receiver Change",
+              phone: "+12025559999",
+              email: "hacked@example.com",
+              label: "None",
+              isSenderReceiver: false,
+            },
+            updatedAt: serverTimestamp(),
+          },
+        ),
+      );
+    });
+
+    it("denies client attempting to forge verification flags directly", async () => {
+      await seedBookingState("accepted");
+      await seedDoc(
+        `bookingHandoffAgreements/${bookingId}`,
+        handoffAgreementFixture(),
+      );
+
+      // Traveler attempting to mark pickupVerified: true
+      await assertFails(
+        updateDoc(
+          doc(userDb(travelerUid), `bookingHandoffAgreements/${bookingId}`),
+          {
+            pickupVerification: {
+              verified: true,
+              verifiedAt: serverTimestamp(),
+              verifiedBy: travelerUid,
+              failedAttempts: 0,
+            },
+            updatedAt: serverTimestamp(),
+          },
+        ),
+      );
+
+      // Sender attempting to mark deliveryVerified: true
+      await assertFails(
+        updateDoc(
+          doc(userDb(senderUid), `bookingHandoffAgreements/${bookingId}`),
+          {
+            deliveryVerification: {
+              verified: true,
+              verifiedAt: serverTimestamp(),
+              verifiedBy: senderUid,
+              failedAttempts: 0,
+            },
+            updatedAt: serverTimestamp(),
+          },
+        ),
+      );
+    });
+
+    it("denies oversized fields in handoff agreement updates", async () => {
+      await seedBookingState("accepted");
+      await seedDoc(
+        `bookingHandoffAgreements/${bookingId}`,
+        handoffAgreementFixture(),
+      );
+
+      // meetingPoint > 160 characters
+      const oversizedMeetingPoint = "A".repeat(161);
+      await assertFails(
+        updateDoc(
+          doc(userDb(senderUid), `bookingHandoffAgreements/${bookingId}`),
+          {
+            pickup: {
+              meetingPoint: oversizedMeetingPoint,
+              scheduledAt: "2026-02-01T15:00:00Z",
+              notes: null,
+            },
+            updatedAt: serverTimestamp(),
+          },
+        ),
+      );
+    });
+
+    it("denies deletion of handoff agreement", async () => {
+      await seedBookingState("accepted");
+      await seedDoc(
+        `bookingHandoffAgreements/${bookingId}`,
+        handoffAgreementFixture(),
+      );
+
+      await assertFails(
+        deleteDoc(doc(userDb(senderUid), `bookingHandoffAgreements/${bookingId}`)),
+      );
+      await assertFails(
+        deleteDoc(doc(userDb(travelerUid), `bookingHandoffAgreements/${bookingId}`)),
+      );
+    });
+  });
+
+  describe("R06 — Critical Shipment Field Locking & Immutable Agreement Snapshots", () => {
+    const r06ShipmentId = "shipment-r06-lock";
+    const r06BookingId = "booking-r06-lock";
+
+    it("locks agreement-critical shipment fields against mutation once activeBookingId is set", async () => {
+      // Seed shipment with activeBookingId set (accepted booking exists)
+      await seedDoc(
+        `shipments/${r06ShipmentId}`,
+        shipmentFixture({
+          ownerId: senderUid,
+          activeBookingId: r06BookingId,
+          activeCarrierId: travelerUid,
+          activeTripId: tripId,
+          weightKg: 5,
+          packageCategory: "electronics",
+          packageDescription: "Original camera package",
+          rewardAmount: 60,
+          packageContentVersion: 1,
+        }),
+      );
+
+      const ref = doc(userDb(senderUid), `shipments/${r06ShipmentId}`);
+
+      // Attempting to change weightKg must fail
+      await assertFails(
+        updateDoc(ref, {
+          weightKg: 10,
+          updatedAt: serverTimestamp(),
+        }),
+      );
+
+      // Attempting to change packageDescription must fail
+      await assertFails(
+        updateDoc(ref, {
+          packageDescription: "Changed to heavy machine",
+          updatedAt: serverTimestamp(),
+        }),
+      );
+
+      // Attempting to change rewardAmount must fail
+      await assertFails(
+        updateDoc(ref, {
+          rewardAmount: 120,
+          updatedAt: serverTimestamp(),
+        }),
+      );
+
+      // Attempting to increment packageContentVersion must fail
+      await assertFails(
+        updateDoc(ref, {
+          packageContentVersion: 2,
+          packageDescription: "Updated content",
+          updatedAt: serverTimestamp(),
+        }),
+      );
+
+      // Allowed: updating status (e.g. to closed) with all agreement-critical fields unchanged
+      await assertSucceeds(
+        updateDoc(ref, {
+          status: "closed",
+          updatedAt: serverTimestamp(),
+        }),
+      );
+    });
+
+    it("strictly denies all client writes to bookingAgreementSnapshots for any role", async () => {
+      const snapPath = `bookingAgreementSnapshots/${r06BookingId}`;
+      const snapData = {
+        bookingId: r06BookingId,
+        shipmentId: r06ShipmentId,
+        tripId,
+        senderId: senderUid,
+        travelerId: travelerUid,
+        weightKg: 5,
+        packageContentVersion: 1,
+      };
+
+      // Deny create
+      await assertFails(setDoc(doc(userDb(senderUid), snapPath), snapData));
+      await assertFails(setDoc(doc(userDb(travelerUid), snapPath), snapData));
+      await assertFails(setDoc(doc(roleDb("admin-1", "super_admin"), snapPath), snapData));
+
+      // Seed via admin emulator helper
+      await seedDoc(snapPath, snapData);
+
+      // Deny update
+      await assertFails(updateDoc(doc(userDb(senderUid), snapPath), { weightKg: 10 }));
+      await assertFails(updateDoc(doc(roleDb("admin-1", "super_admin"), snapPath), { weightKg: 10 }));
+
+      // Deny delete
+      await assertFails(deleteDoc(doc(userDb(senderUid), snapPath)));
+      await assertFails(deleteDoc(doc(roleDb("admin-1", "super_admin"), snapPath)));
+    });
+
+    it("allows booking participants and operations/safety admins to read bookingAgreementSnapshots, while denying other users", async () => {
+      const snapPath = `bookingAgreementSnapshots/${r06BookingId}`;
+      await seedDoc(snapPath, {
+        bookingId: r06BookingId,
+        shipmentId: r06ShipmentId,
+        tripId,
+        senderId: senderUid,
+        travelerId: travelerUid,
+        weightKg: 5,
+        packageContentVersion: 1,
+      });
+
+      // Sender and Traveler (participants) can read
+      await assertSucceeds(getDoc(doc(userDb(senderUid), snapPath)));
+      await assertSucceeds(getDoc(doc(userDb(travelerUid), snapPath)));
+
+      // Operations admin and Safety admin can read
+      await assertSucceeds(getDoc(doc(roleDb("ops-1", "operations_admin"), snapPath)));
+      await assertSucceeds(getDoc(doc(roleDb("safety-1", "safety_admin"), snapPath)));
+      await assertSucceeds(getDoc(doc(roleDb("super-1", "super_admin"), snapPath)));
+
+      // Unrelated user is denied
+      await assertFails(getDoc(doc(userDb(otherUid), snapPath)));
+
+      // Unauthenticated client is denied
+      const unauthDb = testEnv.unauthenticatedContext().firestore();
+      await assertFails(getDoc(doc(unauthDb, snapPath)));
     });
   });
 });

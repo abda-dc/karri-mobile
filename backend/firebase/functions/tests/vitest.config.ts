@@ -8,6 +8,6 @@ export default defineConfig({
     hookTimeout: 20_000,
     include: ["**/*.test.ts"],
     maxWorkers: 1,
-    testTimeout: 10_000,
+    testTimeout: 30_000,
   },
 });

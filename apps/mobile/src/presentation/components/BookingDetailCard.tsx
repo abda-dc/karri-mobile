@@ -26,12 +26,14 @@ import {
 } from "../../domain/shipment/ShipmentLifecycleEvent";
 import type { Trip } from "../../domain/trip/Trip";
 import type { TrustSummary } from "../../domain/trust/TrustScore";
+import type { BookingHandoffAgreement } from "../../domain/handoff/HandoffAgreement";
 import { colors, spacing, typography } from "../../theme/tokens";
 import { reportFriendlyError } from "../errors/getFriendlyError";
 import { mobileServices } from "../services/mobileServices";
 import { ActivityFeed } from "./ActivityFeed";
 import { BookingStatusCard } from "./BookingStatusCard";
 import { CustodySummaryCard } from "./CustodySummaryCard";
+import { HandoffCoordinationCard } from "./HandoffCoordinationCard";
 import { NextActionCard } from "./NextActionCard";
 import { RecentStatusUpdateCard } from "./RecentStatusUpdateCard";
 import { ShipmentStatusCard } from "./ShipmentStatusCard";
@@ -73,10 +75,17 @@ export function BookingDetailCard({
   const [rating, setRating] = useState("");
   const [comment, setComment] = useState("");
   const [custodyModalVisible, setCustodyModalVisible] = useState(false);
+  const [handoffAgreement, setHandoffAgreement] = useState<BookingHandoffAgreement | null>(null);
+  const [loadingHandoff, setLoadingHandoff] = useState(false);
 
   const isSender = booking.senderId === currentUserId;
   const isTraveler = booking.travelerId === currentUserId;
   const otherParticipantId = isSender ? booking.travelerId : booking.senderId;
+
+  const isPostAcceptance =
+    booking.status !== BookingStatus.Pending &&
+    booking.status !== BookingStatus.Declined &&
+    booking.status !== BookingStatus.Cancelled;
 
   useEffect(() => {
     let active = true;
@@ -105,6 +114,35 @@ export function BookingDetailCard({
     const unsubscribers: Array<() => void> = [];
     const onTimelineError = (error: Error) =>
       setActionError(reportFriendlyError(error, "booking-detail.watch-shipment-timeline"));
+
+    if (isPostAcceptance) {
+      setLoadingHandoff(true);
+      try {
+        unsubscribers.push(
+          mobileServices.handoff.watchAgreement(
+            booking.id,
+            (agreement) => {
+              if (active) {
+                setHandoffAgreement(agreement);
+                setLoadingHandoff(false);
+              }
+            },
+            () => {
+              if (active) {
+                setLoadingHandoff(false);
+              }
+            },
+          ),
+        );
+      } catch {
+        if (active) {
+          setLoadingHandoff(false);
+        }
+      }
+    } else {
+      setHandoffAgreement(null);
+      setLoadingHandoff(false);
+    }
 
     try {
       unsubscribers.push(
@@ -137,7 +175,7 @@ export function BookingDetailCard({
       active = false;
       for (const unsubscribe of unsubscribers) unsubscribe();
     };
-  }, [booking.id, booking.shipmentId, booking.tripId, isSender]);
+  }, [booking.id, booking.shipmentId, booking.tripId, isSender, isPostAcceptance]);
 
   const alreadyReviewed = reviews.some((review) => review.reviewerId === currentUserId);
   const recordedTypes = useMemo(
@@ -252,6 +290,14 @@ export function BookingDetailCard({
         currentUserId={currentUserId}
         identityStatus={identityStatus}
         pendingStatus={pendingTransition}
+        senderName={handoffAgreement?.senderContact.name}
+        travelerName={handoffAgreement?.travelerContact.name}
+      />
+      <HandoffCoordinationCard
+        booking={booking}
+        currentUserId={currentUserId}
+        handoffAgreement={handoffAgreement}
+        loading={loadingHandoff}
       />
       <ShipmentStatusCard bookingStatus={booking.status} shipment={shipment} trip={trip} />
       <RecentStatusUpdateCard
@@ -326,12 +372,22 @@ export function BookingDetailCard({
         ) : null}
 
         {booking.status === BookingStatus.Accepted && isTraveler ? (
-          <PrimaryButton
-            disabled={actionInProgress}
-            onPress={() => setCustodyModalVisible(true)}
-          >
-            Confirm pickup
-          </PrimaryButton>
+          <View style={styles.actions}>
+            {!handoffAgreement?.pickupVerification.verified ? (
+              <Banner
+                compact
+                message="Pickup handoff code verification is required before confirming shipment custody transfer."
+                title="Handoff verification required"
+                variant="warning"
+              />
+            ) : null}
+            <PrimaryButton
+              disabled={actionInProgress || !handoffAgreement?.pickupVerification.verified}
+              onPress={() => setCustodyModalVisible(true)}
+            >
+              Confirm pickup
+            </PrimaryButton>
+          </View>
         ) : null}
 
         {booking.status === BookingStatus.InTransit && isTraveler ? (
@@ -377,8 +433,16 @@ export function BookingDetailCard({
                   Record arrival
                 </PrimaryButton>
               ) : null}
+              {!handoffAgreement?.deliveryVerification.verified ? (
+                <Banner
+                  compact
+                  message="Delivery verification code from the intended receiver is required before confirming final delivery."
+                  title="Delivery code required"
+                  variant="warning"
+                />
+              ) : null}
               <PrimaryButton
-                disabled={actionInProgress}
+                disabled={actionInProgress || !handoffAgreement?.deliveryVerification.verified}
                 loading={actionLoading === BookingStatus.Delivered}
                 onPress={() => transition(BookingStatus.Delivered, "Delivery confirmed.")}
               >

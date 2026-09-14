@@ -2,6 +2,7 @@
   "expo": {
     "name": "Karri Mobile",
     "slug": "mobile",
+    "scheme": "karri",
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,6 +11,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.karrimobile.app",
       "buildNumber": "1",
+      "associatedDomains": [
+        "applinks:karri-mobile-dev.firebaseapp.com"
+      ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -17,6 +21,28 @@
     "android": {
       "package": "com.karrimobile.app",
       "versionCode": 1,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "karri-mobile-dev.firebaseapp.com",
+              "pathPrefix": "/__/auth/action"
+            },
+            {
+              "scheme": "https",
+              "host": "karri-mobile-dev.firebaseapp.com",
+              "pathPrefix": "/verify"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

@@ -7,12 +7,14 @@ import {
 } from "../../domain/custody/CustodyEvent";
 import type { CustodyRepository } from "../../domain/custody/CustodyRepository";
 import { assertCanAppendCustodyEvent } from "../../domain/custody/custodyStateMachine";
+import type { CustodyTransitionGateway } from "./CustodyTransitionGateway";
 import { DomainValidationError, optionalText } from "./validation";
 
 export class CustodyService {
   constructor(
     private readonly custody: CustodyRepository,
     private readonly bookings: BookingRepository,
+    private readonly custodyGateway?: CustodyTransitionGateway,
   ) {}
 
   async recordTravelEvent(input: RecordCustodyEventDto): Promise<CustodyEvent> {
@@ -42,6 +44,22 @@ export class CustodyService {
     const existing = await this.custody.listByBooking(booking.id);
 
     assertCanAppendCustodyEvent(existing, input.eventType);
+
+    if (this.custodyGateway) {
+      await this.custodyGateway.recordTravelEvent({
+        bookingId: booking.id,
+        actorId: input.actorId,
+        eventType: input.eventType as "airport_departure" | "airport_arrival",
+        location: input.location,
+        note: input.note,
+      });
+
+      const updatedEvents = await this.custody.listByBooking(booking.id);
+      const matched = updatedEvents.find((e) => e.eventType === input.eventType);
+      if (matched) {
+        return matched;
+      }
+    }
 
     return this.custody.append({
       bookingId: booking.id,

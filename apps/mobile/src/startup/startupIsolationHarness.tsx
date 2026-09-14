@@ -6,12 +6,10 @@ import {
   Text,
   View,
 } from "react-native";
-import { registerRootComponent } from "expo";
-import { RouterIsolationApp } from "./src/startup/routerIsolationHarness";
 
 declare const require: (moduleName: string) => unknown;
 
-type ProbeStatus = "pending" | "running" | "pass" | "fail";
+export type ProbeStatus = "pending" | "running" | "pass" | "fail";
 
 export interface IsolationErrorDetails {
   readonly name: string;
@@ -85,14 +83,14 @@ const probeLabels = [
 const defaultProbeDependencies: IsolationProbeDependencies = {
   loadAsyncStorage: () => require("@react-native-async-storage/async-storage"),
   loadFirebaseAuthPersistence: () =>
-    require("./src/infrastructure/firebase/authPersistence.native"),
+    require("../infrastructure/firebase/authPersistence.native"),
   loadFirestoreMemoryCache: () =>
-    require("./src/infrastructure/firebase/firestoreCache.native"),
+    require("../infrastructure/firebase/firestoreCache.native"),
   loadFirebaseClient: () =>
-    require("./src/infrastructure/firebase/client"),
+    require("../infrastructure/firebase/client"),
   loadExpoNotifications: () => require("expo-notifications"),
   loadMobileServices: () =>
-    require("./src/presentation/services/mobileServices"),
+    require("../presentation/services/mobileServices"),
 };
 
 function safelyStringify(value: unknown): string {
@@ -410,5 +408,3 @@ const styles = StyleSheet.create({
   logCard: { backgroundColor: "#020617", borderRadius: 12, padding: 14 },
   logText: { color: "#dbeafe", fontFamily: "monospace", fontSize: 12, lineHeight: 18, marginBottom: 6 },
 });
-
-registerRootComponent(RouterIsolationApp);

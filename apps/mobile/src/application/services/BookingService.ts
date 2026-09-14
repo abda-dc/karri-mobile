@@ -28,6 +28,8 @@ import {
   CustodyEventType,
   type NewCustodyEvent,
 } from "../../domain/custody/CustodyEvent";
+import type { BookingAcceptanceGateway } from "./BookingAcceptanceGateway";
+import type { CustodyTransitionGateway } from "./CustodyTransitionGateway";
 import type { Clock } from "./Clock";
 import { systemClock } from "./Clock";
 import { DomainValidationError, requireText } from "./validation";
@@ -53,6 +55,8 @@ export class BookingService {
     private readonly trips: TripRepository,
     private readonly events: EventPublisher,
     private readonly clock: Clock = systemClock,
+    private readonly acceptanceGateway?: BookingAcceptanceGateway,
+    private readonly custodyGateway?: CustodyTransitionGateway,
   ) {}
 
   async request(input: RequestBookingDto): Promise<Booking> {
@@ -162,6 +166,98 @@ export class BookingService {
     this.assertActorCanTransition(booking, input.actorId, input.nextStatus);
 
     const occurredAt = this.clock.now();
+
+    if (input.nextStatus === BookingStatus.Accepted && this.acceptanceGateway) {
+      await this.acceptanceGateway.acceptBooking({
+        bookingId: booking.id,
+        actorId: input.actorId,
+        location: input.location,
+        note: input.note,
+      });
+
+      const updatedBooking = (await this.bookings.findById(booking.id)) ?? {
+        ...booking,
+        status: BookingStatus.Accepted,
+        updatedAt: occurredAt,
+      };
+
+      const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
+      if (event) {
+        this.events.publish(event);
+      }
+
+      return updatedBooking;
+    }
+
+    if (input.nextStatus === BookingStatus.InTransit && this.custodyGateway) {
+      if (!input.custodyAcceptance) {
+        throw new DomainValidationError("Traveler custody acceptance declaration is required to confirm pickup.");
+      }
+
+      await this.custodyGateway.confirmPickup({
+        bookingId: booking.id,
+        actorId: input.actorId,
+        location: input.location,
+        note: input.note,
+        custodyAcceptance: input.custodyAcceptance,
+      });
+
+      const updatedBooking = (await this.bookings.findById(booking.id)) ?? {
+        ...booking,
+        status: BookingStatus.InTransit,
+        updatedAt: occurredAt,
+      };
+
+      const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
+      if (event) {
+        this.events.publish(event);
+      }
+
+      return updatedBooking;
+    }
+
+    if (input.nextStatus === BookingStatus.Delivered && this.custodyGateway) {
+      await this.custodyGateway.confirmDelivery({
+        bookingId: booking.id,
+        actorId: input.actorId,
+        location: input.location,
+        note: input.note,
+      });
+
+      const updatedBooking = (await this.bookings.findById(booking.id)) ?? {
+        ...booking,
+        status: BookingStatus.Delivered,
+        updatedAt: occurredAt,
+      };
+
+      const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
+      if (event) {
+        this.events.publish(event);
+      }
+
+      return updatedBooking;
+    }
+
+    if (input.nextStatus === BookingStatus.Completed && this.custodyGateway) {
+      await this.custodyGateway.completeBooking({
+        bookingId: booking.id,
+        actorId: input.actorId,
+      });
+
+      const updatedBooking = (await this.bookings.findById(booking.id)) ?? {
+        ...booking,
+        status: BookingStatus.Completed,
+        updatedAt: occurredAt,
+      };
+
+      const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
+      if (event) {
+        this.events.publish(event);
+      }
+
+      return updatedBooking;
+    }
+
     let mappedAcceptance: TravelerCustodyAcceptance | null = null;
 
     if (input.nextStatus === BookingStatus.InTransit) {

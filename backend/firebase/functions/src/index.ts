@@ -21,6 +21,10 @@ import {
   AdministrativeHoldReleaseReasonCode,
 } from "./utils/reasonCodes.js";
 
+import { BookingAcceptanceService } from "./services/BookingAcceptanceService.js";
+import { HandoffCoordinationService } from "./services/HandoffCoordinationService.js";
+import { CustodyTransitionService } from "./services/CustodyTransitionService.js";
+
 // Initialize Firebase Admin SDK if not already done
 if (admin.apps.length === 0) {
   admin.initializeApp();
@@ -31,6 +35,9 @@ const auditLogService = new AuditLogService(db);
 const shipmentSafetyReviewService = new ShipmentSafetyReviewService(db, auditLogService);
 const administrativeHoldService = new AdministrativeHoldService(db, auditLogService);
 const pushTokenPersistenceService = new PushTokenPersistenceService(db);
+const handoffCoordinationService = new HandoffCoordinationService(db);
+const bookingAcceptanceService = new BookingAcceptanceService(db, handoffCoordinationService);
+const custodyTransitionService = new CustodyTransitionService(db);
 const bookingAcceptedNotificationService = new BookingAcceptedNotificationService(
   db,
   new ExpoPushProvider(),
@@ -276,6 +283,218 @@ export const unregisterPushToken = onCall(callableRuntimeOptions, async (request
       status: result.status,
       alreadyInactive: result.alreadyInactive,
     };
+  } catch (error) {
+    throw mapError(error);
+  }
+});
+
+export const acceptBooking = onCall(callableRuntimeOptions, async (request) => {
+  try {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "Unauthenticated request.");
+    }
+    const data = request.data;
+    if (!data || typeof data !== "object") {
+      throw new ValidationError("Request payload must be an object.");
+    }
+    const { bookingId, location, note, idempotencyKey } = data;
+
+    const result = await db.runTransaction(async (transaction) => {
+      return await bookingAcceptanceService.acceptBooking(
+        transaction,
+        { bookingId, location, note, idempotencyKey },
+        request.auth!.uid,
+      );
+    });
+
+    return {
+      success: result.success,
+      bookingId: result.bookingId,
+      alreadyAccepted: result.alreadyAccepted,
+      tripId: result.tripId,
+      shipmentId: result.shipmentId,
+      reservedWeightKg: result.reservedWeightKg,
+    };
+  } catch (error) {
+    throw mapError(error);
+  }
+});
+
+export const issueHandoffVerificationCode = onCall(callableRuntimeOptions, async (request) => {
+  try {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "Unauthenticated request.");
+    }
+    const data = request.data;
+    if (!data || typeof data !== "object") {
+      throw new ValidationError("Request payload must be an object.");
+    }
+    const { bookingId, codeType } = data;
+    const result = await handoffCoordinationService.issueHandoffCode(
+      request.auth.uid,
+      bookingId,
+      codeType,
+    );
+    return result;
+  } catch (error) {
+    throw mapError(error);
+  }
+});
+
+export const verifyPickupHandoff = onCall(callableRuntimeOptions, async (request) => {
+  try {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "Unauthenticated request.");
+    }
+    const data = request.data;
+    if (!data || typeof data !== "object") {
+      throw new ValidationError("Request payload must be an object.");
+    }
+    const { bookingId, code } = data;
+    const result = await handoffCoordinationService.verifyPickupHandoff(
+      request.auth.uid,
+      bookingId,
+      code,
+    );
+    return result;
+  } catch (error) {
+    throw mapError(error);
+  }
+});
+
+export const verifyDeliveryHandoff = onCall(callableRuntimeOptions, async (request) => {
+  try {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "Unauthenticated request.");
+    }
+    const data = request.data;
+    if (!data || typeof data !== "object") {
+      throw new ValidationError("Request payload must be an object.");
+    }
+    const { bookingId, code } = data;
+    const result = await handoffCoordinationService.verifyDeliveryHandoff(
+      request.auth.uid,
+      bookingId,
+      code,
+    );
+    return result;
+  } catch (error) {
+    throw mapError(error);
+  }
+});
+
+export const regenerateHandoffCode = onCall(callableRuntimeOptions, async (request) => {
+  try {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "Unauthenticated request.");
+    }
+    const data = request.data;
+    if (!data || typeof data !== "object") {
+      throw new ValidationError("Request payload must be an object.");
+    }
+    const { bookingId, codeType } = data;
+    const result = await handoffCoordinationService.regenerateHandoffCode(
+      request.auth.uid,
+      bookingId,
+      codeType,
+    );
+    return result;
+  } catch (error) {
+    throw mapError(error);
+  }
+});
+
+export const confirmPickupCustody = onCall(callableRuntimeOptions, async (request) => {
+  try {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "Unauthenticated request.");
+    }
+    const data = request.data;
+    if (!data || typeof data !== "object") {
+      throw new ValidationError("Request payload must be an object.");
+    }
+
+    const result = await db.runTransaction(async (transaction) => {
+      return await custodyTransitionService.confirmPickupCustody(
+        transaction,
+        data,
+        request.auth!.uid,
+      );
+    });
+
+    return result;
+  } catch (error) {
+    throw mapError(error);
+  }
+});
+
+export const confirmDeliveryCustody = onCall(callableRuntimeOptions, async (request) => {
+  try {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "Unauthenticated request.");
+    }
+    const data = request.data;
+    if (!data || typeof data !== "object") {
+      throw new ValidationError("Request payload must be an object.");
+    }
+
+    const result = await db.runTransaction(async (transaction) => {
+      return await custodyTransitionService.confirmDeliveryCustody(
+        transaction,
+        data,
+        request.auth!.uid,
+      );
+    });
+
+    return result;
+  } catch (error) {
+    throw mapError(error);
+  }
+});
+
+export const completeBookingCustody = onCall(callableRuntimeOptions, async (request) => {
+  try {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "Unauthenticated request.");
+    }
+    const data = request.data;
+    if (!data || typeof data !== "object") {
+      throw new ValidationError("Request payload must be an object.");
+    }
+
+    const result = await db.runTransaction(async (transaction) => {
+      return await custodyTransitionService.completeBookingCustody(
+        transaction,
+        data,
+        request.auth!.uid,
+      );
+    });
+
+    return result;
+  } catch (error) {
+    throw mapError(error);
+  }
+});
+
+export const recordTravelCustodyEvent = onCall(callableRuntimeOptions, async (request) => {
+  try {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "Unauthenticated request.");
+    }
+    const data = request.data;
+    if (!data || typeof data !== "object") {
+      throw new ValidationError("Request payload must be an object.");
+    }
+
+    const result = await db.runTransaction(async (transaction) => {
+      return await custodyTransitionService.recordTravelEvent(
+        transaction,
+        data,
+        request.auth!.uid,
+      );
+    });
+
+    return result;
   } catch (error) {
     throw mapError(error);
   }

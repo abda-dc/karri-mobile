@@ -99,8 +99,51 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     googleServiceInfoPlistFile = "./GoogleService-Info.plist";
   }
 
-  const androidConfig = { ...(config.android ?? {}) };
-  const iosConfig = { ...(config.ios ?? {}) };
+  const authDomain =
+    process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ||
+    "karri-mobile-dev.firebaseapp.com";
+
+  const existingIntentFilters = config.android?.intentFilters ?? [];
+  const hasAuthIntentFilter = existingIntentFilters.some((filter: any) =>
+    filter.data?.some((d: any) => d.host === authDomain),
+  );
+  const androidIntentFilters = hasAuthIntentFilter
+    ? existingIntentFilters
+    : [
+        ...existingIntentFilters,
+        {
+          action: "VIEW",
+          autoVerify: true,
+          data: [
+            {
+              scheme: "https",
+              host: authDomain,
+              pathPrefix: "/__/auth/action",
+            },
+            {
+              scheme: "https",
+              host: authDomain,
+              pathPrefix: "/verify",
+            },
+          ],
+          category: ["BROWSABLE", "DEFAULT"],
+        },
+      ];
+
+  const existingAssociatedDomains = config.ios?.associatedDomains ?? [];
+  const authDomainEntry = `applinks:${authDomain}`;
+  const iosAssociatedDomains = existingAssociatedDomains.includes(authDomainEntry)
+    ? existingAssociatedDomains
+    : [...existingAssociatedDomains, authDomainEntry];
+
+  const androidConfig = {
+    ...(config.android ?? {}),
+    intentFilters: androidIntentFilters,
+  };
+  const iosConfig = {
+    ...(config.ios ?? {}),
+    associatedDomains: iosAssociatedDomains,
+  };
 
   delete androidConfig.googleServicesFile;
   delete iosConfig.googleServicesFile;

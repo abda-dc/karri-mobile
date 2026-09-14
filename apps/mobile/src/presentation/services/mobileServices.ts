@@ -16,11 +16,13 @@ import { ShipmentService } from "../../application/services/ShipmentService";
 import { ShipmentTimelineService } from "../../application/services/ShipmentTimelineService";
 import { TripService } from "../../application/services/TripService";
 import { TrustService } from "../../application/services/TrustService";
+import { HandoffService } from "../../application/services/HandoffService";
 import { EventBus } from "../../domain/events/EventBus";
 import { FirebaseAuthSessionGateway } from "../../infrastructure/firebase/auth";
 import {
   FirebaseBookingRepository,
   FirebaseCustodyRepository,
+  FirebaseHandoffRepository,
   FirebaseNotificationRepository,
   FirebaseNotificationPreferenceRepository,
   FirebaseProfileRepository,
@@ -43,6 +45,9 @@ import {
 import { reportApplicationError } from "../errors/getFriendlyError";
 import { PrivilegedCallableTransport } from "../../infrastructure/firebase/privilegedCallableTransport";
 import { PlatformAppCheckTokenProvider } from "../../infrastructure/firebase/appCheckTokenProvider";
+import { FirebaseBookingAcceptanceGateway } from "../../infrastructure/firebase/gateways/FirebaseBookingAcceptanceGateway";
+import { FirebaseCustodyTransitionGateway } from "../../infrastructure/firebase/gateways/FirebaseCustodyTransitionGateway";
+import { systemClock } from "../../application/services/Clock";
 
 const eventBus = new EventBus();
 const bookingRepository = new FirebaseBookingRepository();
@@ -90,6 +95,14 @@ const pushRegistrationService = new PushRegistrationService(
   new ExpoPushTokenRegistrationGateway(),
   new FirebasePushTokenRepository(privilegedCallableTransport),
 );
+const bookingAcceptanceGateway = new FirebaseBookingAcceptanceGateway(
+  privilegedCallableTransport,
+);
+const custodyTransitionGateway = new FirebaseCustodyTransitionGateway(
+  privilegedCallableTransport,
+);
+const handoffRepository = new FirebaseHandoffRepository(privilegedCallableTransport);
+const handoffService = new HandoffService(handoffRepository, systemClock);
 const notificationRouter = new NotificationRouter(
   new FirebaseNotificationRoutingSource(),
 );
@@ -115,8 +128,12 @@ export const mobileServices = {
     shipmentRepository,
     tripRepository,
     eventBus,
+    systemClock,
+    bookingAcceptanceGateway,
+    custodyTransitionGateway,
   ),
-  custody: new CustodyService(custodyRepository, bookingRepository),
+  custody: new CustodyService(custodyRepository, bookingRepository, custodyTransitionGateway),
+  handoff: handoffService,
   identityVerification: identityVerificationService,
   matching: matchingService,
   localNotifications: localNotificationService,

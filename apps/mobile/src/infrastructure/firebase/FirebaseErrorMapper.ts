@@ -215,6 +215,84 @@ function mapFirestoreError(error: unknown, providerCode: string): ApplicationErr
   }
 }
 
+function mapCallableError(error: unknown, providerCode: string): ApplicationError {
+  const code = providerCode.slice("callable/".length);
+  const rawMessage = error instanceof Error ? error.message : "";
+
+  if (rawMessage.includes("no longer has enough available capacity")) {
+    return createMappedError(error, providerCode, {
+      code: ApplicationErrorCode.Conflict,
+      retryable: false,
+      retryGuidance: "Check another trip or package.",
+      userMessage: "This trip no longer has enough available capacity.",
+    });
+  }
+
+  if (rawMessage.includes("already been accepted by another traveler")) {
+    return createMappedError(error, providerCode, {
+      code: ApplicationErrorCode.Conflict,
+      retryable: false,
+      retryGuidance: "Choose another shipment.",
+      userMessage: "This shipment has already been accepted by another traveler.",
+    });
+  }
+
+  switch (code) {
+    case "already-exists":
+    case "failed-precondition":
+      return createMappedError(error, providerCode, {
+        code: ApplicationErrorCode.Conflict,
+        retryable: false,
+        retryGuidance: "Refresh the latest state before another attempt.",
+        userMessage: rawMessage || "That action was already completed or is no longer available.",
+      });
+    case "permission-denied":
+      return createMappedError(error, providerCode, {
+        code: ApplicationErrorCode.Permission,
+        retryable: false,
+        retryGuidance: "Check your account permissions and try again.",
+        userMessage: rawMessage || "You do not have permission to perform that action.",
+      });
+    case "not-found":
+      return createMappedError(error, providerCode, {
+        code: ApplicationErrorCode.NotFound,
+        retryable: false,
+        retryGuidance: "Refresh and choose an available item.",
+        userMessage: rawMessage || "That record is no longer available.",
+      });
+    case "invalid-argument":
+      return createMappedError(error, providerCode, {
+        code: ApplicationErrorCode.Validation,
+        retryable: false,
+        retryGuidance: "Review the information and try again.",
+        userMessage: rawMessage || "Karri could not accept part of that request.",
+      });
+    case "unauthenticated":
+    case "signed-out":
+    case "invalid-auth-token":
+      return createMappedError(error, providerCode, {
+        code: ApplicationErrorCode.Authentication,
+        retryable: false,
+        retryGuidance: "Sign in again, then retry the action.",
+        userMessage: "Your Karri session is no longer active.",
+      });
+    case "network":
+      return createMappedError(error, providerCode, {
+        code: ApplicationErrorCode.Network,
+        retryable: true,
+        retryGuidance: "Check your connection and try again.",
+        userMessage: "Karri cannot reach the service right now.",
+      });
+    default:
+      return createMappedError(error, providerCode, {
+        code: ApplicationErrorCode.Temporary,
+        retryable: true,
+        retryGuidance: "Try again in a moment.",
+        userMessage: rawMessage || "The service could not complete that action right now.",
+      });
+  }
+}
+
 export class FirebaseErrorMapper implements ApplicationErrorMapper {
   map(error: unknown): ApplicationError | null {
     if (error instanceof Error && error.name === "FirebaseConfigurationError") {
@@ -226,6 +304,25 @@ export class FirebaseErrorMapper implements ApplicationErrorMapper {
       });
     }
 
+    if (error instanceof Error) {
+      if (error.message.includes("no longer has enough available capacity")) {
+        return createMappedError(error, null, {
+          code: ApplicationErrorCode.Conflict,
+          retryable: false,
+          retryGuidance: "Check another trip or package.",
+          userMessage: "This trip no longer has enough available capacity.",
+        });
+      }
+      if (error.message.includes("already been accepted by another traveler")) {
+        return createMappedError(error, null, {
+          code: ApplicationErrorCode.Conflict,
+          retryable: false,
+          retryGuidance: "Choose another shipment.",
+          userMessage: "This shipment has already been accepted by another traveler.",
+        });
+      }
+    }
+
     const providerCode = getProviderCode(error);
     if (!providerCode) {
       return null;
@@ -233,6 +330,10 @@ export class FirebaseErrorMapper implements ApplicationErrorMapper {
 
     if (providerCode.startsWith("auth/")) {
       return mapAuthError(error, providerCode);
+    }
+
+    if (providerCode.startsWith("callable/")) {
+      return mapCallableError(error, providerCode);
     }
 
     return mapFirestoreError(error, providerCode);
