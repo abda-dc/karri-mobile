@@ -4,6 +4,9 @@ import type { DocumentData, DocumentReference } from "firebase-admin/firestore";
 import {
   BOOKING_ACCEPTED_NOTIFICATION,
   EXPO_VISIBLE_NOTIFICATION,
+  LIFECYCLE_NOTIFICATIONS,
+  type SupportedLifecycleEventType,
+  type DeliveryStatus,
   type BookingUpdateResult,
   type ExpoPushMessage,
   type PushDeliveryResult,
@@ -54,8 +57,16 @@ function digestId(prefix: string, input: string): string {
   return `${prefix}_${createHash("sha256").update(input, "utf8").digest("hex")}`;
 }
 
+export function deriveLifecycleNotificationId(
+  eventType: string,
+  bookingId: string,
+  recipientId: string,
+): string {
+  return digestId("notification", `${eventType}:v1:${bookingId}:${recipientId}`);
+}
+
 export function deriveBookingAcceptedNotificationId(bookingId: string, senderId: string): string {
-  return digestId("notification", `booking.accepted:v1:${bookingId}:${senderId}`);
+  return deriveLifecycleNotificationId("booking.accepted", bookingId, senderId);
 }
 
 export function derivePushDeliveryEffectId(notificationId: string, deviceId: string): string {
@@ -108,16 +119,88 @@ function valuesEqual(left: unknown, right: unknown): boolean {
   return false;
 }
 
-function validateAcceptedTransition(bookingId: string, before: DocumentData, after: DocumentData): void {
+export interface TransitionDescriptor {
+  readonly eventType: SupportedLifecycleEventType;
+  readonly recipientId: string;
+  readonly actorId: string;
+  readonly template: (typeof LIFECYCLE_NOTIFICATIONS)[SupportedLifecycleEventType];
+}
+
+export function resolveBookingLifecycleTransition(
+  before: DocumentData,
+  after: DocumentData,
+): TransitionDescriptor | null {
+  if (before.status === "pending" && after.status === "accepted") {
+    return {
+      eventType: "booking.accepted",
+      recipientId: after.senderId,
+      actorId: after.travelerId,
+      template: LIFECYCLE_NOTIFICATIONS["booking.accepted"],
+    };
+  }
+  if (before.status === "accepted" && after.status === "in_transit") {
+    return {
+      eventType: "package.picked_up",
+      recipientId: after.senderId,
+      actorId: after.travelerId,
+      template: LIFECYCLE_NOTIFICATIONS["package.picked_up"],
+    };
+  }
+  if (before.status === "in_transit" && after.status === "delivered") {
+    return {
+      eventType: "package.delivered",
+      recipientId: after.senderId,
+      actorId: after.travelerId,
+      template: LIFECYCLE_NOTIFICATIONS["package.delivered"],
+    };
+  }
+  if (before.status === "delivered" && after.status === "completed") {
+    return {
+      eventType: "shipment.completed",
+      recipientId: after.travelerId,
+      actorId: after.senderId,
+      template: LIFECYCLE_NOTIFICATIONS["shipment.completed"],
+    };
+  }
+  if (before.status === "pending" && after.status === "declined") {
+    return {
+      eventType: "booking.declined",
+      recipientId: after.senderId,
+      actorId: after.travelerId,
+      template: LIFECYCLE_NOTIFICATIONS["booking.declined"],
+    };
+  }
+  if (before.status === "pending" && after.status === "cancelled") {
+    return {
+      eventType: "booking.cancelled",
+      recipientId: after.travelerId,
+      actorId: after.senderId,
+      template: LIFECYCLE_NOTIFICATIONS["booking.cancelled"],
+    };
+  }
+  return null;
+}
+
+export function validateLifecycleTransition(
+  bookingId: string,
+  before: DocumentData,
+  after: DocumentData,
+  descriptor: TransitionDescriptor,
+): void {
+  const isAccepted = descriptor.eventType === "booking.accepted";
+  const errorMessage = isAccepted
+    ? "Invalid booking acceptance transition."
+    : "Invalid booking lifecycle transition.";
+
   if (!isIdentifier(bookingId) || !isIdentifier(after.senderId) || !isIdentifier(after.travelerId)) {
-    throw new Error("Invalid booking acceptance transition.");
+    throw new Error(errorMessage);
   }
   if (after.senderId === after.travelerId) {
-    throw new Error("Invalid booking acceptance transition.");
+    throw new Error(errorMessage);
   }
   for (const field of IMMUTABLE_BOOKING_FIELDS) {
     if (!valuesEqual(before[field], after[field])) {
-      throw new Error("Invalid booking acceptance transition.");
+      throw new Error(errorMessage);
     }
   }
 
@@ -125,18 +208,53 @@ function validateAcceptedTransition(bookingId: string, before: DocumentData, aft
   const afterHistory = after.statusHistory;
   if (!Array.isArray(beforeHistory) || !Array.isArray(afterHistory) ||
       afterHistory.length !== beforeHistory.length + 1) {
-    throw new Error("Invalid booking acceptance transition.");
+    throw new Error(errorMessage);
   }
   for (let index = 0; index < beforeHistory.length; index += 1) {
     if (!valuesEqual(beforeHistory[index], afterHistory[index])) {
-      throw new Error("Invalid booking acceptance transition.");
+      throw new Error(errorMessage);
     }
   }
   const appended = afterHistory[afterHistory.length - 1];
   if (!appended || typeof appended !== "object" || Array.isArray(appended) ||
-      appended.status !== "accepted" || appended.changedBy !== after.travelerId ||
+      appended.status !== after.status || appended.changedBy !== descriptor.actorId ||
       !isTimestamp(appended.changedAt)) {
+    throw new Error(errorMessage);
+  }
+}
+
+function validateAcceptedTransition(bookingId: string, before: DocumentData, after: DocumentData): void {
+  const descriptor = resolveBookingLifecycleTransition(before, after);
+  if (!descriptor || descriptor.eventType !== "booking.accepted") {
     throw new Error("Invalid booking acceptance transition.");
+  }
+  validateLifecycleTransition(bookingId, before, after, descriptor);
+}
+
+export function validateBookingCreated(bookingId: string, booking: DocumentData): void {
+  const errorMessage = "Invalid booking request document.";
+  if (!isIdentifier(bookingId) || !isIdentifier(booking.senderId) || !isIdentifier(booking.travelerId)) {
+    throw new Error(errorMessage);
+  }
+  if (booking.senderId === booking.travelerId) {
+    throw new Error(errorMessage);
+  }
+  if (booking.status !== "pending") {
+    throw new Error(errorMessage);
+  }
+  if (!Array.isArray(booking.statusHistory) || booking.statusHistory.length < 1) {
+    throw new Error(errorMessage);
+  }
+  const initial = booking.statusHistory[0];
+  if (
+    !initial ||
+    typeof initial !== "object" ||
+    Array.isArray(initial) ||
+    initial.status !== "pending" ||
+    initial.changedBy !== booking.senderId ||
+    !isTimestamp(initial.changedAt)
+  ) {
+    throw new Error(errorMessage);
   }
 }
 
@@ -199,9 +317,13 @@ function hasExactFields(value: unknown, fields: ReadonlyArray<string>): value is
   return actualFields.length === fields.length && fields.every((field) => actualFields.includes(field));
 }
 
-function validPreferences(data: DocumentData | undefined, senderId: string): boolean {
+function validPreferences(
+  data: DocumentData | undefined,
+  recipientId: string,
+  requiredCategory: typeof CATEGORY_FIELDS[number] = "booking_updates",
+): boolean {
   if (!hasExactFields(data, PREFERENCE_FIELDS) ||
-      data.userId !== senderId ||
+      data.userId !== recipientId ||
       !isFirestoreTimestamp(data.createdAt) ||
       !isFirestoreTimestamp(data.updatedAt) ||
       !hasExactFields(data.channels, CHANNEL_FIELDS) ||
@@ -217,7 +339,7 @@ function validPreferences(data: DocumentData | undefined, senderId: string): boo
     channels.email === false &&
     channels.sms === false &&
     CATEGORY_FIELDS.every((field) => typeof categories[field] === "boolean") &&
-    categories.booking_updates === true;
+    categories[requiredCategory] === true;
 }
 
 function validRegistration(data: DocumentData, documentId: string, senderId: string): boolean {
@@ -232,12 +354,17 @@ function validRegistration(data: DocumentData, documentId: string, senderId: str
     data.registrationVersion >= 1;
 }
 
-function canonicalIdentityMatches(data: DocumentData, bookingId: string, senderId: string): boolean {
-  return data.userId === senderId &&
-    data.title === BOOKING_ACCEPTED_NOTIFICATION.title &&
-    data.body === BOOKING_ACCEPTED_NOTIFICATION.body &&
-    data.type === BOOKING_ACCEPTED_NOTIFICATION.type &&
-    data.relatedEntityType === BOOKING_ACCEPTED_NOTIFICATION.relatedEntityType &&
+function canonicalIdentityMatches(
+  data: DocumentData,
+  bookingId: string,
+  recipientId: string,
+  template: { title: string; body: string; type: string; relatedEntityType: string } = BOOKING_ACCEPTED_NOTIFICATION,
+): boolean {
+  return data.userId === recipientId &&
+    data.title === template.title &&
+    data.body === template.body &&
+    data.type === template.type &&
+    data.relatedEntityType === template.relatedEntityType &&
     data.relatedId === bookingId;
 }
 
@@ -249,34 +376,61 @@ export class BookingAcceptedNotificationService {
     private readonly clock: () => Date = () => new Date(),
   ) {}
 
+  async handleBookingCreated(
+    bookingId: string,
+    booking: DocumentData,
+  ): Promise<BookingUpdateResult> {
+    if (booking.status !== "pending") {
+      return this.result(false, null, false, "not_applicable", 0);
+    }
+    validateBookingCreated(bookingId, booking);
+
+    const descriptor: TransitionDescriptor = {
+      eventType: "booking.requested",
+      recipientId: booking.travelerId,
+      actorId: booking.senderId,
+      template: LIFECYCLE_NOTIFICATIONS["booking.requested"],
+    };
+
+    return await this.dispatchLifecycleNotification(bookingId, descriptor);
+  }
+
   async handleBookingUpdate(
     bookingId: string,
     before: DocumentData,
     after: DocumentData,
   ): Promise<BookingUpdateResult> {
-    if (before.status !== "pending" || after.status !== "accepted") {
+    const descriptor = resolveBookingLifecycleTransition(before, after);
+    if (!descriptor) {
       return this.result(false, null, false, "not_applicable", 0);
     }
 
-    validateAcceptedTransition(bookingId, before, after);
-    const senderId = after.senderId as string;
-    const notificationId = deriveBookingAcceptedNotificationId(bookingId, senderId);
+    validateLifecycleTransition(bookingId, before, after, descriptor);
+    return await this.dispatchLifecycleNotification(bookingId, descriptor);
+  }
+
+  public async dispatchLifecycleNotification(
+    bookingId: string,
+    descriptor: TransitionDescriptor,
+  ): Promise<BookingUpdateResult> {
+    const recipientId = descriptor.recipientId;
+    const notificationId = deriveLifecycleNotificationId(descriptor.eventType, bookingId, recipientId);
     const notificationRef = this.db.collection("notifications").doc(notificationId);
     const canonicalCreated = await this.db.runTransaction(async (transaction) => {
       const existing = await transaction.get(notificationRef);
       if (existing.exists) {
-        if (!canonicalIdentityMatches(existing.data() ?? {}, bookingId, senderId)) {
+        if (!canonicalIdentityMatches(existing.data() ?? {}, bookingId, recipientId, descriptor.template)) {
           throw new Error("Conflicting canonical notification.");
         }
         return false;
       }
       const timestamp = admin.firestore.FieldValue.serverTimestamp();
       transaction.create(notificationRef, {
-        userId: senderId,
-        title: BOOKING_ACCEPTED_NOTIFICATION.title,
-        body: BOOKING_ACCEPTED_NOTIFICATION.body,
-        type: BOOKING_ACCEPTED_NOTIFICATION.type,
-        relatedEntityType: BOOKING_ACCEPTED_NOTIFICATION.relatedEntityType,
+        userId: recipientId,
+        title: descriptor.template.title,
+        body: descriptor.template.body,
+        type: descriptor.template.type,
+        relatedEntityType: descriptor.template.relatedEntityType,
         relatedId: bookingId,
         status: "unread",
         readAt: null,
@@ -296,12 +450,12 @@ export class BookingAcceptedNotificationService {
 
     let preferences: DocumentData | undefined;
     try {
-      const snapshot = await this.db.collection("notificationPreferences").doc(senderId).get();
+      const snapshot = await this.db.collection("notificationPreferences").doc(recipientId).get();
       preferences = snapshot.exists ? snapshot.data() : undefined;
     } catch {
       return this.result(true, notificationId, canonicalCreated, "preferences", 0);
     }
-    if (!validPreferences(preferences, senderId)) {
+    if (!validPreferences(preferences, recipientId, descriptor.template.category)) {
       return this.result(true, notificationId, canonicalCreated, "preferences", 0);
     }
 
@@ -312,7 +466,7 @@ export class BookingAcceptedNotificationService {
 
     let registrations: ReadonlyArray<SelectedRegistration>;
     try {
-      const snapshot = await this.db.collection("pushTokenRegistrations").doc(senderId)
+      const snapshot = await this.db.collection("pushTokenRegistrations").doc(recipientId)
         .collection("devices")
         .orderBy(admin.firestore.FieldPath.documentId())
         .limit(MAX_N3A_DEVICE_REGISTRATIONS)
@@ -320,7 +474,7 @@ export class BookingAcceptedNotificationService {
       const seenTokens = new Set<string>();
       registrations = snapshot.docs.flatMap((document) => {
         const data = document.data();
-        if (!validRegistration(data, document.id, senderId) || seenTokens.has(data.token)) {
+        if (!validRegistration(data, document.id, recipientId) || seenTokens.has(data.token)) {
           return [];
         }
         seenTokens.add(data.token);
@@ -340,13 +494,13 @@ export class BookingAcceptedNotificationService {
     }
 
     const claims = (await Promise.all(registrations.map((registration) =>
-      this.claimDelivery(notificationId, bookingId, senderId, registration)
+      this.claimDelivery(notificationId, bookingId, recipientId, registration)
     ))).filter((claim): claim is ClaimedRegistration => claim !== null);
     if (claims.length === 0) {
       return this.result(true, notificationId, canonicalCreated, null, 0);
     }
 
-    const messages = claims.map((claim): ExpoPushMessage => ({
+    const messages = claims.map((claim: ClaimedRegistration): ExpoPushMessage => ({
       to: claim.token,
       title: EXPO_VISIBLE_NOTIFICATION.title,
       body: EXPO_VISIBLE_NOTIFICATION.body,
@@ -372,7 +526,7 @@ export class BookingAcceptedNotificationService {
     }
 
     const resultPersistence: Array<Promise<unknown>> = [];
-    claims.forEach((claim, index) => {
+    claims.forEach((claim: ClaimedRegistration, index: number) => {
       const deliveryResult = results[index];
       resultPersistence.push(claim.effectRef.update({
         status: deliveryResult.status,
@@ -389,24 +543,25 @@ export class BookingAcceptedNotificationService {
     return this.result(true, notificationId, canonicalCreated, null, claims.length);
   }
 
-  private async claimDelivery(
+  public async claimDelivery(
     notificationId: string,
     bookingId: string,
-    senderId: string,
+    recipientId: string,
     registration: SelectedRegistration,
   ): Promise<ClaimedRegistration | null> {
     const effectId = derivePushDeliveryEffectId(notificationId, registration.deviceId);
     const effectRef = this.db.collection("notificationDeliveries").doc(effectId);
     const claimed = await this.db.runTransaction(async (transaction) => {
-      const existing = await transaction.get(effectRef);
-      if (existing.exists) {
+      const snapshot = await transaction.get(effectRef);
+      if (snapshot.exists) {
         return false;
       }
+
       const timestamp = admin.firestore.FieldValue.serverTimestamp();
       transaction.create(effectRef, {
         notificationId,
         bookingId,
-        recipientId: senderId,
+        recipientId,
         registrationId: registration.deviceId,
         registrationVersion: registration.registrationVersion,
         provider: "expo",
@@ -414,12 +569,333 @@ export class BookingAcceptedNotificationService {
         status: "claimed",
         outcomeCode: null,
         providerTicketId: null,
+        attemptCount: 1,
+        maxAttempts: 3,
         createdAt: timestamp,
         updatedAt: timestamp,
       });
       return true;
     });
     return claimed ? { ...registration, effectId, effectRef } : null;
+  }
+
+  public async retryDelivery(effectId: string): Promise<PushDeliveryResult> {
+    const effectRef = this.db.collection("notificationDeliveries").doc(effectId);
+
+    type RetryClaimResult =
+      | {
+          claimed: false;
+          status: DeliveryStatus;
+          outcomeCode: string;
+          ticketId: string | null;
+        }
+      | {
+          claimed: true;
+          notificationId: string;
+          recipientId: string;
+          registrationId: string;
+          registrationVersion: number;
+          platform: "android" | "ios";
+          attemptCount: number;
+          maxAttempts: number;
+        };
+
+    const claimResult: RetryClaimResult = await this.db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(effectRef);
+      if (!snapshot.exists) {
+        throw new Error("Delivery effect not found.");
+      }
+      const data = snapshot.data()!;
+      if (data.status === "accepted" || data.status === "invalid_registration") {
+        return {
+          claimed: false,
+          status: data.status as DeliveryStatus,
+          outcomeCode: "already_terminal",
+          ticketId: (data.providerTicketId as string | null) || null,
+        };
+      }
+      const attemptCount = (typeof data.attemptCount === "number" && data.attemptCount >= 1) ? data.attemptCount : 1;
+      const maxAttempts = (typeof data.maxAttempts === "number" && data.maxAttempts >= 1) ? data.maxAttempts : 3;
+      if (attemptCount >= maxAttempts) {
+        transaction.update(effectRef, {
+          status: "permanent_failure",
+          outcomeCode: "attempts_exhausted",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return {
+          claimed: false,
+          status: "permanent_failure" as DeliveryStatus,
+          outcomeCode: "attempts_exhausted",
+          ticketId: null,
+        };
+      }
+
+      if (data.status === "claimed") {
+        let isExpired = false;
+        const updatedAt = data.updatedAt as admin.firestore.Timestamp | undefined;
+        if (updatedAt && typeof updatedAt.toMillis === "function") {
+          const elapsedMs = this.clock().getTime() - updatedAt.toMillis();
+          if (elapsedMs >= 5 * 60 * 1000) {
+            isExpired = true;
+          }
+        }
+        if (!isExpired) {
+          return {
+            claimed: false,
+            status: "claimed" as DeliveryStatus,
+            outcomeCode: "in_progress",
+            ticketId: null,
+          };
+        }
+      }
+
+      const nextAttempt = attemptCount + 1;
+      transaction.update(effectRef, {
+        status: "claimed",
+        attemptCount: nextAttempt,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return {
+        claimed: true,
+        notificationId: String(data.notificationId),
+        recipientId: String(data.recipientId),
+        registrationId: String(data.registrationId),
+        registrationVersion: Number(data.registrationVersion ?? 1),
+        platform: (data.platform === "ios" ? "ios" : "android") as "android" | "ios",
+        attemptCount: nextAttempt,
+        maxAttempts,
+      };
+    });
+
+    if (!claimResult.claimed) {
+      return {
+        status: claimResult.status,
+        outcomeCode: claimResult.outcomeCode,
+        providerTicketId: claimResult.ticketId,
+      };
+    }
+
+    const deviceRef = this.db.collection("pushTokenRegistrations")
+      .doc(claimResult.recipientId)
+      .collection("devices")
+      .doc(claimResult.registrationId);
+    const deviceSnap = await deviceRef.get();
+    const devData = deviceSnap.data();
+    if (!deviceSnap.exists || !devData || devData.active !== true || !devData.token ||
+        devData.registrationVersion !== claimResult.registrationVersion) {
+      await effectRef.update({
+        status: "permanent_failure",
+        outcomeCode: "registration_invalid_or_changed",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return {
+        status: "permanent_failure",
+        outcomeCode: "registration_invalid_or_changed",
+        providerTicketId: null,
+      };
+    }
+
+    const message: ExpoPushMessage = {
+      to: devData.token,
+      title: EXPO_VISIBLE_NOTIFICATION.title,
+      body: EXPO_VISIBLE_NOTIFICATION.body,
+      data: { schemaVersion: 1, notificationId: claimResult.notificationId, action: "open_notifications" },
+      channelId: EXPO_VISIBLE_NOTIFICATION.channelId,
+    };
+
+    let sendResult: PushDeliveryResult;
+    try {
+      const results = await this.provider.send([message]);
+      sendResult = results[0] || { status: "temporary_failure", outcomeCode: "provider_empty_response", providerTicketId: null };
+    } catch {
+      sendResult = { status: "temporary_failure", outcomeCode: "provider_boundary_failure", providerTicketId: null };
+    }
+
+    let finalStatus = sendResult.status;
+    let finalOutcome = sendResult.outcomeCode;
+    if (finalStatus === "temporary_failure" && claimResult.attemptCount >= claimResult.maxAttempts) {
+      finalStatus = "permanent_failure";
+      finalOutcome = "attempts_exhausted";
+    }
+
+    await effectRef.update({
+      status: finalStatus,
+      outcomeCode: finalOutcome,
+      providerTicketId: sendResult.providerTicketId,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    if (sendResult.status === "invalid_registration") {
+      await this.deactivateRegistration({
+        ref: deviceRef,
+        deviceId: claimResult.registrationId,
+        token: devData.token,
+        platform: claimResult.platform,
+        registrationVersion: claimResult.registrationVersion,
+      });
+    }
+
+    return {
+      status: finalStatus,
+      outcomeCode: finalOutcome,
+      providerTicketId: sendResult.providerTicketId,
+    };
+  }
+
+  public async processRetryableDeliveries(
+    limit = 20,
+  ): Promise<{
+    processed: number;
+    retried: number;
+    permanentFailures: number;
+    inProgressOrTerminal: number;
+  }> {
+    const deliveriesRef = this.db.collection("notificationDeliveries");
+    const failedSnapshot = await deliveriesRef
+      .where("status", "==", "temporary_failure")
+      .limit(limit)
+      .get();
+
+    const claimedSnapshot = await deliveriesRef
+      .where("status", "==", "claimed")
+      .limit(limit)
+      .get();
+
+    const candidates = new Map<string, admin.firestore.QueryDocumentSnapshot>();
+    for (const doc of failedSnapshot.docs) {
+      candidates.set(doc.id, doc);
+    }
+    for (const doc of claimedSnapshot.docs) {
+      candidates.set(doc.id, doc);
+    }
+
+    let processed = 0;
+    let retried = 0;
+    let permanentFailures = 0;
+    let inProgressOrTerminal = 0;
+
+    for (const [effectId, doc] of candidates.entries()) {
+      if (processed >= limit) {
+        break;
+      }
+      const data = doc.data();
+      if (data.status === "claimed") {
+        const updatedAt = data.updatedAt as admin.firestore.Timestamp | undefined;
+        let isExpired = false;
+        if (updatedAt && typeof updatedAt.toMillis === "function") {
+          const elapsedMs = this.clock().getTime() - updatedAt.toMillis();
+          if (elapsedMs >= 5 * 60 * 1000) {
+            isExpired = true;
+          }
+        }
+        if (!isExpired) {
+          continue;
+        }
+      }
+
+      processed++;
+      const outcome = await this.retryDelivery(effectId);
+      if (outcome.outcomeCode === "already_terminal" || outcome.outcomeCode === "in_progress") {
+        inProgressOrTerminal++;
+      } else if (outcome.status === "accepted") {
+        retried++;
+      } else if (outcome.status === "permanent_failure") {
+        permanentFailures++;
+      } else {
+        inProgressOrTerminal++;
+      }
+    }
+
+    return { processed, retried, permanentFailures, inProgressOrTerminal };
+  }
+
+  public async reconcileBookingLifecycleNotifications(
+    bookingId: string,
+  ): Promise<{
+    scanned: number;
+    recovered: number;
+    alreadyExisted: number;
+  }> {
+    const bookingDoc = await this.db.collection("bookings").doc(bookingId).get();
+    if (!bookingDoc.exists) {
+      return { scanned: 0, recovered: 0, alreadyExisted: 0 };
+    }
+    const bookingData = bookingDoc.data()!;
+    const history = Array.isArray(bookingData.statusHistory) ? bookingData.statusHistory : [];
+
+    let scanned = 0;
+    let recovered = 0;
+    let alreadyExisted = 0;
+
+    // Reconcile initial booking.requested for the pending request
+    if (history.length > 0 && history[0].status === "pending") {
+      scanned++;
+      const reqNotifId = deriveLifecycleNotificationId(
+        "booking.requested",
+        bookingId,
+        bookingData.travelerId,
+      );
+      const notifDoc = await this.db.collection("notifications").doc(reqNotifId).get();
+      if (notifDoc.exists) {
+        alreadyExisted++;
+      } else {
+        const initialPendingDoc: DocumentData = {
+          ...bookingData,
+          status: "pending",
+          statusHistory: [history[0]],
+          updatedAt: history[0].changedAt,
+        };
+        const res = await this.handleBookingCreated(bookingId, initialPendingDoc);
+        if (res.canonicalCreated) {
+          recovered++;
+        } else {
+          alreadyExisted++;
+        }
+      }
+    }
+
+    for (let i = 1; i < history.length; i++) {
+      const prevEntry = history[i - 1];
+      const currEntry = history[i];
+
+      const histBefore: DocumentData = {
+        ...bookingData,
+        status: prevEntry.status,
+        statusHistory: history.slice(0, i),
+        updatedAt: prevEntry.changedAt,
+      };
+      const histAfter: DocumentData = {
+        ...bookingData,
+        status: currEntry.status,
+        statusHistory: history.slice(0, i + 1),
+        updatedAt: currEntry.changedAt,
+      };
+
+      const descriptor = resolveBookingLifecycleTransition(histBefore, histAfter);
+      if (!descriptor) {
+        continue;
+      }
+      scanned++;
+
+      const notificationId = deriveLifecycleNotificationId(
+        descriptor.eventType,
+        bookingId,
+        descriptor.recipientId,
+      );
+      const notifDoc = await this.db.collection("notifications").doc(notificationId).get();
+      if (notifDoc.exists) {
+        alreadyExisted++;
+      } else {
+        const res = await this.handleBookingUpdate(bookingId, histBefore, histAfter);
+        if (res.canonicalCreated) {
+          recovered++;
+        } else {
+          alreadyExisted++;
+        }
+      }
+    }
+
+    return { scanned, recovered, alreadyExisted };
   }
 
   private async deactivateRegistration(registration: SelectedRegistration): Promise<void> {
@@ -454,3 +930,5 @@ export class BookingAcceptedNotificationService {
     return { processed, notificationId, canonicalCreated, pushSuppressionReason, claimedDeliveries };
   }
 }
+
+export { BookingAcceptedNotificationService as LifecycleNotificationService };

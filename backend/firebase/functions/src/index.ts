@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { onDocumentUpdated, onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import admin from "firebase-admin";
 import { assertPermission } from "./guards/PermissionGuard.js";
 import { AuditLogService } from "./services/AuditLogService.js";
@@ -500,10 +501,29 @@ export const recordTravelCustodyEvent = onCall(callableRuntimeOptions, async (re
   }
 });
 
+export const onBookingCreated = onDocumentCreated(
+  {
+    document: "bookings/{bookingId}",
+    region: "us-east1",
+    retry: true,
+  },
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) {
+      return;
+    }
+    await bookingAcceptedNotificationService.handleBookingCreated(
+      event.params.bookingId,
+      data,
+    );
+  },
+);
+
 export const onBookingAccepted = onDocumentUpdated(
   {
     document: "bookings/{bookingId}",
     region: "us-east1",
+    retry: true,
   },
   async (event) => {
     const before = event.data?.before.data();
@@ -518,3 +538,19 @@ export const onBookingAccepted = onDocumentUpdated(
     );
   },
 );
+
+export const processDeliveryRetriesScheduled = onSchedule(
+  {
+    schedule: "every 1 minutes",
+    region: "us-east1",
+    retryCount: 1,
+    maxRetrySeconds: 60,
+  },
+  async () => {
+    await bookingAcceptedNotificationService.processRetryableDeliveries(20);
+  },
+);
+
+export const processDeliveryRetries = onCall(callableRuntimeOptions, async () => {
+  return await bookingAcceptedNotificationService.processRetryableDeliveries(20);
+});

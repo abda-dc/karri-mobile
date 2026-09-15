@@ -4,7 +4,13 @@ import { createPlatformEvent, type PlatformDomainEvent } from "../../domain/even
 import type { NotificationRepository } from "../../domain/notification/NotificationRepository";
 import { NotificationService } from "./NotificationService";
 
-type TestedEventType = "booking.accepted" | "booking.declined" | "package.delivered";
+type TestedEventType =
+  | "booking.accepted"
+  | "booking.declined"
+  | "booking.cancelled"
+  | "package.delivered"
+  | "booking.requested"
+  | "review.submitted";
 
 function event<TType extends TestedEventType>(
   type: TType,
@@ -24,21 +30,25 @@ async function flushAsyncHandler(): Promise<void> {
 }
 
 describe("NotificationService notification ownership", () => {
-  it("does not materialize booking.accepted events from the mobile event bus", async () => {
+  it("does not materialize server-authoritative lifecycle events from the mobile event bus", async () => {
     const bus = new EventBus();
     const create = vi.fn();
     const repository = { create } as unknown as NotificationRepository;
     const service = new NotificationService(bus, repository);
     service.start();
 
+    bus.publish(event("booking.requested"));
     bus.publish(event("booking.accepted"));
+    bus.publish(event("booking.declined"));
+    bus.publish(event("booking.cancelled"));
+    bus.publish(event("package.delivered"));
     await flushAsyncHandler();
 
     expect(create).not.toHaveBeenCalled();
     service.stop();
   });
 
-  it("keeps existing non-migrated event templates active", async () => {
+  it("keeps non-migrated event templates active", async () => {
     const bus = new EventBus();
     const create = vi.fn(async (notification) => ({
       ...notification,
@@ -51,14 +61,12 @@ describe("NotificationService notification ownership", () => {
     const service = new NotificationService(bus, repository);
     service.start();
 
-    bus.publish(event("booking.declined"));
-    bus.publish(event("package.delivered"));
+    bus.publish(event("review.submitted"));
     await flushAsyncHandler();
 
-    expect(create).toHaveBeenCalledTimes(2);
+    expect(create).toHaveBeenCalledTimes(1);
     expect(create.mock.calls.map(([notification]) => notification.type)).toEqual([
-      "booking.declined",
-      "package.delivered",
+      "review.submitted",
     ]);
     service.stop();
   });

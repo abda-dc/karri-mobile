@@ -835,15 +835,131 @@ describe("notifications", () => {
     );
   });
 
-  it("keeps valid client creation for a non-migrated notification type", async () => {
+  it("denies client creation of a package.picked_up notification", async () => {
+    await seedBookingState("in_transit");
+    await assertFails(
+      setDoc(
+        doc(userDb(travelerUid), `notifications/${notificationId}`),
+        notificationFixture({
+          type: "package.picked_up",
+          title: "Package picked up",
+          body: "Your package has been picked up by the traveler.",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+      ),
+    );
+  });
+
+  it("denies client creation of a package.delivered notification", async () => {
+    await seedBookingState("delivered");
+    await assertFails(
+      setDoc(
+        doc(userDb(travelerUid), `notifications/${notificationId}`),
+        notificationFixture({
+          type: "package.delivered",
+          title: "Package delivered",
+          body: "Your package has been delivered.",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+      ),
+    );
+  });
+
+  it("denies client creation of a shipment.completed notification", async () => {
+    await seedBookingState("completed");
+    await assertFails(
+      setDoc(
+        doc(userDb(senderUid), `notifications/${notificationId}`),
+        notificationFixture({
+          type: "shipment.completed",
+          title: "Shipment completed",
+          body: "The shipment has been successfully completed.",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+      ),
+    );
+  });
+
+  it("denies client creation of a booking.declined notification", async () => {
     await seedBookingState("declined");
-    await assertSucceeds(
+    await assertFails(
       setDoc(
         doc(userDb(travelerUid), `notifications/${notificationId}`),
         notificationFixture({
           type: "booking.declined",
           title: "Booking declined",
           body: "The booking request was declined.",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+      ),
+    );
+  });
+
+  it("denies client creation of a booking.cancelled notification", async () => {
+    await seedBookingState("cancelled");
+    await assertFails(
+      setDoc(
+        doc(userDb(senderUid), `notifications/${notificationId}`),
+        notificationFixture({
+          type: "booking.cancelled",
+          userId: travelerUid,
+          title: "Booking cancelled",
+          body: "The booking request was cancelled.",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+      ),
+    );
+  });
+
+  it("denies client creation of a booking.requested notification", async () => {
+    await seedBookingState("pending");
+    await assertFails(
+      setDoc(
+        doc(userDb(senderUid), `notifications/${notificationId}`),
+        notificationFixture({
+          type: "booking.requested",
+          userId: travelerUid,
+          title: "Booking requested",
+          body: "A booking request needs your attention.",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+      ),
+    );
+  });
+
+  it("denies arbitrary client notification creation for unrelated travelers or forged bookings", async () => {
+    await seedBookingState("pending");
+    // Client trying to forge a notification to an unrelated user
+    await assertFails(
+      setDoc(
+        doc(userDb(senderUid), `notifications/${notificationId}`),
+        notificationFixture({
+          type: "booking.requested",
+          userId: otherUid,
+          title: "Booking requested",
+          body: "A booking request needs your attention.",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+      ),
+    );
+
+    // Client trying to invent a nonexistent bookingId
+    await assertFails(
+      setDoc(
+        doc(userDb(senderUid), `notifications/${notificationId}`),
+        notificationFixture({
+          relatedId: "nonexistent-booking-id",
+          type: "booking.requested",
+          userId: travelerUid,
+          title: "Booking requested",
+          body: "A booking request needs your attention.",
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         }),

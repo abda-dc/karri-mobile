@@ -12,34 +12,6 @@ interface NotificationTemplate {
 }
 
 const templates: Partial<Record<PlatformEventType, NotificationTemplate>> = {
-  "booking.requested": {
-    title: "Booking requested",
-    body: "A booking request needs your attention.",
-  },
-  "booking.declined": {
-    title: "Booking declined",
-    body: "The booking request was declined.",
-  },
-  "booking.cancelled": {
-    title: "Booking cancelled",
-    body: "The booking was cancelled.",
-  },
-  "booking.expired": {
-    title: "Booking expired",
-    body: "The booking request expired before acceptance.",
-  },
-  "package.picked_up": {
-    title: "Shipment picked up",
-    body: "Custody was transferred and the shipment is now in transit.",
-  },
-  "package.delivered": {
-    title: "Shipment delivered",
-    body: "The shipment was marked delivered.",
-  },
-  "shipment.completed": {
-    title: "Shipment completed",
-    body: "The sender completed the shipment journey.",
-  },
   "review.submitted": {
     title: "Review received",
     body: "A booking participant submitted a review.",
