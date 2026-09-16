@@ -324,6 +324,10 @@ describe("BookingService - Atomic Booking Acceptance Gateway", () => {
   const mockAcceptanceGateway = {
     acceptBooking: vi.fn(),
   };
+  const mockCancellationGateway = {
+    cancelBooking: vi.fn(),
+    declineBooking: vi.fn(),
+  };
 
   const clock = { now: () => "2026-07-11T12:00:00Z" };
 
@@ -333,8 +337,20 @@ describe("BookingService - Atomic Booking Acceptance Gateway", () => {
     mockTripRepository,
     mockEvents,
     clock,
-    mockAcceptanceGateway as any
+    mockAcceptanceGateway as any,
   );
+
+  const serviceWithAllGateways = new BookingService(
+    mockBookingRepository,
+    mockShipmentRepository,
+    mockTripRepository,
+    mockEvents,
+    clock,
+    mockAcceptanceGateway as any,
+    undefined,
+    mockCancellationGateway as any,
+  );
+
 
   const pendingBooking = {
     id: "booking-pending",
@@ -453,7 +469,78 @@ describe("BookingService - Atomic Booking Acceptance Gateway", () => {
     expect(mockBookingRepository.saveTransition).toHaveBeenCalled();
     expect(result.status).toBe(BookingStatus.Declined);
   });
+
+  it("delegates cancellation to BookingCancellationGateway and publishes event", async () => {
+    vi.mocked(mockBookingRepository.findById)
+      .mockResolvedValueOnce(acceptedBooking as any)
+      .mockResolvedValueOnce({ ...acceptedBooking, status: BookingStatus.Cancelled } as any);
+
+    mockCancellationGateway.cancelBooking.mockResolvedValueOnce({
+      success: true,
+      bookingId: "booking-pending",
+      status: "cancelled",
+      cancelled: true,
+      idempotent: false,
+      capacityRestored: true,
+      shipmentReleased: true,
+    });
+
+    const result = await serviceWithAllGateways.transition({
+      bookingId: "booking-pending",
+      actorId: "traveler-1",
+      nextStatus: BookingStatus.Cancelled,
+      note: "Emergency",
+    });
+
+    expect(mockCancellationGateway.cancelBooking).toHaveBeenCalledWith({
+      bookingId: "booking-pending",
+      actorId: "traveler-1",
+      note: "Emergency",
+    });
+    expect(mockEvents.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "booking.cancelled",
+        aggregateId: "booking-pending",
+      })
+    );
+    expect(result.status).toBe(BookingStatus.Cancelled);
+  });
+
+  it("delegates decline to BookingCancellationGateway and publishes event", async () => {
+    vi.mocked(mockBookingRepository.findById)
+      .mockResolvedValueOnce(pendingBooking as any)
+      .mockResolvedValueOnce({ ...pendingBooking, status: BookingStatus.Declined } as any);
+
+    mockCancellationGateway.declineBooking.mockResolvedValueOnce({
+      success: true,
+      bookingId: "booking-pending",
+      status: "declined",
+      declined: true,
+      idempotent: false,
+    });
+
+    const result = await serviceWithAllGateways.transition({
+      bookingId: "booking-pending",
+      actorId: "traveler-1",
+      nextStatus: BookingStatus.Declined,
+      note: "Cannot carry",
+    });
+
+    expect(mockCancellationGateway.declineBooking).toHaveBeenCalledWith({
+      bookingId: "booking-pending",
+      actorId: "traveler-1",
+      note: "Cannot carry",
+    });
+    expect(mockEvents.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "booking.declined",
+        aggregateId: "booking-pending",
+      })
+    );
+    expect(result.status).toBe(BookingStatus.Declined);
+  });
 });
+
 
 describe("BookingService - Custody Transition Gateway (R05)", () => {
   const mockBookingRepository = {

@@ -23,3 +23,24 @@ export enum AdministrativeHoldReleaseReasonCode {
   HOLD_PLACED_IN_ERROR = "hold_placed_in_error",
   NO_FURTHER_ACTION = "no_further_action",
 }
+
+export enum BookingCancellationReasonCode {
+  SENDER_REQUESTED = "sender_requested",
+  TRAVELER_UNAVAILABLE = "traveler_unavailable",
+  SCHEDULE_CONFLICT = "schedule_conflict",
+  FLIGHT_CANCELLED = "flight_cancelled",
+  FAILED_PICKUP = "failed_pickup",
+  NO_SHOW = "no_show",
+  SAFETY_CONCERN = "safety_concern",
+  MUTUAL_AGREEMENT = "mutual_agreement",
+  OTHER = "other",
+}
+
+export enum BookingDeclineReasonCode {
+  CAPACITY_UNAVAILABLE = "capacity_unavailable",
+  SCHEDULE_MISMATCH = "schedule_mismatch",
+  ROUTE_MISMATCH = "route_mismatch",
+  UNABLE_TO_CARRY = "unable_to_carry",
+  SAFETY_CONCERN = "safety_concern",
+  OTHER = "other",
+}

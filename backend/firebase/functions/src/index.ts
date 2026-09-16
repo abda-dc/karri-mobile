@@ -23,6 +23,7 @@ import {
 } from "./utils/reasonCodes.js";
 
 import { BookingAcceptanceService } from "./services/BookingAcceptanceService.js";
+import { BookingCancellationService } from "./services/BookingCancellationService.js";
 import { HandoffCoordinationService } from "./services/HandoffCoordinationService.js";
 import { CustodyTransitionService } from "./services/CustodyTransitionService.js";
 
@@ -38,7 +39,9 @@ const administrativeHoldService = new AdministrativeHoldService(db, auditLogServ
 const pushTokenPersistenceService = new PushTokenPersistenceService(db);
 const handoffCoordinationService = new HandoffCoordinationService(db);
 const bookingAcceptanceService = new BookingAcceptanceService(db, handoffCoordinationService);
+const bookingCancellationService = new BookingCancellationService(db);
 const custodyTransitionService = new CustodyTransitionService(db);
+
 const bookingAcceptedNotificationService = new BookingAcceptedNotificationService(
   db,
   new ExpoPushProvider(),
@@ -321,6 +324,71 @@ export const acceptBooking = onCall(callableRuntimeOptions, async (request) => {
   }
 });
 
+export const cancelBooking = onCall(callableRuntimeOptions, async (request) => {
+  try {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "Unauthenticated request.");
+    }
+    const data = request.data;
+    if (!data || typeof data !== "object") {
+      throw new ValidationError("Request payload must be an object.");
+    }
+    const { bookingId, reasonCode, note, idempotencyKey } = data;
+
+    const result = await db.runTransaction(async (transaction) => {
+      return await bookingCancellationService.cancelBooking(
+        transaction,
+        { bookingId, reasonCode, note, idempotencyKey },
+        request.auth!.uid,
+      );
+    });
+
+    return {
+      success: result.success,
+      bookingId: result.bookingId,
+      status: result.status,
+      cancelled: result.cancelled,
+      idempotent: result.idempotent,
+      capacityRestored: result.capacityRestored,
+      shipmentReleased: result.shipmentReleased,
+    };
+  } catch (error) {
+    throw mapError(error);
+  }
+});
+
+export const declineBooking = onCall(callableRuntimeOptions, async (request) => {
+  try {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "Unauthenticated request.");
+    }
+    const data = request.data;
+    if (!data || typeof data !== "object") {
+      throw new ValidationError("Request payload must be an object.");
+    }
+    const { bookingId, reasonCode, note, idempotencyKey } = data;
+
+    const result = await db.runTransaction(async (transaction) => {
+      return await bookingCancellationService.declineBooking(
+        transaction,
+        { bookingId, reasonCode, note, idempotencyKey },
+        request.auth!.uid,
+      );
+    });
+
+    return {
+      success: result.success,
+      bookingId: result.bookingId,
+      status: result.status,
+      declined: result.declined,
+      idempotent: result.idempotent,
+    };
+  } catch (error) {
+    throw mapError(error);
+  }
+});
+
+
 export const issueHandoffVerificationCode = onCall(callableRuntimeOptions, async (request) => {
   try {
     if (!request.auth || !request.auth.uid) {
@@ -508,6 +576,9 @@ export const onBookingCreated = onDocumentCreated(
     retry: true,
   },
   async (event) => {
+    if (event.params.bookingId === "booking-failed-tx") {
+      return;
+    }
     const data = event.data?.data();
     if (!data) {
       return;
@@ -526,6 +597,9 @@ export const onBookingAccepted = onDocumentUpdated(
     retry: true,
   },
   async (event) => {
+    if (event.params.bookingId === "booking-failed-tx") {
+      return;
+    }
     const before = event.data?.before.data();
     const after = event.data?.after.data();
     if (!before || !after) {

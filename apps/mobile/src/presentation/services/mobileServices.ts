@@ -46,7 +46,9 @@ import { reportApplicationError } from "../errors/getFriendlyError";
 import { PrivilegedCallableTransport } from "../../infrastructure/firebase/privilegedCallableTransport";
 import { PlatformAppCheckTokenProvider } from "../../infrastructure/firebase/appCheckTokenProvider";
 import { FirebaseBookingAcceptanceGateway } from "../../infrastructure/firebase/gateways/FirebaseBookingAcceptanceGateway";
+import { FirebaseBookingCancellationGateway } from "../../infrastructure/firebase/gateways/FirebaseBookingCancellationGateway";
 import { FirebaseCustodyTransitionGateway } from "../../infrastructure/firebase/gateways/FirebaseCustodyTransitionGateway";
+
 import { systemClock } from "../../application/services/Clock";
 
 const eventBus = new EventBus();
@@ -98,6 +100,9 @@ const pushRegistrationService = new PushRegistrationService(
 const bookingAcceptanceGateway = new FirebaseBookingAcceptanceGateway(
   privilegedCallableTransport,
 );
+const bookingCancellationGateway = new FirebaseBookingCancellationGateway(
+  privilegedCallableTransport,
+);
 const custodyTransitionGateway = new FirebaseCustodyTransitionGateway(
   privilegedCallableTransport,
 );
@@ -131,7 +136,9 @@ export const mobileServices = {
     systemClock,
     bookingAcceptanceGateway,
     custodyTransitionGateway,
+    bookingCancellationGateway,
   ),
+
   custody: new CustodyService(custodyRepository, bookingRepository, custodyTransitionGateway),
   handoff: handoffService,
   identityVerification: identityVerificationService,

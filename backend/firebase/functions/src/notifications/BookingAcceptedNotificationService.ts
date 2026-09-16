@@ -178,6 +178,20 @@ export function resolveBookingLifecycleTransition(
       template: LIFECYCLE_NOTIFICATIONS["booking.cancelled"],
     };
   }
+  if (before.status === "accepted" && after.status === "cancelled") {
+    const lastHistory = Array.isArray(after.statusHistory) && after.statusHistory.length > 0
+      ? after.statusHistory[after.statusHistory.length - 1]
+      : null;
+    const isTravelerActor = lastHistory?.changedBy === after.travelerId;
+    const recipientId = isTravelerActor ? after.senderId : after.travelerId;
+    const actorId = isTravelerActor ? after.travelerId : after.senderId;
+    return {
+      eventType: "booking.cancelled",
+      recipientId,
+      actorId,
+      template: LIFECYCLE_NOTIFICATIONS["booking.cancelled"],
+    };
+  }
   return null;
 }
 
@@ -193,14 +207,14 @@ export function validateLifecycleTransition(
     : "Invalid booking lifecycle transition.";
 
   if (!isIdentifier(bookingId) || !isIdentifier(after.senderId) || !isIdentifier(after.travelerId)) {
-    throw new Error(errorMessage);
+    throw new Error(`${errorMessage} (invalid identifiers)`);
   }
   if (after.senderId === after.travelerId) {
-    throw new Error(errorMessage);
+    throw new Error(`${errorMessage} (sender equals traveler)`);
   }
   for (const field of IMMUTABLE_BOOKING_FIELDS) {
     if (!valuesEqual(before[field], after[field])) {
-      throw new Error(errorMessage);
+      throw new Error(`${errorMessage} (immutable field mismatch: ${field})`);
     }
   }
 
@@ -208,18 +222,18 @@ export function validateLifecycleTransition(
   const afterHistory = after.statusHistory;
   if (!Array.isArray(beforeHistory) || !Array.isArray(afterHistory) ||
       afterHistory.length !== beforeHistory.length + 1) {
-    throw new Error(errorMessage);
+    throw new Error(`${errorMessage} (history length mismatch: before=${beforeHistory?.length}, after=${afterHistory?.length})`);
   }
   for (let index = 0; index < beforeHistory.length; index += 1) {
     if (!valuesEqual(beforeHistory[index], afterHistory[index])) {
-      throw new Error(errorMessage);
+      throw new Error(`${errorMessage} (history element ${index} mismatch)`);
     }
   }
   const appended = afterHistory[afterHistory.length - 1];
   if (!appended || typeof appended !== "object" || Array.isArray(appended) ||
       appended.status !== after.status || appended.changedBy !== descriptor.actorId ||
       !isTimestamp(appended.changedAt)) {
-    throw new Error(errorMessage);
+    throw new Error(`${errorMessage} (appended entry mismatch: status=${appended?.status} vs ${after.status}, actor=${appended?.changedBy} vs ${descriptor.actorId})`);
   }
 }
 

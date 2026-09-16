@@ -2124,4 +2124,99 @@ describe("Milestone 31 - Coarse Admin Roles and Multi-Role Access Control Bounda
       await assertFails(getDoc(doc(unauthDb, snapPath)));
     });
   });
+
+  describe("R08 — Authoritative Cancellation & Non-Happy-Path Security Rules", () => {
+    it("denies direct client write attempting accepted -> cancelled transition on bookings", async () => {
+      await seedBookingState("accepted");
+      const bPath = `bookings/${bookingId}`;
+
+      // Sender attempt to directly write status = cancelled on accepted booking is denied
+      await assertFails(
+        updateDoc(doc(userDb(senderUid), bPath), {
+          status: "cancelled",
+          updatedAt: serverTimestamp(),
+        }),
+      );
+
+      // Traveler attempt to directly write status = cancelled on accepted booking is denied
+      await assertFails(
+        updateDoc(doc(userDb(travelerUid), bPath), {
+          status: "cancelled",
+          updatedAt: serverTimestamp(),
+        }),
+      );
+    });
+
+    it("denies direct client write attempting to clear activeBookingId on shipments", async () => {
+      const sPath = `shipments/${shipmentId}`;
+      await seedDoc(
+        sPath,
+        shipmentFixture({
+          activeBookingId: bookingId,
+          activeCarrierId: travelerUid,
+          activeTripId: tripId,
+        }),
+      );
+
+      // Sender attempt to directly clear activeBookingId is denied
+      await assertFails(
+        updateDoc(doc(userDb(senderUid), sPath), {
+          activeBookingId: null,
+          activeCarrierId: null,
+          activeTripId: null,
+          updatedAt: serverTimestamp(),
+        }),
+      );
+    });
+
+    it("denies direct client write attempting to manipulate reservedCapacityKg on trips", async () => {
+      const tPath = `trips/${tripId}`;
+      await seedDoc(
+        tPath,
+        tripFixture({
+          reservedCapacityKg: 5,
+          availableCapacityKg: 15,
+        }),
+      );
+
+      // Traveler attempt to manipulate reserved capacity directly is denied
+      await assertFails(
+        updateDoc(doc(userDb(travelerUid), tPath), {
+          reservedCapacityKg: 0,
+          availableCapacityKg: 20,
+          updatedAt: serverTimestamp(),
+        }),
+      );
+    });
+
+    it("denies unrelated user attempting to cancel a pending booking", async () => {
+      await seedBookingState("pending");
+      const bPath = `bookings/${bookingId}`;
+
+      await assertFails(
+        updateDoc(doc(userDb(otherUid), bPath), {
+          status: "cancelled",
+          updatedAt: serverTimestamp(),
+        }),
+      );
+    });
+
+    it("denies direct client writes attempting post-custody cancellation (in_transit or delivered)", async () => {
+      await seedBookingState("in_transit");
+      const bPath = `bookings/${bookingId}`;
+
+      await assertFails(
+        updateDoc(doc(userDb(senderUid), bPath), {
+          status: "cancelled",
+          updatedAt: serverTimestamp(),
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(userDb(travelerUid), bPath), {
+          status: "cancelled",
+          updatedAt: serverTimestamp(),
+        }),
+      );
+    });
+  });
 });

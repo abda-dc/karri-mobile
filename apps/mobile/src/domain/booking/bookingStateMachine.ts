@@ -7,7 +7,7 @@ const allowedTransitions: Readonly<Record<BookingStatus, ReadonlyArray<BookingSt
     BookingStatus.Cancelled,
     BookingStatus.Expired,
   ],
-  [BookingStatus.Accepted]: [BookingStatus.InTransit],
+  [BookingStatus.Accepted]: [BookingStatus.InTransit, BookingStatus.Cancelled],
   [BookingStatus.InTransit]: [BookingStatus.Delivered],
   [BookingStatus.Delivered]: [BookingStatus.Completed],
   [BookingStatus.Completed]: [],

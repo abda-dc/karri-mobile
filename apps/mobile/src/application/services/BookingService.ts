@@ -29,7 +29,9 @@ import {
   type NewCustodyEvent,
 } from "../../domain/custody/CustodyEvent";
 import type { BookingAcceptanceGateway } from "./BookingAcceptanceGateway";
+import type { BookingCancellationGateway } from "./BookingCancellationGateway";
 import type { CustodyTransitionGateway } from "./CustodyTransitionGateway";
+
 import type { Clock } from "./Clock";
 import { systemClock } from "./Clock";
 import { DomainValidationError, requireText } from "./validation";
@@ -57,7 +59,9 @@ export class BookingService {
     private readonly clock: Clock = systemClock,
     private readonly acceptanceGateway?: BookingAcceptanceGateway,
     private readonly custodyGateway?: CustodyTransitionGateway,
+    private readonly cancellationGateway?: BookingCancellationGateway,
   ) {}
+
 
   async request(input: RequestBookingDto): Promise<Booking> {
     const senderId = requireText(input.senderId, "senderId", 128);
@@ -258,7 +262,50 @@ export class BookingService {
       return updatedBooking;
     }
 
+    if (input.nextStatus === BookingStatus.Cancelled && this.cancellationGateway) {
+      await this.cancellationGateway.cancelBooking({
+        bookingId: booking.id,
+        actorId: input.actorId,
+        note: input.note,
+      });
+
+      const updatedBooking = (await this.bookings.findById(booking.id)) ?? {
+        ...booking,
+        status: BookingStatus.Cancelled,
+        updatedAt: occurredAt,
+      };
+
+      const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
+      if (event) {
+        this.events.publish(event);
+      }
+
+      return updatedBooking;
+    }
+
+    if (input.nextStatus === BookingStatus.Declined && this.cancellationGateway) {
+      await this.cancellationGateway.declineBooking({
+        bookingId: booking.id,
+        actorId: input.actorId,
+        note: input.note,
+      });
+
+      const updatedBooking = (await this.bookings.findById(booking.id)) ?? {
+        ...booking,
+        status: BookingStatus.Declined,
+        updatedAt: occurredAt,
+      };
+
+      const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
+      if (event) {
+        this.events.publish(event);
+      }
+
+      return updatedBooking;
+    }
+
     let mappedAcceptance: TravelerCustodyAcceptance | null = null;
+
 
     if (input.nextStatus === BookingStatus.InTransit) {
       if (!input.custodyAcceptance) {
@@ -451,6 +498,23 @@ export class BookingService {
     actorId: string,
     nextStatus: BookingStatus,
   ): void {
+    if (nextStatus === BookingStatus.Expired && actorId !== "system") {
+      throw new DomainValidationError("Only the trusted system actor can expire a booking.");
+    }
+
+    if (nextStatus === BookingStatus.Cancelled) {
+      if (booking.status === BookingStatus.Pending && actorId !== booking.senderId) {
+        throw new DomainValidationError("Only the booking sender can cancel a pending booking request.");
+      }
+      if (booking.status === BookingStatus.Accepted && actorId !== booking.senderId && actorId !== booking.travelerId) {
+        throw new DomainValidationError("Only booking participants can cancel an accepted booking.");
+      }
+      if (booking.status !== BookingStatus.Pending && booking.status !== BookingStatus.Accepted) {
+        throw new DomainValidationError(`Cancellation is not permitted when booking is ${booking.status}.`);
+      }
+      return;
+    }
+
     const travelerTransitions: ReadonlyArray<BookingStatus> = [
       BookingStatus.Accepted,
       BookingStatus.Declined,
@@ -458,15 +522,10 @@ export class BookingService {
       BookingStatus.Delivered,
     ];
     const senderTransitions: ReadonlyArray<BookingStatus> = [
-      BookingStatus.Cancelled,
       BookingStatus.Completed,
     ];
     const requiresTraveler = travelerTransitions.includes(nextStatus);
     const requiresSender = senderTransitions.includes(nextStatus);
-
-    if (nextStatus === BookingStatus.Expired && actorId !== "system") {
-      throw new DomainValidationError("Only the trusted system actor can expire a booking.");
-    }
 
     if (requiresTraveler && actorId !== booking.travelerId) {
       throw new DomainValidationError("Only the booking traveler can perform this transition.");
@@ -476,6 +535,7 @@ export class BookingService {
       throw new DomainValidationError("Only the booking sender can perform this transition.");
     }
   }
+
 
   private createTransitionEvent(
     booking: Booking,

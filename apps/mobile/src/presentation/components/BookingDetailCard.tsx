@@ -387,8 +387,28 @@ export function BookingDetailCard({
             >
               Confirm pickup
             </PrimaryButton>
+            <PrimaryButton
+              disabled={actionInProgress}
+              loading={actionLoading === BookingStatus.Cancelled}
+              variant="secondary"
+              onPress={() => transition(BookingStatus.Cancelled, "Booking cancelled.")}
+            >
+              Cancel booking
+            </PrimaryButton>
           </View>
         ) : null}
+
+        {booking.status === BookingStatus.Accepted && isSender ? (
+          <PrimaryButton
+            disabled={actionInProgress}
+            loading={actionLoading === BookingStatus.Cancelled}
+            variant="secondary"
+            onPress={() => transition(BookingStatus.Cancelled, "Booking cancelled.")}
+          >
+            Cancel booking
+          </PrimaryButton>
+        ) : null}
+
 
         {booking.status === BookingStatus.InTransit && isTraveler ? (
           <View style={styles.form}>

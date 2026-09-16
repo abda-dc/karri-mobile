@@ -28,7 +28,10 @@ export type PrivilegedCallableName =
   | "confirmPickupCustody"
   | "confirmDeliveryCustody"
   | "completeBookingCustody"
-  | "recordTravelCustodyEvent";
+  | "recordTravelCustodyEvent"
+  | "cancelBooking"
+  | "declineBooking";
+
 
 export interface ConfirmPickupCustodyPayload {
   readonly bookingId: string;
@@ -125,6 +128,39 @@ export interface AcceptBookingCallableResult {
   readonly shipmentId: string;
   readonly reservedWeightKg: number;
 }
+
+export interface CancelBookingPayload {
+  readonly bookingId: string;
+  readonly reasonCode?: string | null;
+  readonly note?: string | null;
+  readonly idempotencyKey?: string | null;
+}
+
+export interface CancelBookingCallableResult {
+  readonly success: boolean;
+  readonly bookingId: string;
+  readonly status: "cancelled";
+  readonly cancelled: boolean;
+  readonly idempotent: boolean;
+  readonly capacityRestored: boolean;
+  readonly shipmentReleased: boolean;
+}
+
+export interface DeclineBookingPayload {
+  readonly bookingId: string;
+  readonly reasonCode?: string | null;
+  readonly note?: string | null;
+  readonly idempotencyKey?: string | null;
+}
+
+export interface DeclineBookingCallableResult {
+  readonly success: boolean;
+  readonly bookingId: string;
+  readonly status: "declined";
+  readonly declined: boolean;
+  readonly idempotent: boolean;
+}
+
 
 export interface RegisterPushTokenPayload {
   readonly deviceId: string;
@@ -350,6 +386,31 @@ export class PrivilegedCallableTransport {
       expectedUserId,
     );
   }
+
+  cancelBooking(
+    payload: CancelBookingPayload,
+    expectedUserId?: string,
+  ): Promise<CancelBookingCallableResult> {
+    return this.invoke(
+      "cancelBooking",
+      payload,
+      [],
+      expectedUserId,
+    );
+  }
+
+  declineBooking(
+    payload: DeclineBookingPayload,
+    expectedUserId?: string,
+  ): Promise<DeclineBookingCallableResult> {
+    return this.invoke(
+      "declineBooking",
+      payload,
+      [],
+      expectedUserId,
+    );
+  }
+
 
   issueHandoffVerificationCode(
     payload: IssueHandoffVerificationCodePayload,
