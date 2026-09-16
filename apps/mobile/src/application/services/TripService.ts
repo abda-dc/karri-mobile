@@ -22,6 +22,15 @@ export class TripService {
   ) {}
 
   async create(input: CreateTripDto): Promise<Trip> {
+    const ownerId = requireText(input.ownerId, "ownerId", 128);
+
+    if (input.operationId) {
+      const existing = await this.trips.findById(`trip__${ownerId}__${input.operationId}`);
+      if (existing) {
+        return existing;
+      }
+    }
+
     const departureDate = requireIsoDate(input.departureDate, "departureDate");
     const arrivalDate = requireIsoDate(input.arrivalDate, "arrivalDate");
 
@@ -30,7 +39,7 @@ export class TripService {
     }
 
     const trip: NewTrip = {
-      ownerId: requireText(input.ownerId, "ownerId", 128),
+      ownerId,
       originCountry: requireText(input.originCountry, "originCountry", 80),
       originCity: requireText(input.originCity, "originCity", 120),
       destinationCountry: requireText(input.destinationCountry, "destinationCountry", 80),
@@ -45,7 +54,7 @@ export class TripService {
       notes: optionalText(input.notes ?? "", "notes", 500),
       status: ListingStatus.Active,
     };
-    const created = await this.trips.create(trip);
+    const created = await this.trips.create(trip, input.operationId);
     const occurredAt = created.createdAt ?? this.clock.now();
 
     this.events.publish(

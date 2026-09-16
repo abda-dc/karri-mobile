@@ -720,3 +720,257 @@ describe("BookingService - Custody Transition Gateway (R05)", () => {
     expect(result.status).toBe(BookingStatus.Completed);
   });
 });
+
+describe("BookingService - Creation Gateway and Retry Deduplication (R09)", () => {
+  const mockBookingRepository = {
+    findById: vi.fn(),
+    createRequest: vi.fn(),
+  } as unknown as BookingRepository;
+  const mockShipmentRepository = {
+    findById: vi.fn(),
+  } as unknown as ShipmentRepository;
+  const mockTripRepository = {
+    findById: vi.fn(),
+  } as unknown as TripRepository;
+  const mockEvents = { publish: vi.fn() } as unknown as EventPublisher;
+  const clock = { now: () => "2026-09-16T12:00:00Z" };
+
+  const mockCreationGateway = {
+    requestBooking: vi.fn(),
+  };
+  const mockAcceptanceGateway = {
+    acceptBooking: vi.fn(),
+  };
+  const mockCustodyGateway = {
+    confirmPickup: vi.fn(),
+    confirmDelivery: vi.fn(),
+    completeBooking: vi.fn(),
+    recordTravelEvent: vi.fn(),
+  };
+  const mockCancellationGateway = {
+    cancelBooking: vi.fn(),
+    declineBooking: vi.fn(),
+  };
+
+  const service = new BookingService(
+    mockBookingRepository,
+    mockShipmentRepository,
+    mockTripRepository,
+    mockEvents,
+    clock,
+    mockAcceptanceGateway as any,
+    mockCustodyGateway as any,
+    mockCancellationGateway as any,
+    mockCreationGateway as any,
+  );
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("delegates request to creationGateway and publishes booking.requested if newly created", async () => {
+    const booking = {
+      id: "booking-r09-1",
+      shipmentId: "ship-1",
+      tripId: "trip-1",
+      senderId: "sender-1",
+      travelerId: "traveler-1",
+      status: BookingStatus.Pending,
+      createdAt: "2026-09-16T12:00:00Z",
+    };
+
+    mockCreationGateway.requestBooking.mockResolvedValueOnce({
+      success: true,
+      bookingId: booking.id,
+      bookingRequestId: "req-1",
+      status: "pending",
+      alreadyExisted: false,
+      rebooked: false,
+      tripId: "trip-1",
+      shipmentId: "ship-1",
+    });
+    vi.mocked(mockBookingRepository.findById).mockResolvedValueOnce(booking as any);
+
+    const result = await service.request({
+      shipmentId: "ship-1",
+      tripId: "trip-1",
+      senderId: "sender-1",
+      travelerId: "traveler-1",
+      operationId: "op-test-1",
+    });
+
+    expect(result.id).toBe(booking.id);
+    expect(mockCreationGateway.requestBooking).toHaveBeenCalledWith({
+      shipmentId: "ship-1",
+      tripId: "trip-1",
+      senderId: "sender-1",
+      travelerId: "traveler-1",
+      message: undefined,
+      operationId: "op-test-1",
+    });
+    expect(mockEvents.publish).toHaveBeenCalledTimes(1);
+    expect(mockEvents.publish).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "booking.requested" }),
+    );
+  });
+
+  it("delegates request to creationGateway and SUPPRESSES duplicate event if alreadyExisted: true", async () => {
+    const booking = {
+      id: "booking-r09-dup",
+      shipmentId: "ship-1",
+      tripId: "trip-1",
+      senderId: "sender-1",
+      travelerId: "traveler-1",
+      status: BookingStatus.Pending,
+      createdAt: "2026-09-16T12:00:00Z",
+    };
+
+    mockCreationGateway.requestBooking.mockResolvedValueOnce({
+      success: true,
+      bookingId: booking.id,
+      bookingRequestId: "req-1",
+      status: "pending",
+      alreadyExisted: true,
+      rebooked: false,
+      tripId: "trip-1",
+      shipmentId: "ship-1",
+    });
+    vi.mocked(mockBookingRepository.findById).mockResolvedValueOnce(booking as any);
+
+    const result = await service.request({
+      shipmentId: "ship-1",
+      tripId: "trip-1",
+      senderId: "sender-1",
+      travelerId: "traveler-1",
+      operationId: "op-test-retry",
+    });
+
+    expect(result.id).toBe(booking.id);
+    // Duplicate side effect suppressed!
+    expect(mockEvents.publish).not.toHaveBeenCalled();
+  });
+
+  it("suppresses duplicate event on alreadyAccepted: true in transition to accepted", async () => {
+    const booking = {
+      id: "booking-acc",
+      shipmentId: "ship-1",
+      tripId: "trip-1",
+      senderId: "sender-1",
+      travelerId: "traveler-1",
+      status: BookingStatus.Pending,
+    };
+
+    vi.mocked(mockBookingRepository.findById)
+      .mockResolvedValueOnce(booking as any)
+      .mockResolvedValueOnce({ ...booking, status: BookingStatus.Accepted } as any);
+
+    mockAcceptanceGateway.acceptBooking.mockResolvedValueOnce({
+      success: true,
+      bookingId: booking.id,
+      alreadyAccepted: true,
+    });
+
+    await service.transition({
+      bookingId: booking.id,
+      actorId: "traveler-1",
+      nextStatus: BookingStatus.Accepted,
+    });
+
+    expect(mockEvents.publish).not.toHaveBeenCalled();
+  });
+
+  it("suppresses duplicate event on alreadyTransitioned: true in confirmPickup", async () => {
+    const booking = {
+      id: "booking-pickup",
+      shipmentId: "ship-1",
+      tripId: "trip-1",
+      senderId: "sender-1",
+      travelerId: "traveler-1",
+      status: BookingStatus.Accepted,
+    };
+
+    vi.mocked(mockBookingRepository.findById)
+      .mockResolvedValueOnce(booking as any)
+      .mockResolvedValueOnce({ ...booking, status: BookingStatus.InTransit } as any);
+
+    mockCustodyGateway.confirmPickup.mockResolvedValueOnce({
+      success: true,
+      bookingId: booking.id,
+      status: "in_transit",
+      alreadyTransitioned: true,
+    });
+
+    await service.transition({
+      bookingId: booking.id,
+      actorId: "traveler-1",
+      nextStatus: BookingStatus.InTransit,
+      custodyAcceptance: { dummy: true } as any,
+    });
+
+    expect(mockEvents.publish).not.toHaveBeenCalled();
+  });
+
+  it("suppresses duplicate event on idempotent: true in cancelBooking", async () => {
+    const booking = {
+      id: "booking-cancel",
+      shipmentId: "ship-1",
+      tripId: "trip-1",
+      senderId: "sender-1",
+      travelerId: "traveler-1",
+      status: BookingStatus.Pending,
+    };
+
+    vi.mocked(mockBookingRepository.findById)
+      .mockResolvedValueOnce(booking as any)
+      .mockResolvedValueOnce({ ...booking, status: BookingStatus.Cancelled } as any);
+
+    mockCancellationGateway.cancelBooking.mockResolvedValueOnce({
+      success: true,
+      bookingId: booking.id,
+      status: "cancelled",
+      cancelled: false,
+      idempotent: true,
+      capacityRestored: false,
+      shipmentReleased: false,
+    });
+
+    await service.transition({
+      bookingId: booking.id,
+      actorId: "sender-1",
+      nextStatus: BookingStatus.Cancelled,
+    });
+
+    expect(mockEvents.publish).not.toHaveBeenCalled();
+  });
+
+  it("suppresses duplicate event on idempotent: true in declineBooking", async () => {
+    const booking = {
+      id: "booking-decline",
+      shipmentId: "ship-1",
+      tripId: "trip-1",
+      senderId: "sender-1",
+      travelerId: "traveler-1",
+      status: BookingStatus.Pending,
+    };
+
+    vi.mocked(mockBookingRepository.findById)
+      .mockResolvedValueOnce(booking as any)
+      .mockResolvedValueOnce({ ...booking, status: BookingStatus.Declined } as any);
+
+    mockCancellationGateway.declineBooking.mockResolvedValueOnce({
+      success: true,
+      bookingId: booking.id,
+      status: "declined",
+      declined: false,
+      idempotent: true,
+    });
+
+    await service.transition({
+      bookingId: booking.id,
+      actorId: "traveler-1",
+      nextStatus: BookingStatus.Declined,
+    });
+
+    expect(mockEvents.publish).not.toHaveBeenCalled();
+  });
+});

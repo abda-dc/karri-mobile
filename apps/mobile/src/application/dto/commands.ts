@@ -28,6 +28,7 @@ export interface CreateShipmentDto {
   readonly customsDeclarationRequired: boolean;
   readonly packageContentVersion: number;
   readonly safetyDeclaration: SafetyDeclarationSnapshot;
+  readonly operationId?: string;
 }
 
 export interface CreateTripDto {
@@ -40,6 +41,7 @@ export interface CreateTripDto {
   readonly arrivalDate: string;
   readonly availableCapacityKg: number;
   readonly notes?: string;
+  readonly operationId?: string;
 }
 
 export interface RequestBookingDto {
@@ -48,6 +50,7 @@ export interface RequestBookingDto {
   readonly senderId: string;
   readonly travelerId: string;
   readonly message?: string;
+  readonly operationId?: string;
 }
 
 export interface TransitionBookingDto {
@@ -57,6 +60,7 @@ export interface TransitionBookingDto {
   readonly location?: string;
   readonly note?: string;
   readonly custodyAcceptance?: Omit<TravelerCustodyAcceptance, "acceptedAt">;
+  readonly idempotencyKey?: string;
 }
 
 export interface RecordCustodyEventDto {
@@ -74,9 +78,11 @@ export interface SubmitReviewDto {
   readonly direction: ReviewDirection;
   readonly rating: number;
   readonly comment: string;
+  readonly operationId?: string;
 }
 
 export interface CalculateTrustDto {
   readonly userId: string;
   readonly inputs: TrustInputs;
 }
+

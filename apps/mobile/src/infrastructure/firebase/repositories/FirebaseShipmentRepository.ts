@@ -9,6 +9,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   where,
 } from "firebase/firestore";
 import type { NewShipment, Shipment } from "../../../domain/shipment/Shipment";
@@ -18,8 +19,27 @@ import { getFirebaseServices } from "../client";
 import { mapShipment, toFirestoreShipment } from "../mappers/shipmentMapper";
 
 export class FirebaseShipmentRepository implements ShipmentRepository {
-  async create(shipment: NewShipment): Promise<Shipment> {
+  async create(shipment: NewShipment, operationId?: string): Promise<Shipment> {
     const { db } = getFirebaseServices();
+
+    if (operationId) {
+      const docRef = doc(db, "shipments", `shipment__${shipment.ownerId}__${operationId}`);
+      const existing = await getDoc(docRef);
+      if (existing.exists()) {
+        return mapShipment(existing);
+      }
+
+      await firebaseOfflineStatusGateway.trackWrite(() =>
+        setDoc(docRef, {
+          ...toFirestoreShipment(shipment),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+      );
+
+      return mapShipment(await getDoc(docRef));
+    }
+
     const reference = await firebaseOfflineStatusGateway.trackWrite(() =>
       addDoc(collection(db, "shipments"), {
         ...toFirestoreShipment(shipment),

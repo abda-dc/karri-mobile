@@ -15,6 +15,7 @@ const NON_RETRYABLE_CALLABLE_CODES = new Set([
 ]);
 
 export type PrivilegedCallableName =
+  | "requestBooking"
   | "placeAdministrativeHold"
   | "releaseAdministrativeHold"
   | "submitSafetyReview"
@@ -31,6 +32,25 @@ export type PrivilegedCallableName =
   | "recordTravelCustodyEvent"
   | "cancelBooking"
   | "declineBooking";
+
+export interface RequestBookingPayload {
+  readonly shipmentId: string;
+  readonly tripId: string;
+  readonly message?: string | null;
+  readonly operationId?: string | null;
+}
+
+export interface RequestBookingCallableResult {
+  readonly success: boolean;
+  readonly bookingId: string;
+  readonly bookingRequestId: string;
+  readonly status: string;
+  readonly alreadyExisted: boolean;
+  readonly rebooked: boolean;
+  readonly tripId: string;
+  readonly shipmentId: string;
+}
+
 
 
 export interface ConfirmPickupCustodyPayload {
@@ -369,6 +389,18 @@ export class PrivilegedCallableTransport {
   ): Promise<UnregisterPushTokenResult> {
     return this.invoke(
       "unregisterPushToken",
+      payload,
+      [],
+      expectedUserId,
+    );
+  }
+
+  requestBooking(
+    payload: RequestBookingPayload,
+    expectedUserId?: string,
+  ): Promise<RequestBookingCallableResult> {
+    return this.invoke(
+      "requestBooking",
       payload,
       [],
       expectedUserId,

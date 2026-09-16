@@ -34,11 +34,6 @@ export class FirebaseBookingRepository implements BookingRepository {
     const bookingKey = `${records.booking.shipmentId}__${records.booking.tripId}`;
     const requestReference = doc(db, "bookingRequests", `request__${bookingKey}`);
     const bookingReference = doc(db, "bookings", `booking__${bookingKey}`);
-    const custodyReference = doc(
-      db,
-      "custodyEvents",
-      `${bookingReference.id}__${records.initialCustodyEvent.eventType}`,
-    );
     const batch = writeBatch(db);
 
     batch.set(requestReference, {
@@ -54,13 +49,6 @@ export class FirebaseBookingRepository implements BookingRepository {
       }),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    });
-    batch.set(custodyReference, {
-      ...toFirestoreCustodyEvent({
-        ...records.initialCustodyEvent,
-        bookingId: bookingReference.id,
-      }),
-      timestamp: serverTimestamp(),
     });
     await firebaseOfflineStatusGateway.trackWrite(() => batch.commit());
 

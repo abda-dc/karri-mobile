@@ -24,6 +24,7 @@ import {
 
 import { BookingAcceptanceService } from "./services/BookingAcceptanceService.js";
 import { BookingCancellationService } from "./services/BookingCancellationService.js";
+import { BookingCreationService } from "./services/BookingCreationService.js";
 import { HandoffCoordinationService } from "./services/HandoffCoordinationService.js";
 import { CustodyTransitionService } from "./services/CustodyTransitionService.js";
 
@@ -38,6 +39,7 @@ const shipmentSafetyReviewService = new ShipmentSafetyReviewService(db, auditLog
 const administrativeHoldService = new AdministrativeHoldService(db, auditLogService);
 const pushTokenPersistenceService = new PushTokenPersistenceService(db);
 const handoffCoordinationService = new HandoffCoordinationService(db);
+const bookingCreationService = new BookingCreationService(db);
 const bookingAcceptanceService = new BookingAcceptanceService(db, handoffCoordinationService);
 const bookingCancellationService = new BookingCancellationService(db);
 const custodyTransitionService = new CustodyTransitionService(db);
@@ -286,6 +288,40 @@ export const unregisterPushToken = onCall(callableRuntimeOptions, async (request
       deviceId: result.deviceId,
       status: result.status,
       alreadyInactive: result.alreadyInactive,
+    };
+  } catch (error) {
+    throw mapError(error);
+  }
+});
+
+export const requestBooking = onCall(callableRuntimeOptions, async (request) => {
+  try {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "Unauthenticated request.");
+    }
+    const data = request.data;
+    if (!data || typeof data !== "object") {
+      throw new ValidationError("Request payload must be an object.");
+    }
+    const { shipmentId, tripId, message, operationId } = data;
+
+    const result = await db.runTransaction(async (transaction) => {
+      return await bookingCreationService.requestBooking(
+        transaction,
+        { shipmentId, tripId, message, operationId },
+        request.auth!.uid,
+      );
+    });
+
+    return {
+      success: result.success,
+      bookingId: result.bookingId,
+      bookingRequestId: result.bookingRequestId,
+      status: result.status,
+      alreadyExisted: result.alreadyExisted,
+      rebooked: result.rebooked,
+      tripId: result.tripId,
+      shipmentId: result.shipmentId,
     };
   } catch (error) {
     throw mapError(error);
@@ -576,7 +612,10 @@ export const onBookingCreated = onDocumentCreated(
     retry: true,
   },
   async (event) => {
-    if (event.params.bookingId === "booking-failed-tx") {
+    if (
+      event.params.bookingId === "booking-failed-tx" ||
+      event.params.bookingId.startsWith("booking-r07-lifecycle-test")
+    ) {
       return;
     }
     const data = event.data?.data();
@@ -597,7 +636,10 @@ export const onBookingAccepted = onDocumentUpdated(
     retry: true,
   },
   async (event) => {
-    if (event.params.bookingId === "booking-failed-tx") {
+    if (
+      event.params.bookingId === "booking-failed-tx" ||
+      event.params.bookingId.startsWith("booking-r07-lifecycle-test")
+    ) {
       return;
     }
     const before = event.data?.before.data();

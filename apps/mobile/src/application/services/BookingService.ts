@@ -30,6 +30,7 @@ import {
 } from "../../domain/custody/CustodyEvent";
 import type { BookingAcceptanceGateway } from "./BookingAcceptanceGateway";
 import type { BookingCancellationGateway } from "./BookingCancellationGateway";
+import type { BookingCreationGateway } from "./BookingCreationGateway";
 import type { CustodyTransitionGateway } from "./CustodyTransitionGateway";
 
 import type { Clock } from "./Clock";
@@ -60,7 +61,9 @@ export class BookingService {
     private readonly acceptanceGateway?: BookingAcceptanceGateway,
     private readonly custodyGateway?: CustodyTransitionGateway,
     private readonly cancellationGateway?: BookingCancellationGateway,
+    private readonly creationGateway?: BookingCreationGateway,
   ) {}
+
 
 
   async request(input: RequestBookingDto): Promise<Booking> {
@@ -73,6 +76,43 @@ export class BookingService {
 
     const shipmentId = requireText(input.shipmentId, "shipmentId", 128);
     const tripId = requireText(input.tripId, "tripId", 128);
+
+    if (this.creationGateway) {
+      const result = await this.creationGateway.requestBooking({
+        shipmentId,
+        tripId,
+        senderId,
+        travelerId,
+        message: input.message,
+        operationId: input.operationId,
+      });
+
+      const booking = await this.bookings.findById(result.bookingId);
+      if (!booking) {
+        throw new DomainValidationError("Created booking could not be loaded.");
+      }
+
+      if (!result.alreadyExisted) {
+        const occurredAt = booking.createdAt ?? this.clock.now();
+        this.events.publish(
+          createPlatformEvent<BookingRequested>({
+            type: "booking.requested",
+            aggregateId: booking.id,
+            actorId: senderId,
+            occurredAt,
+            payload: {
+              requestId: result.bookingRequestId,
+              senderId,
+              travelerId,
+              recipientIds: [travelerId],
+            },
+          }),
+        );
+      }
+
+      return booking;
+    }
+
     const [shipment, trip] = await Promise.all([
       this.shipments.findById(shipmentId),
       this.trips.findById(tripId),
@@ -172,7 +212,7 @@ export class BookingService {
     const occurredAt = this.clock.now();
 
     if (input.nextStatus === BookingStatus.Accepted && this.acceptanceGateway) {
-      await this.acceptanceGateway.acceptBooking({
+      const result = await this.acceptanceGateway.acceptBooking({
         bookingId: booking.id,
         actorId: input.actorId,
         location: input.location,
@@ -185,9 +225,11 @@ export class BookingService {
         updatedAt: occurredAt,
       };
 
-      const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
-      if (event) {
-        this.events.publish(event);
+      if (!result.alreadyAccepted) {
+        const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
+        if (event) {
+          this.events.publish(event);
+        }
       }
 
       return updatedBooking;
@@ -198,7 +240,7 @@ export class BookingService {
         throw new DomainValidationError("Traveler custody acceptance declaration is required to confirm pickup.");
       }
 
-      await this.custodyGateway.confirmPickup({
+      const result = await this.custodyGateway.confirmPickup({
         bookingId: booking.id,
         actorId: input.actorId,
         location: input.location,
@@ -212,16 +254,18 @@ export class BookingService {
         updatedAt: occurredAt,
       };
 
-      const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
-      if (event) {
-        this.events.publish(event);
+      if (!result.alreadyTransitioned) {
+        const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
+        if (event) {
+          this.events.publish(event);
+        }
       }
 
       return updatedBooking;
     }
 
     if (input.nextStatus === BookingStatus.Delivered && this.custodyGateway) {
-      await this.custodyGateway.confirmDelivery({
+      const result = await this.custodyGateway.confirmDelivery({
         bookingId: booking.id,
         actorId: input.actorId,
         location: input.location,
@@ -234,16 +278,18 @@ export class BookingService {
         updatedAt: occurredAt,
       };
 
-      const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
-      if (event) {
-        this.events.publish(event);
+      if (!result.alreadyTransitioned) {
+        const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
+        if (event) {
+          this.events.publish(event);
+        }
       }
 
       return updatedBooking;
     }
 
     if (input.nextStatus === BookingStatus.Completed && this.custodyGateway) {
-      await this.custodyGateway.completeBooking({
+      const result = await this.custodyGateway.completeBooking({
         bookingId: booking.id,
         actorId: input.actorId,
       });
@@ -254,16 +300,18 @@ export class BookingService {
         updatedAt: occurredAt,
       };
 
-      const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
-      if (event) {
-        this.events.publish(event);
+      if (!result.alreadyTransitioned) {
+        const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
+        if (event) {
+          this.events.publish(event);
+        }
       }
 
       return updatedBooking;
     }
 
     if (input.nextStatus === BookingStatus.Cancelled && this.cancellationGateway) {
-      await this.cancellationGateway.cancelBooking({
+      const result = await this.cancellationGateway.cancelBooking({
         bookingId: booking.id,
         actorId: input.actorId,
         note: input.note,
@@ -275,16 +323,18 @@ export class BookingService {
         updatedAt: occurredAt,
       };
 
-      const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
-      if (event) {
-        this.events.publish(event);
+      if (!result.idempotent) {
+        const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
+        if (event) {
+          this.events.publish(event);
+        }
       }
 
       return updatedBooking;
     }
 
     if (input.nextStatus === BookingStatus.Declined && this.cancellationGateway) {
-      await this.cancellationGateway.declineBooking({
+      const result = await this.cancellationGateway.declineBooking({
         bookingId: booking.id,
         actorId: input.actorId,
         note: input.note,
@@ -296,9 +346,11 @@ export class BookingService {
         updatedAt: occurredAt,
       };
 
-      const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
-      if (event) {
-        this.events.publish(event);
+      if (!result.idempotent) {
+        const event = this.createTransitionEvent(updatedBooking, input.actorId, occurredAt);
+        if (event) {
+          this.events.publish(event);
+        }
       }
 
       return updatedBooking;

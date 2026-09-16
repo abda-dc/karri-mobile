@@ -47,6 +47,7 @@ import { PrivilegedCallableTransport } from "../../infrastructure/firebase/privi
 import { PlatformAppCheckTokenProvider } from "../../infrastructure/firebase/appCheckTokenProvider";
 import { FirebaseBookingAcceptanceGateway } from "../../infrastructure/firebase/gateways/FirebaseBookingAcceptanceGateway";
 import { FirebaseBookingCancellationGateway } from "../../infrastructure/firebase/gateways/FirebaseBookingCancellationGateway";
+import { FirebaseBookingCreationGateway } from "../../infrastructure/firebase/gateways/FirebaseBookingCreationGateway";
 import { FirebaseCustodyTransitionGateway } from "../../infrastructure/firebase/gateways/FirebaseCustodyTransitionGateway";
 
 import { systemClock } from "../../application/services/Clock";
@@ -103,6 +104,9 @@ const bookingAcceptanceGateway = new FirebaseBookingAcceptanceGateway(
 const bookingCancellationGateway = new FirebaseBookingCancellationGateway(
   privilegedCallableTransport,
 );
+const bookingCreationGateway = new FirebaseBookingCreationGateway(
+  privilegedCallableTransport,
+);
 const custodyTransitionGateway = new FirebaseCustodyTransitionGateway(
   privilegedCallableTransport,
 );
@@ -137,6 +141,7 @@ export const mobileServices = {
     bookingAcceptanceGateway,
     custodyTransitionGateway,
     bookingCancellationGateway,
+    bookingCreationGateway,
   ),
 
   custody: new CustodyService(custodyRepository, bookingRepository, custodyTransitionGateway),

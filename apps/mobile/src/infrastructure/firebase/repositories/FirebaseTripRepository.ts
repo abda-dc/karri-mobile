@@ -9,6 +9,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   where,
 } from "firebase/firestore";
 import type { NewTrip, Trip } from "../../../domain/trip/Trip";
@@ -18,8 +19,27 @@ import { getFirebaseServices } from "../client";
 import { mapTrip, toFirestoreTrip } from "../mappers/tripMapper";
 
 export class FirebaseTripRepository implements TripRepository {
-  async create(trip: NewTrip): Promise<Trip> {
+  async create(trip: NewTrip, operationId?: string): Promise<Trip> {
     const { db } = getFirebaseServices();
+
+    if (operationId) {
+      const docRef = doc(db, "trips", `trip__${trip.ownerId}__${operationId}`);
+      const existing = await getDoc(docRef);
+      if (existing.exists()) {
+        return mapTrip(existing);
+      }
+
+      await firebaseOfflineStatusGateway.trackWrite(() =>
+        setDoc(docRef, {
+          ...toFirestoreTrip(trip),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+      );
+
+      return mapTrip(await getDoc(docRef));
+    }
+
     const reference = await firebaseOfflineStatusGateway.trackWrite(() =>
       addDoc(collection(db, "trips"), {
         ...toFirestoreTrip(trip),

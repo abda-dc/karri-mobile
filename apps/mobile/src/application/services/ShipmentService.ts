@@ -29,6 +29,14 @@ export class ShipmentService {
 
   async create(input: CreateShipmentDto): Promise<Shipment> {
     const ownerId = requireText(input.ownerId, "ownerId", 128);
+
+    if (input.operationId) {
+      const existing = await this.shipments.findById(`shipment__${ownerId}__${input.operationId}`);
+      if (existing) {
+        return existing;
+      }
+    }
+
     const packageContentVersion = input.packageContentVersion;
 
     // Validate safety declaration first
@@ -70,7 +78,7 @@ export class ShipmentService {
       safetyDeclaration: input.safetyDeclaration,
     };
 
-    const created = await this.shipments.create(shipment);
+    const created = await this.shipments.create(shipment, input.operationId);
     const occurredAt = created.createdAt ?? this.clock.now();
 
     this.events.publish(
