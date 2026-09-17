@@ -26,6 +26,7 @@ import {
   FirebaseNotificationRepository,
   FirebaseNotificationPreferenceRepository,
   FirebaseProfileRepository,
+  FirebaseReputationRepository,
   FirebaseReviewRepository,
   FirebaseShipmentRepository,
   FirebaseTripRepository,
@@ -59,6 +60,7 @@ const notificationRepository = new FirebaseNotificationRepository();
 const notificationPreferenceRepository =
   new FirebaseNotificationPreferenceRepository();
 const profileRepository = new FirebaseProfileRepository();
+const reputationRepository = new FirebaseReputationRepository();
 const reviewRepository = new FirebaseReviewRepository();
 const shipmentRepository = new FirebaseShipmentRepository();
 const tripRepository = new FirebaseTripRepository();
@@ -70,7 +72,13 @@ const identityVerificationService = new IdentityVerificationService(
 const offlineService = new OfflineService(firebaseOfflineStatusGateway);
 const shipmentService = new ShipmentService(shipmentRepository, eventBus);
 const tripService = new TripService(tripRepository, eventBus);
-const trustService = new TrustService(trustRepository, reviewRepository);
+const trustService = new TrustService(
+  trustRepository,
+  reviewRepository,
+  undefined,
+  undefined,
+  reputationRepository,
+);
 const matchingService = new MatchingService(
   shipmentService,
   tripService,
@@ -158,7 +166,13 @@ export const mobileServices = {
   profile: new ProfileService(profileRepository),
   pushNotification: pushNotificationService,
   pushRegistration: pushRegistrationService,
-  review: new ReviewService(reviewRepository, bookingRepository, eventBus),
+  review: new ReviewService(
+    reviewRepository,
+    bookingRepository,
+    eventBus,
+    systemClock,
+    reputationRepository,
+  ),
   shipment: shipmentService,
   shipmentTimeline: new ShipmentTimelineService(custodyRepository),
   trip: tripService,

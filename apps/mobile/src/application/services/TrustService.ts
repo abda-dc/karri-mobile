@@ -6,6 +6,7 @@ import type { TrustSummary, VerificationLevel } from "../../domain/trust/TrustSc
 import type { Booking } from "../../domain/booking/Booking";
 import { BookingStatus } from "../../domain/booking/Booking";
 import type { ReviewRepository } from "../../domain/review/ReviewRepository";
+import type { ReputationRepository } from "../../domain/review/ReputationRepository";
 import type { Clock } from "./Clock";
 import { systemClock } from "./Clock";
 import { DomainValidationError, requireText } from "./validation";
@@ -16,6 +17,7 @@ export class TrustService {
     private readonly reviews: ReviewRepository,
     private readonly calculator: TrustCalculator = new TrustCalculator(),
     private readonly clock: Clock = systemClock,
+    private readonly reputationRepo?: ReputationRepository,
   ) {}
 
   async getVisibleSummary(
@@ -27,12 +29,33 @@ export class TrustService {
     } = {},
   ): Promise<TrustSummary> {
     const calculatedAt = this.clock.now();
-    const reviews = await this.reviews.listByReviewee(userId);
-    const averageReview =
-      reviews.length === 0
-        ? null
-        : reviews.reduce((total, review) => total + review.rating, 0) / reviews.length;
-    const visibleCompletedBookingIds = new Set(reviews.map((review) => review.bookingId));
+
+    let averageReview: number | null = null;
+    let reviewCount = 0;
+    let completedDeliveriesCount: number | null = null;
+    let cancellationsCount: number | null = null;
+
+    if (this.reputationRepo) {
+      const rep = await this.reputationRepo.findById(userId);
+      if (rep) {
+        averageReview = rep.averageRating;
+        reviewCount = rep.reviewCount;
+        completedDeliveriesCount = rep.completedBookingsCount;
+        cancellationsCount = rep.cancelledBookingsCount;
+      }
+    }
+
+    let visibleCompletedBookingIds = new Set<string>();
+    if (averageReview === null && reviewCount === 0) {
+      const reviews = await this.reviews.listByReviewee(userId);
+      averageReview =
+        reviews.length === 0
+          ? null
+          : Math.round((reviews.reduce((total, review) => total + review.rating, 0) / reviews.length) * 100) / 100;
+      reviewCount = reviews.length;
+      visibleCompletedBookingIds = new Set(reviews.map((review) => review.bookingId));
+    }
+
     const hasParticipantContext =
       context.bookings !== undefined ||
       context.accountCreatedAt !== undefined ||
@@ -54,12 +77,12 @@ export class TrustService {
     const inputs = {
       completedDeliveries: bookings
         ? bookings.filter((booking) => booking.status === BookingStatus.Completed).length
-        : visibleCompletedBookingIds.size,
+        : (completedDeliveriesCount ?? visibleCompletedBookingIds.size),
       cancellations: bookings
         ? bookings.filter((booking) => booking.status === BookingStatus.Cancelled).length
-        : 0,
-      averageReview: averageReview === null ? null : Math.round(averageReview * 100) / 100,
-      reviewCount: reviews.length,
+        : (cancellationsCount ?? 0),
+      averageReview,
+      reviewCount,
       accountAgeDays,
       verificationLevel: context.verificationLevel ?? "none",
     } as const;

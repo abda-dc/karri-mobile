@@ -25,6 +25,7 @@ import {
 import { BookingAcceptanceService } from "./services/BookingAcceptanceService.js";
 import { BookingCancellationService } from "./services/BookingCancellationService.js";
 import { BookingCreationService } from "./services/BookingCreationService.js";
+import { ReputationService } from "./services/ReputationService.js";
 import { HandoffCoordinationService } from "./services/HandoffCoordinationService.js";
 import { CustodyTransitionService } from "./services/CustodyTransitionService.js";
 
@@ -40,6 +41,7 @@ const administrativeHoldService = new AdministrativeHoldService(db, auditLogServ
 const pushTokenPersistenceService = new PushTokenPersistenceService(db);
 const handoffCoordinationService = new HandoffCoordinationService(db);
 const bookingCreationService = new BookingCreationService(db);
+const reputationService = new ReputationService(db);
 const bookingAcceptanceService = new BookingAcceptanceService(db, handoffCoordinationService);
 const bookingCancellationService = new BookingCancellationService(db);
 const custodyTransitionService = new CustodyTransitionService(db);
@@ -669,4 +671,35 @@ export const processDeliveryRetriesScheduled = onSchedule(
 
 export const processDeliveryRetries = onCall(callableRuntimeOptions, async () => {
   return await bookingAcceptedNotificationService.processRetryableDeliveries(20);
+});
+
+export const onReviewCreated = onDocumentCreated(
+  {
+    document: "reviews/{reviewId}",
+    region: "us-east1",
+    retry: true,
+  },
+  async (event) => {
+    if (event.params.reviewId.startsWith("test-skip-trigger")) {
+      return;
+    }
+    const data = event.data?.data();
+    if (!data || !data.subjectId) {
+      return;
+    }
+    await reputationService.updateUserReputation(data.subjectId);
+  },
+);
+
+export const getUserReputation = onCall(callableRuntimeOptions, async (request) => {
+  try {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError("unauthenticated", "Unauthenticated request.");
+    }
+    const data = request.data;
+    const userId = data?.userId ?? request.auth.uid;
+    return await reputationService.getUserReputation(userId);
+  } catch (error) {
+    throw mapError(error);
+  }
 });

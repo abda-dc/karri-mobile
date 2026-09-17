@@ -10,3 +10,4 @@ export { FirebaseTrustRepository } from "./FirebaseTrustRepository";
 export { FirebaseUserRepository } from "./FirebaseUserRepository";
 export { FirebaseVerificationRepository } from "./FirebaseVerificationRepository";
 export { FirebaseHandoffRepository } from "./FirebaseHandoffRepository";
+export { FirebaseReputationRepository } from "./FirebaseReputationRepository";

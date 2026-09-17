@@ -77,7 +77,7 @@ export interface SubmitReviewDto {
   readonly revieweeId: string;
   readonly direction: ReviewDirection;
   readonly rating: number;
-  readonly comment: string;
+  readonly comment?: string;
   readonly operationId?: string;
 }
 

@@ -80,6 +80,10 @@ function userDb(uid: string) {
   return testEnv.authenticatedContext(uid).firestore();
 }
 
+function unauthDb() {
+  return testEnv.unauthenticatedContext().firestore();
+}
+
 async function seedDoc(path: string, data: DocumentData) {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), path), data);
@@ -1332,6 +1336,75 @@ describe("reviews and trust", () => {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         })),
+    );
+  });
+
+  it("denies review updates and deletes to enforce immutability", async () => {
+    const reviewId = `${bookingId}__${senderUid}__${travelerUid}`;
+    await seedDoc(`reviews/${reviewId}`, reviewFixture());
+
+    await assertFails(
+      updateDoc(doc(userDb(senderUid), `reviews/${reviewId}`), {
+        rating: 4,
+      }),
+    );
+    await assertFails(
+      deleteDoc(doc(userDb(senderUid), `reviews/${reviewId}`)),
+    );
+  });
+
+  it("denies review creation with rating out of bounds or non-integer", async () => {
+    await seedBookingState("completed");
+    const validId = `${bookingId}__${senderUid}__${travelerUid}`;
+
+    // rating 0 (below 1)
+    await assertFails(
+      setDoc(doc(userDb(senderUid), `reviews/${validId}`),
+        reviewFixture({ rating: 0, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })),
+    );
+
+    // rating 6 (above 5)
+    await assertFails(
+      setDoc(doc(userDb(senderUid), `reviews/${validId}`),
+        reviewFixture({ rating: 6, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })),
+    );
+
+    // rating 4.5 (float)
+    await assertFails(
+      setDoc(doc(userDb(senderUid), `reviews/${validId}`),
+        reviewFixture({ rating: 4.5, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })),
+    );
+  });
+
+  it("allows signed-in users to read userReputations, but denies direct client writes", async () => {
+    const targetUid = travelerUid;
+    await seedDoc(`userReputations/${targetUid}`, {
+      userId: targetUid,
+      averageRating: 4.8,
+      reviewCount: 5,
+    });
+
+    // Signed in user can read
+    await assertSucceeds(getDoc(doc(userDb(otherUid), `userReputations/${targetUid}`)));
+
+    // Unauthenticated read fails
+    await assertFails(getDoc(doc(unauthDb(), `userReputations/${targetUid}`)));
+
+    // Client writes strictly denied
+    await assertFails(
+      setDoc(doc(userDb(targetUid), `userReputations/${targetUid}`), {
+        userId: targetUid,
+        averageRating: 5.0,
+        reviewCount: 999,
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(userDb(targetUid), `userReputations/${targetUid}`), {
+        averageRating: 5.0,
+      }),
+    );
+    await assertFails(
+      deleteDoc(doc(userDb(targetUid), `userReputations/${targetUid}`)),
     );
   });
 

@@ -253,6 +253,7 @@ export function BookingDetailCard({
         direction: isSender ? "sender_reviews_traveler" : "traveler_reviews_sender",
         rating: Number(rating),
         comment,
+        operationId: `review__${booking.id}__${currentUserId}`,
       });
       setReviews((current) =>
         current.some((existing) => existing.id === review.id) ? current : [...current, review],

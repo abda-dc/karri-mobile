@@ -1155,6 +1155,11 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /userReputations/{userId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
     match /trustScores/{userId} {
       allow read, write: if false;
     }
