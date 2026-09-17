@@ -34,6 +34,8 @@ import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
 import { useProfile } from "../../src/presentation/hooks/useProfile";
 import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
+import { generateSecureId } from "../../src/infrastructure/storage/PendingOperationStorage";
+import { isDefinitiveNonCommit } from "../../src/application/services/validation";
 import { colors, radii, spacing, touchTargets, typography } from "../../src/theme/tokens";
 import type { Shipment } from "../../src/types/models";
 
@@ -677,6 +679,7 @@ function WeightSelector({
 export default function SendScreen() {
   const auth = useAuthSession();
   const profileState = useProfile(auth.user?.uid ?? null);
+
   const [form, setForm] = useState(emptyForm);
   const [shipments, setShipments] = useState<ReadonlyArray<Shipment>>([]);
   const [listLoading, setListLoading] = useState(true);
@@ -685,6 +688,25 @@ export default function SendScreen() {
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [errorType, setErrorType] = useState<"definitive" | "ambiguous" | null>(null);
+  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [operationId, setOperationId] = useState<string>(() =>
+    generateSecureId("ship"),
+  );
+
+  useEffect(() => {
+    if (!auth.user?.uid) {
+      return;
+    }
+    mobileServices.pendingOperationStorage
+      .getPendingOperation("shipment", auth.user.uid)
+      .then((persisted) => {
+        if (persisted) {
+          setOperationId(persisted);
+        }
+      })
+      .catch(() => {});
+  }, [auth.user?.uid]);
   const [matchFilters, setMatchFilters] = useState<MatchDiscoveryFilters>(
     defaultMatchDiscoveryFilters,
   );
@@ -1059,6 +1081,7 @@ export default function SendScreen() {
     try {
       await mobileServices.shipment.create({
         ownerId: auth.user.uid,
+        operationId,
         originCountry: form.originCountry,
         originCity: form.originCity,
         destinationCountry: form.destinationCountry,
@@ -1095,10 +1118,57 @@ export default function SendScreen() {
       setCustomWeightUnit("kg");
       setReviewingShipment(false);
       setSuccessMessage("Shipment saved. It is now available for corridor matching.");
+      setOperationId(generateSecureId("ship"));
+      setErrorType(null);
     } catch (error) {
+      const isDefinitive = isDefinitiveNonCommit(error);
+      setErrorType(isDefinitive ? "definitive" : "ambiguous");
       setFormError(reportFriendlyError(error, "send.create-shipment"));
     } finally {
       setSaving(false);
+    }
+  }
+
+  function handleDiscardDefinitive() {
+    setForm(emptyForm);
+    setWeightMode("preset");
+    setCustomWeightInput("");
+    setCustomWeightUnit("kg");
+    setReviewingShipment(false);
+    setFormError(null);
+    setErrorType(null);
+    setSuccessMessage(null);
+    setOperationId(generateSecureId("ship"));
+  }
+
+  async function handleCheckStatus() {
+    if (!auth.user?.uid || checkingStatus || saving) {
+      return;
+    }
+    setCheckingStatus(true);
+    try {
+      const result = await mobileServices.shipment.reconcilePendingOperation(auth.user.uid);
+      if (result.status === "found") {
+        setForm(emptyForm);
+        setReviewingShipment(false);
+        setFormError(null);
+        setErrorType(null);
+        setSuccessMessage("Shipment confirmed on server and recovered.");
+        setOperationId(generateSecureId("ship"));
+      } else if (result.status === "absent") {
+        setForm(emptyForm);
+        setReviewingShipment(false);
+        setFormError(null);
+        setErrorType(null);
+        setSuccessMessage("No shipment was recorded. Starting fresh.");
+        setOperationId(generateSecureId("ship"));
+      } else {
+        setFormError("Status could not be confirmed. Check connection and retry.");
+      }
+    } catch {
+      setFormError("Status could not be confirmed. Check connection and retry.");
+    } finally {
+      setCheckingStatus(false);
     }
   }
 
@@ -1410,7 +1480,29 @@ export default function SendScreen() {
             ) : null}
 
             {formError ? (
-              <Banner message={formError} title="Review shipment details" variant="error" />
+              <View style={styles.errorBannerContainer}>
+                <Banner message={formError} title="Review shipment details" variant="error" />
+                {errorType === "definitive" ? (
+                  <PrimaryButton
+                    accessibilityHint="Discards the invalid shipment attempt and starts a fresh form."
+                    disabled={saving}
+                    onPress={handleDiscardDefinitive}
+                    variant="ghost"
+                  >
+                    Discard & start fresh
+                  </PrimaryButton>
+                ) : (
+                  <PrimaryButton
+                    accessibilityHint="Checks if shipment was committed before allowing a new shipment."
+                    disabled={saving}
+                    loading={checkingStatus}
+                    onPress={handleCheckStatus}
+                    variant="ghost"
+                  >
+                    Check status
+                  </PrimaryButton>
+                )}
+              </View>
             ) : null}
             {successMessage ? (
               <Banner message={successMessage} title="Shipment ready" variant="success" />
@@ -2063,5 +2155,8 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     ...typography.caption,
     fontSize: 11,
+  },
+  errorBannerContainer: {
+    gap: spacing.sm,
   },
 });

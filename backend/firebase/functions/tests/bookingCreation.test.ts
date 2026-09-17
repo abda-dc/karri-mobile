@@ -406,4 +406,118 @@ describe("Booking Creation & Duplicate Safety (R09)", () => {
       }),
     ).rejects.toThrow(/not have enough available capacity/i);
   });
+
+  it("12. Reuses same operation ID with matching payload idempotently without duplicating resource", async () => {
+    const shipmentId = "ship-idemp-match";
+    const tripId = "trip-idemp-match";
+    const senderId = "sender-idemp";
+    const travelerId = "traveler-idemp";
+    const opId = "op-stable-123";
+
+    await seedShipment(shipmentId, { ownerId: senderId });
+    await seedTrip(tripId, { ownerId: travelerId });
+
+    // First attempt: succeeds and creates booking
+    const firstResult = await (requestBooking.run as any)({
+      data: { shipmentId, tripId, senderId, travelerId, message: "Handled with care", operationId: opId },
+      auth: { uid: senderId, token: {} },
+    });
+
+    expect(firstResult.success).toBe(true);
+    expect(firstResult.alreadyExisted).toBe(false);
+
+    // Simulated retry with same operationId and same payload
+    const retryResult = await (requestBooking.run as any)({
+      data: { shipmentId, tripId, senderId, travelerId, message: "Handled with care", operationId: opId },
+      auth: { uid: senderId, token: {} },
+    });
+
+    expect(retryResult.success).toBe(true);
+    expect(retryResult.alreadyExisted).toBe(true);
+    expect(retryResult.bookingId).toBe(firstResult.bookingId);
+
+    // Verify only one booking document exists
+    const bookingsSnap = await db.collection("bookings").where("senderId", "==", senderId).get();
+    expect(bookingsSnap.size).toBe(1);
+  });
+
+  it("13. Rejects same operation ID when supplied with materially different payload (conflict)", async () => {
+    const shipmentId = "ship-idemp-diff";
+    const tripId = "trip-idemp-diff";
+    const senderId = "sender-idemp-diff";
+    const travelerId = "traveler-idemp-diff";
+    const opId = "op-collision-test";
+
+    await seedShipment(shipmentId, { ownerId: senderId });
+    await seedTrip(tripId, { ownerId: travelerId });
+
+    // First call: message A
+    const firstResult = await (requestBooking.run as any)({
+      data: { shipmentId, tripId, senderId, travelerId, message: "Original payload message", operationId: opId },
+      auth: { uid: senderId, token: {} },
+    });
+    expect(firstResult.success).toBe(true);
+
+    // Second call: same operationId, different message -> conflict error!
+    await expect(
+      (requestBooking.run as any)({
+        data: { shipmentId, tripId, senderId, travelerId, message: "Materially different message", operationId: opId },
+        auth: { uid: senderId, token: {} },
+      }),
+    ).rejects.toThrow(/Operation ID already exists with a different request payload/i);
+  });
+
+  it("14. Retry with a fresh client operation ID after simulated process death reconciles server-side to the same active booking without duplicate capacity allocation or side effects", async () => {
+    const shipmentId = "ship-restart-fresh";
+    const tripId = "trip-restart-fresh";
+    const senderId = "sender-restart-fresh";
+    const travelerId = "traveler-restart-fresh";
+    const opIdInitial = "op-initial-crashed";
+    const opIdAfterRestart = "op-fresh-after-restart";
+
+    await seedShipment(shipmentId, { ownerId: senderId, weightKg: 3 });
+    await seedTrip(tripId, { ownerId: travelerId, availableCapacityKg: 10 });
+
+    // Step 1: Initial call before crash/process death
+    const firstResult = await (requestBooking.run as any)({
+      data: { shipmentId, tripId, senderId, travelerId, operationId: opIdInitial },
+      auth: { uid: senderId, token: {} },
+    });
+
+    expect(firstResult.success).toBe(true);
+    expect(firstResult.alreadyExisted).toBe(false);
+    expect(firstResult.bookingId).toBeTruthy();
+
+    // Verify exactly one custody event and one request were created
+    const initialCustodySnap = await db.collection("custodyEvents").where("bookingId", "==", firstResult.bookingId).get();
+    expect(initialCustodySnap.size).toBe(1);
+
+    const initialReqSnap = await db.collection("bookingRequests").where("bookingId", "==", firstResult.bookingId).get();
+    expect(initialReqSnap.size).toBe(1);
+
+    // Step 2: Simulated process death / app restart occurred, and caller retries with a brand new, fresh operation ID
+    const retryResult = await (requestBooking.run as any)({
+      data: { shipmentId, tripId, senderId, travelerId, operationId: opIdAfterRestart },
+      auth: { uid: senderId, token: {} },
+    });
+
+    // Step 3: Server-side active-booking reconciliation returns the same booking
+    expect(retryResult.success).toBe(true);
+    expect(retryResult.alreadyExisted).toBe(true);
+    expect(retryResult.bookingId).toBe(firstResult.bookingId);
+    expect(retryResult.status).toBe("pending");
+
+    // Step 4: Verify zero duplicate allocations and zero duplicate side effects
+    const allBookingsSnap = await db.collection("bookings").where("shipmentId", "==", shipmentId).get();
+    expect(allBookingsSnap.size).toBe(1);
+
+    const allRequestsSnap = await db.collection("bookingRequests").where("bookingId", "==", firstResult.bookingId).get();
+    expect(allRequestsSnap.size).toBe(1);
+
+    const allCustodySnap = await db.collection("custodyEvents").where("bookingId", "==", firstResult.bookingId).get();
+    expect(allCustodySnap.size).toBe(1);
+
+    const tripDoc = await db.collection("trips").doc(tripId).get();
+    expect(tripDoc.data()?.availableCapacityKg).toBe(10);
+  });
 });

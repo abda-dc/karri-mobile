@@ -41,3 +41,6 @@ keystores/
 service-account.json
 serviceAccount*.json
 firebase-admin*.json
+
+# Firebase Emulator artifacts
+functions.yaml

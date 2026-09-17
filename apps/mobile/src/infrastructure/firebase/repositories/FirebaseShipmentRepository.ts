@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   getDoc,
+  getDocFromServer,
   getDocs,
   limit,
   onSnapshot,
@@ -17,6 +18,7 @@ import type { ShipmentRepository } from "../../../domain/shipment/ShipmentReposi
 import { firebaseOfflineStatusGateway } from "../FirebaseOfflineStatusGateway";
 import { getFirebaseServices } from "../client";
 import { mapShipment, toFirestoreShipment } from "../mappers/shipmentMapper";
+import { DomainValidationError } from "../../../application/services/validation";
 
 export class FirebaseShipmentRepository implements ShipmentRepository {
   async create(shipment: NewShipment, operationId?: string): Promise<Shipment> {
@@ -26,7 +28,30 @@ export class FirebaseShipmentRepository implements ShipmentRepository {
       const docRef = doc(db, "shipments", `shipment__${shipment.ownerId}__${operationId}`);
       const existing = await getDoc(docRef);
       if (existing.exists()) {
-        return mapShipment(existing);
+        const mapped = mapShipment(existing);
+        if (
+          mapped.ownerId !== shipment.ownerId ||
+          mapped.originCountry !== shipment.originCountry ||
+          mapped.originCity !== shipment.originCity ||
+          mapped.destinationCountry !== shipment.destinationCountry ||
+          mapped.destinationCity !== shipment.destinationCity ||
+          mapped.packageCategory !== shipment.packageCategory ||
+          mapped.packageDescription !== shipment.packageDescription ||
+          mapped.weightKg !== shipment.weightKg ||
+          mapped.deliveryWindow !== shipment.deliveryWindow ||
+          mapped.rewardAmount !== shipment.rewardAmount ||
+          mapped.rewardCurrency !== shipment.rewardCurrency ||
+          mapped.containsBattery !== shipment.containsBattery ||
+          mapped.batteryType !== shipment.batteryType ||
+          mapped.containsLiquid !== shipment.containsLiquid ||
+          mapped.containsFoodOrAgri !== shipment.containsFoodOrAgri ||
+          mapped.containsMedicine !== shipment.containsMedicine ||
+          mapped.customsDeclarationRequired !== shipment.customsDeclarationRequired ||
+          mapped.packageContentVersion !== shipment.packageContentVersion
+        ) {
+          throw new DomainValidationError("Operation ID already exists with a different payload.");
+        }
+        return mapped;
       }
 
       await firebaseOfflineStatusGateway.trackWrite(() =>
@@ -51,9 +76,14 @@ export class FirebaseShipmentRepository implements ShipmentRepository {
     return mapShipment(await getDoc(reference));
   }
 
-  async findById(shipmentId: string): Promise<Shipment | null> {
+  async findById(shipmentId: string, authoritative = true): Promise<Shipment | null> {
     const { db } = getFirebaseServices();
-    const snapshot = await getDoc(doc(db, "shipments", shipmentId));
+    const docRef = doc(db, "shipments", shipmentId);
+    if (authoritative) {
+      const snapshot = await getDocFromServer(docRef);
+      return snapshot.exists() ? mapShipment(snapshot) : null;
+    }
+    const snapshot = await getDoc(docRef);
     return snapshot.exists() ? mapShipment(snapshot) : null;
   }
 

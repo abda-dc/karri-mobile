@@ -956,6 +956,15 @@ service cloud.firestore {
     match /reviews/{reviewId} {
       allow read: if signedIn();
       allow create: if signedIn()
+        && request.resource.data.keys().hasAll([
+          'bookingId',
+          'reviewerId',
+          'subjectId',
+          'direction',
+          'rating',
+          'createdAt',
+          'updatedAt'
+        ])
         && request.resource.data.keys().hasOnly([
           'bookingId',
           'reviewerId',
@@ -978,10 +987,14 @@ service cloud.firestore {
         && request.resource.data.rating is int
         && request.resource.data.rating >= 1
         && request.resource.data.rating <= 5
-        && request.resource.data.comment is string
-        && request.resource.data.comment.size() <= 1000
+        && (
+          !('comment' in request.resource.data)
+          || request.resource.data.comment == null
+          || (request.resource.data.comment is string && request.resource.data.comment.size() <= 1000)
+        )
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
+        && exists(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId))
         && get(
           /databases/$(database)/documents/bookings/$(request.resource.data.bookingId)
         ).data.status == 'completed'

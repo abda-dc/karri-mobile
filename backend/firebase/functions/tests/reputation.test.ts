@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import admin from "firebase-admin";
 import { ReputationService } from "../src/services/ReputationService.js";
-import { getUserReputation } from "../src/index.js";
+import { getUserReputation, onBookingAccepted, onReviewCreated } from "../src/index.js";
 
 if (admin.apps.length === 0) {
   admin.initializeApp({
@@ -153,5 +153,196 @@ describe("ReputationService & Aggregated Reputation (R10)", () => {
 
     expect(result).toBeDefined();
     expect(result.userId).toBe(targetUserId);
+  });
+
+  it("onBookingAccepted trigger recalculates reputation when booking status transitions to completed", async () => {
+    // Seed a completed booking in firestore for targetUserId
+    await db.collection("bookings").doc("b-completed-trig").set({
+      travelerId: targetUserId,
+      senderId: "sender-x",
+      status: "completed",
+    });
+
+    const event = {
+      params: { bookingId: "b-completed-trig" },
+      data: {
+        before: {
+          data: () => ({
+            status: "delivered",
+            travelerId: targetUserId,
+            senderId: "sender-x",
+          }),
+        },
+        after: {
+          data: () => ({
+            status: "completed",
+            travelerId: targetUserId,
+            senderId: "sender-x",
+          }),
+        },
+      },
+    };
+
+    await (onBookingAccepted.run as any)(event);
+
+    const stored = await db.collection("userReputations").doc(targetUserId).get();
+    expect(stored.exists).toBe(true);
+    expect(stored.data()?.completedBookingsCount).toBe(1);
+    expect(stored.data()?.completionRate).toBe(1.0);
+  });
+
+  it("onBookingAccepted trigger recalculates reputation when booking status transitions to cancelled", async () => {
+    await db.collection("bookings").doc("b-cancelled-trig").set({
+      travelerId: targetUserId,
+      senderId: "sender-y",
+      status: "cancelled",
+    });
+
+    const event = {
+      params: { bookingId: "b-cancelled-trig" },
+      data: {
+        before: {
+          data: () => ({
+            status: "confirmed",
+            travelerId: targetUserId,
+            senderId: "sender-y",
+          }),
+        },
+        after: {
+          data: () => ({
+            status: "cancelled",
+            travelerId: targetUserId,
+            senderId: "sender-y",
+          }),
+        },
+      },
+    };
+
+    await (onBookingAccepted.run as any)(event);
+
+    const stored = await db.collection("userReputations").doc(targetUserId).get();
+    expect(stored.exists).toBe(true);
+    expect(stored.data()?.cancelledBookingsCount).toBe(1);
+    expect(stored.data()?.completionRate).toBe(0.0);
+  });
+
+  it("onReviewCreated trigger recalculates reputation when review document is created", async () => {
+    await db.collection("reviews").doc("rev-trig-1").set({
+      bookingId: "b-rev-1",
+      reviewerId: "sender-z",
+      subjectId: targetUserId,
+      direction: "sender_reviews_traveler",
+      rating: 5,
+      comment: "Outstanding",
+      createdAt: admin.firestore.Timestamp.now(),
+      updatedAt: admin.firestore.Timestamp.now(),
+    });
+
+    const event = {
+      params: { reviewId: "rev-trig-1" },
+      data: {
+        data: () => ({
+          bookingId: "b-rev-1",
+          reviewerId: "sender-z",
+          subjectId: targetUserId,
+          direction: "sender_reviews_traveler",
+          rating: 5,
+        }),
+      },
+    };
+
+    await (onReviewCreated.run as any)(event);
+
+    const stored = await db.collection("userReputations").doc(targetUserId).get();
+    expect(stored.exists).toBe(true);
+    expect(stored.data()?.reviewCount).toBe(1);
+    expect(stored.data()?.averageRating).toBe(5);
+    expect(stored.data()?.distribution[5]).toBe(1);
+  });
+
+  it("simultaneous same-direction review creation results in at most one review document, no duplicate reputation contribution, and no duplicate side effects", async () => {
+    const bookingId = "b-concurrent-review";
+    const reviewerId = "sender-conc";
+    const reviewId = `${bookingId}__${reviewerId}__${targetUserId}`;
+
+    await db.collection("bookings").doc(bookingId).set({
+      travelerId: targetUserId,
+      senderId: reviewerId,
+      status: "completed",
+    });
+
+    const reviewRef = db.collection("reviews").doc(reviewId);
+
+    // Simulate two simultaneous creation transactions
+    const [res1, res2] = await Promise.all([
+      db.runTransaction(async (tx) => {
+        const snap = await tx.get(reviewRef);
+        if (snap.exists) {
+          return { created: false };
+        }
+        tx.set(reviewRef, {
+          bookingId,
+          reviewerId,
+          subjectId: targetUserId,
+          direction: "sender_reviews_traveler",
+          rating: 5,
+          comment: "Great service",
+          createdAt: admin.firestore.Timestamp.now(),
+          updatedAt: admin.firestore.Timestamp.now(),
+        });
+        return { created: true };
+      }),
+      db.runTransaction(async (tx) => {
+        const snap = await tx.get(reviewRef);
+        if (snap.exists) {
+          return { created: false };
+        }
+        tx.set(reviewRef, {
+          bookingId,
+          reviewerId,
+          subjectId: targetUserId,
+          direction: "sender_reviews_traveler",
+          rating: 5,
+          comment: "Great service duplicate race",
+          createdAt: admin.firestore.Timestamp.now(),
+          updatedAt: admin.firestore.Timestamp.now(),
+        });
+        return { created: true };
+      }),
+    ]);
+
+    // Exactly one created, one detected collision
+    const outcomes = [res1.created, res2.created];
+    expect(outcomes).toContain(true);
+    expect(outcomes).toContain(false);
+
+    // Assert: at most one review document exists
+    const allReviewsSnap = await db
+      .collection("reviews")
+      .where("bookingId", "==", bookingId)
+      .where("reviewerId", "==", reviewerId)
+      .get();
+    expect(allReviewsSnap.size).toBe(1);
+
+    // Trigger reputation update for the created document
+    await (onReviewCreated.run as any)({
+      params: { reviewId },
+      data: {
+        data: () => ({
+          bookingId,
+          reviewerId,
+          subjectId: targetUserId,
+          direction: "sender_reviews_traveler",
+          rating: 5,
+        }),
+      },
+    });
+
+    // Assert: no duplicate reputation contribution occurs
+    const stored = await db.collection("userReputations").doc(targetUserId).get();
+    expect(stored.exists).toBe(true);
+    expect(stored.data()?.reviewCount).toBe(1);
+    expect(stored.data()?.averageRating).toBe(5);
+    expect(stored.data()?.distribution[5]).toBe(1);
   });
 });

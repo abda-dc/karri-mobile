@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Badge } from "../../src/components/Badge";
 import { Banner } from "../../src/components/Banner";
@@ -18,6 +18,7 @@ import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
 import { useProfile } from "../../src/presentation/hooks/useProfile";
 import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
+import { generateSecureId } from "../../src/infrastructure/storage/PendingOperationStorage";
 import { TrustSummaryCard } from "../../src/presentation/components/TrustSummaryCard";
 import { colors, radii, spacing, typography } from "../../src/theme/tokens";
 import type { Shipment, Trip } from "../../src/types/models";
@@ -88,6 +89,7 @@ export default function AppHomeScreen() {
   >(() => new Map());
   const [requestMessage, setRequestMessage] = useState<string | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
+  const pendingOperationIds = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     setOptimisticRequests(new Map());
@@ -179,6 +181,22 @@ export default function AppHomeScreen() {
       return;
     }
 
+    const bookingScope = `${auth.user.uid}_${shipment.id}_${trip.id}`;
+    let opId = pendingOperationIds.current.get(matchId);
+    if (!opId) {
+      opId =
+        (await mobileServices.pendingOperationStorage.getPendingOperation(
+          "booking",
+          bookingScope,
+        )) ?? generateSecureId("book");
+      pendingOperationIds.current.set(matchId, opId);
+      await mobileServices.pendingOperationStorage.savePendingOperation(
+        "booking",
+        bookingScope,
+        opId,
+      );
+    }
+
     setOptimisticRequests((current) => new Map(current).set(matchId, "pending"));
     setRequestMessage(null);
     setRequestError(null);
@@ -189,7 +207,13 @@ export default function AppHomeScreen() {
         tripId: trip.id,
         senderId: auth.user.uid,
         travelerId: trip.ownerId,
+        operationId: opId,
       });
+      pendingOperationIds.current.delete(matchId);
+      await mobileServices.pendingOperationStorage.clearPendingOperation(
+        "booking",
+        bookingScope,
+      );
       setOptimisticRequests((current) => new Map(current).set(matchId, "confirmed"));
       setRequestMessage("Booking requested. The traveler has an in-app notification.");
     } catch (error) {

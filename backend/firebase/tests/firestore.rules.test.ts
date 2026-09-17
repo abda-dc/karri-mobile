@@ -1376,6 +1376,155 @@ describe("reviews and trust", () => {
     );
   });
 
+  it("denies reviews submitted when booking is delivered (immediately preceding final completion) and allows when completed", async () => {
+    const validId = `${bookingId}__${senderUid}__${travelerUid}`;
+
+    // Delivered state: immediately preceding completion -> MUST NOT unlock reviews
+    await seedBookingState("delivered");
+    await assertFails(
+      setDoc(doc(userDb(senderUid), `reviews/${validId}`),
+        reviewFixture({
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })),
+    );
+
+    // Completed state: authoritative final state -> MUST unlock reviews
+    await seedBookingState("completed");
+    await assertSucceeds(
+      setDoc(doc(userDb(senderUid), `reviews/${validId}`),
+        reviewFixture({
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })),
+    );
+  });
+
+  it("denies review creation with forged direction or direction mismatching participants", async () => {
+    await seedBookingState("completed");
+    const validId = `${bookingId}__${senderUid}__${travelerUid}`;
+
+    // Sender claims traveler_reviews_sender
+    await assertFails(
+      setDoc(doc(userDb(senderUid), `reviews/${validId}`),
+        reviewFixture({
+          direction: "traveler_reviews_sender",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })),
+    );
+
+    // Sender claims arbitrary/invalid direction
+    await assertFails(
+      setDoc(doc(userDb(senderUid), `reviews/${validId}`),
+        reviewFixture({
+          direction: "admin_reviews_all",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })),
+    );
+  });
+
+  it("denies self-reviews where reviewer equals subject", async () => {
+    await seedBookingState("completed");
+    const selfReviewId = `${bookingId}__${senderUid}__${senderUid}`;
+
+    await assertFails(
+      setDoc(doc(userDb(senderUid), `reviews/${selfReviewId}`),
+        reviewFixture({
+          reviewerId: senderUid,
+          subjectId: senderUid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })),
+    );
+  });
+
+  it("denies reviews with oversized comments or invalid comment types", async () => {
+    await seedBookingState("completed");
+    const validId = `${bookingId}__${senderUid}__${travelerUid}`;
+
+    // Oversized comment (1001 chars)
+    const longComment = "a".repeat(1001);
+    await assertFails(
+      setDoc(doc(userDb(senderUid), `reviews/${validId}`),
+        reviewFixture({
+          comment: longComment,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })),
+    );
+
+    // Invalid comment type (number instead of string)
+    await assertFails(
+      setDoc(doc(userDb(senderUid), `reviews/${validId}`),
+        reviewFixture({
+          comment: 12345 as any,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })),
+    );
+  });
+
+  it("denies review creation with manipulated or non-server timestamps", async () => {
+    await seedBookingState("completed");
+    const validId = `${bookingId}__${senderUid}__${travelerUid}`;
+
+    // Past timestamp
+    const fakeTimestamp = new Date("2026-01-01T00:00:00Z");
+    await assertFails(
+      setDoc(doc(userDb(senderUid), `reviews/${validId}`),
+        reviewFixture({
+          createdAt: fakeTimestamp as any,
+          updatedAt: serverTimestamp(),
+        })),
+    );
+    await assertFails(
+      setDoc(doc(userDb(senderUid), `reviews/${validId}`),
+        reviewFixture({
+          createdAt: serverTimestamp(),
+          updatedAt: fakeTimestamp as any,
+        })),
+    );
+  });
+
+  it("denies review creation with unexpected integrity-sensitive extra fields", async () => {
+    await seedBookingState("completed");
+    const validId = `${bookingId}__${senderUid}__${travelerUid}`;
+
+    await assertFails(
+      setDoc(doc(userDb(senderUid), `reviews/${validId}`), {
+        ...reviewFixture({
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+        isAdmin: true,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(userDb(senderUid), `reviews/${validId}`), {
+        ...reviewFixture({
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+        verified: true,
+      }),
+    );
+  });
+
+  it("denies review creation when document ID does not match expected composite format", async () => {
+    await seedBookingState("completed");
+    const wrongId = "random-doc-id-123";
+
+    await assertFails(
+      setDoc(doc(userDb(senderUid), `reviews/${wrongId}`),
+        reviewFixture({
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })),
+    );
+  });
+
   it("allows signed-in users to read userReputations, but denies direct client writes", async () => {
     const targetUid = travelerUid;
     await seedDoc(`userReputations/${targetUid}`, {

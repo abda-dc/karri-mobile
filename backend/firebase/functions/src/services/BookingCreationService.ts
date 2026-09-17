@@ -156,6 +156,13 @@ export class BookingCreationService {
       const activeData = activeBookingDoc.data();
       // If the active booking matches the SAME trip and SAME sender: idempotent resolution
       if (activeData.tripId === input.tripId && activeData.senderId === callerUid) {
+        if (input.operationId && activeData.operationId && activeData.operationId === input.operationId.trim()) {
+          const existingMsg = (activeData.message ?? "").trim().slice(0, 500);
+          const incomingMsg = (input.message ?? "").trim().slice(0, 500);
+          if (existingMsg !== incomingMsg) {
+            throw new ConflictError("Operation ID already exists with a different request payload.");
+          }
+        }
         return {
           success: true,
           bookingId: activeBookingDoc.id,
@@ -185,6 +192,39 @@ export class BookingCreationService {
     const isRebooking = priorTripBookings.length > 0;
 
     // Check if an operationId was provided and if a booking with that ID already exists
+    if (input.operationId) {
+      const opTrimmed = input.operationId.trim();
+      const opQuery = await transaction.get(
+        this.db
+          .collection("bookings")
+          .where("senderId", "==", callerUid)
+          .where("operationId", "==", opTrimmed),
+      );
+      if (!opQuery.empty) {
+        const opDoc = opQuery.docs[0];
+        const opData = opDoc.data();
+        const existingMsg = (opData.message ?? "").trim().slice(0, 500);
+        const incomingMsg = (input.message ?? "").trim().slice(0, 500);
+        if (
+          opData.shipmentId !== input.shipmentId ||
+          opData.tripId !== input.tripId ||
+          existingMsg !== incomingMsg
+        ) {
+          throw new ConflictError("Operation ID already exists with a different request payload.");
+        }
+        return {
+          success: true,
+          bookingId: opDoc.id,
+          bookingRequestId: opData.bookingRequestId,
+          status: opData.status,
+          alreadyExisted: true,
+          rebooked: false,
+          tripId: input.tripId,
+          shipmentId: input.shipmentId,
+        };
+      }
+    }
+
     let bookingId: string;
     if (input.operationId) {
       bookingId = `booking__${input.shipmentId}__${input.tripId}__${input.operationId.trim()}`;
@@ -199,6 +239,15 @@ export class BookingCreationService {
     if (existingDoc.exists) {
       const data = existingDoc.data()!;
       if (data.senderId === callerUid) {
+        const existingMsg = (data.message ?? "").trim().slice(0, 500);
+        const incomingMsg = (input.message ?? "").trim().slice(0, 500);
+        if (
+          data.shipmentId !== input.shipmentId ||
+          data.tripId !== input.tripId ||
+          existingMsg !== incomingMsg
+        ) {
+          throw new ConflictError("Operation ID already exists with a different request payload.");
+        }
         return {
           success: true,
           bookingId: existingDoc.id,
@@ -223,10 +272,12 @@ export class BookingCreationService {
     // 1. Create booking
     transaction.set(bookingRef, {
       bookingRequestId,
+      operationId: input.operationId?.trim() ?? null,
       shipmentId: input.shipmentId,
       tripId: input.tripId,
       senderId: callerUid,
       travelerId: trip.ownerId,
+      message: (input.message ?? "").trim().slice(0, 500),
       status: "pending",
       statusHistory: [
         {
@@ -242,6 +293,7 @@ export class BookingCreationService {
     // 2. Create booking request
     transaction.set(bookingRequestRef, {
       bookingId,
+      operationId: input.operationId?.trim() ?? null,
       shipmentId: input.shipmentId,
       tripId: input.tripId,
       senderId: callerUid,

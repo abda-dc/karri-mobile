@@ -148,10 +148,20 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   delete androidConfig.googleServicesFile;
   delete iosConfig.googleServicesFile;
 
+  const existingPlugins = config.plugins ?? [];
+  const hasSplashScreenPlugin = existingPlugins.some(
+    (plugin) =>
+      plugin === "expo-splash-screen" ||
+      (Array.isArray(plugin) && plugin[0] === "expo-splash-screen"),
+  );
+
   const finalConfig: ExpoConfig = {
     ...config,
     name: config.name!,
     slug: config.slug!,
+    plugins: hasSplashScreenPlugin
+      ? existingPlugins
+      : [...existingPlugins, "expo-splash-screen"],
     android: androidConfig,
     ios: iosConfig,
   };

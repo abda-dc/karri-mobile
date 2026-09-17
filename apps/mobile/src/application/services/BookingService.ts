@@ -152,6 +152,17 @@ export class BookingService {
       throw new DomainValidationError("The trip does not have enough available capacity.");
     }
 
+    if (input.operationId) {
+      const existingBookingId = `booking__${shipmentId}__${tripId}__${input.operationId}`;
+      const existing = await this.bookings.findById(existingBookingId);
+      if (existing) {
+        if (existing.shipmentId !== shipmentId || existing.tripId !== tripId || existing.senderId !== senderId) {
+          throw new DomainValidationError("Operation ID already exists with a different payload.");
+        }
+        return existing;
+      }
+    }
+
     const created = await this.bookings.createRequest({
       request: {
         shipmentId,

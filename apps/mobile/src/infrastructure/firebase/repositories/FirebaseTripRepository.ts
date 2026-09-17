@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   getDoc,
+  getDocFromServer,
   getDocs,
   limit,
   onSnapshot,
@@ -17,6 +18,7 @@ import type { TripRepository } from "../../../domain/trip/TripRepository";
 import { firebaseOfflineStatusGateway } from "../FirebaseOfflineStatusGateway";
 import { getFirebaseServices } from "../client";
 import { mapTrip, toFirestoreTrip } from "../mappers/tripMapper";
+import { DomainValidationError } from "../../../application/services/validation";
 
 export class FirebaseTripRepository implements TripRepository {
   async create(trip: NewTrip, operationId?: string): Promise<Trip> {
@@ -26,7 +28,21 @@ export class FirebaseTripRepository implements TripRepository {
       const docRef = doc(db, "trips", `trip__${trip.ownerId}__${operationId}`);
       const existing = await getDoc(docRef);
       if (existing.exists()) {
-        return mapTrip(existing);
+        const mapped = mapTrip(existing);
+        if (
+          mapped.ownerId !== trip.ownerId ||
+          mapped.originCountry !== trip.originCountry ||
+          mapped.originCity !== trip.originCity ||
+          mapped.destinationCountry !== trip.destinationCountry ||
+          mapped.destinationCity !== trip.destinationCity ||
+          mapped.departureDate !== trip.departureDate ||
+          mapped.arrivalDate !== trip.arrivalDate ||
+          mapped.availableCapacityKg !== trip.availableCapacityKg ||
+          (mapped.notes ?? "") !== (trip.notes ?? "")
+        ) {
+          throw new DomainValidationError("Operation ID already exists with a different payload.");
+        }
+        return mapped;
       }
 
       await firebaseOfflineStatusGateway.trackWrite(() =>
@@ -50,9 +66,14 @@ export class FirebaseTripRepository implements TripRepository {
     return mapTrip(await getDoc(reference));
   }
 
-  async findById(tripId: string): Promise<Trip | null> {
+  async findById(tripId: string, authoritative = true): Promise<Trip | null> {
     const { db } = getFirebaseServices();
-    const snapshot = await getDoc(doc(db, "trips", tripId));
+    const docRef = doc(db, "trips", tripId);
+    if (authoritative) {
+      const snapshot = await getDocFromServer(docRef);
+      return snapshot.exists() ? mapTrip(snapshot) : null;
+    }
+    const snapshot = await getDoc(docRef);
     return snapshot.exists() ? mapTrip(snapshot) : null;
   }
 

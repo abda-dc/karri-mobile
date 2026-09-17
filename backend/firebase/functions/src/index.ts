@@ -649,11 +649,33 @@ export const onBookingAccepted = onDocumentUpdated(
     if (!before || !after) {
       return;
     }
-    await bookingAcceptedNotificationService.handleBookingUpdate(
-      event.params.bookingId,
-      before,
-      after,
-    );
+    try {
+      await bookingAcceptedNotificationService.handleBookingUpdate(
+        event.params.bookingId,
+        before,
+        after,
+      );
+    } catch (err) {
+      // Notification dispatch failures should not prevent reputation recalculations
+    }
+
+    // Reputation recalculation on booking lifecycle state changes (Option A)
+    if (
+      before.status !== after.status &&
+      (after.status === "completed" ||
+        after.status === "cancelled" ||
+        before.status === "completed" ||
+        before.status === "cancelled")
+    ) {
+      const promises: Promise<any>[] = [];
+      if (after.senderId) {
+        promises.push(reputationService.updateUserReputation(after.senderId));
+      }
+      if (after.travelerId) {
+        promises.push(reputationService.updateUserReputation(after.travelerId));
+      }
+      await Promise.all(promises);
+    }
   },
 );
 
@@ -698,7 +720,11 @@ export const getUserReputation = onCall(callableRuntimeOptions, async (request) 
     }
     const data = request.data;
     const userId = data?.userId ?? request.auth.uid;
-    return await reputationService.getUserReputation(userId);
+    let record = await reputationService.getUserReputation(userId);
+    if (!record) {
+      record = await reputationService.updateUserReputation(userId);
+    }
+    return record;
   } catch (error) {
     throw mapError(error);
   }

@@ -52,6 +52,7 @@ import { FirebaseBookingCreationGateway } from "../../infrastructure/firebase/ga
 import { FirebaseCustodyTransitionGateway } from "../../infrastructure/firebase/gateways/FirebaseCustodyTransitionGateway";
 
 import { systemClock } from "../../application/services/Clock";
+import { defaultPendingOperationStorage } from "../../infrastructure/storage/PendingOperationStorage";
 
 const eventBus = new EventBus();
 const bookingRepository = new FirebaseBookingRepository();
@@ -70,8 +71,18 @@ const identityVerificationService = new IdentityVerificationService(
   verificationRepository,
 );
 const offlineService = new OfflineService(firebaseOfflineStatusGateway);
-const shipmentService = new ShipmentService(shipmentRepository, eventBus);
-const tripService = new TripService(tripRepository, eventBus);
+const shipmentService = new ShipmentService(
+  shipmentRepository,
+  eventBus,
+  systemClock,
+  defaultPendingOperationStorage,
+);
+const tripService = new TripService(
+  tripRepository,
+  eventBus,
+  systemClock,
+  defaultPendingOperationStorage,
+);
 const trustService = new TrustService(
   trustRepository,
   reviewRepository,
@@ -178,4 +189,5 @@ export const mobileServices = {
   trip: tripService,
   trust: trustService,
   privilegedCallable: privilegedCallableTransport,
+  pendingOperationStorage: defaultPendingOperationStorage,
 } as const;

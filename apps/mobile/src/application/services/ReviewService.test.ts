@@ -255,6 +255,99 @@ describe("ReviewService (R10 Post-Delivery Review & Reputation Integrity)", () =
       expect(mockReviewRepository.create).not.toHaveBeenCalled();
       expect(mockEvents.publish).not.toHaveBeenCalled();
     });
+
+    it("ensures duplicate same-direction review submissions produce exactly one review", async () => {
+      vi.mocked(mockBookingRepository.findById).mockResolvedValue(completedBooking as any);
+      const createdReview = {
+        id: "rev-single",
+        bookingId: completedBooking.id,
+        reviewerId: "sender-1",
+        revieweeId: "traveler-1",
+        direction: "sender_reviews_traveler" as const,
+        rating: 5,
+        comment: "Great experience",
+        createdAt: "2026-09-16T12:00:00Z",
+        updatedAt: "2026-09-16T12:00:00Z",
+      };
+
+      // First call finds no existing reviews and creates one
+      vi.mocked(mockReviewRepository.listByBooking).mockResolvedValueOnce([]);
+      vi.mocked(mockReviewRepository.create).mockResolvedValueOnce(createdReview);
+
+      const first = await service.submit({
+        bookingId: completedBooking.id,
+        reviewerId: "sender-1",
+        revieweeId: "traveler-1",
+        direction: "sender_reviews_traveler",
+        rating: 5,
+        comment: "Great experience",
+      });
+
+      // Second call finds the existing review and returns it idempotently
+      vi.mocked(mockReviewRepository.listByBooking).mockResolvedValueOnce([createdReview]);
+
+      const second = await service.submit({
+        bookingId: completedBooking.id,
+        reviewerId: "sender-1",
+        revieweeId: "traveler-1",
+        direction: "sender_reviews_traveler",
+        rating: 5,
+        comment: "Great experience",
+      });
+
+      expect(first.id).toBe("rev-single");
+      expect(second.id).toBe("rev-single");
+      expect(mockReviewRepository.create).toHaveBeenCalledTimes(1);
+      expect(mockEvents.publish).toHaveBeenCalledTimes(1);
+    });
+
+    it("simultaneous same-direction review submissions result in exactly one review created and no duplicate events", async () => {
+      vi.mocked(mockBookingRepository.findById).mockResolvedValue(completedBooking as any);
+      const createdReview = {
+        id: "rev-concurrent",
+        bookingId: completedBooking.id,
+        reviewerId: "sender-1",
+        revieweeId: "traveler-1",
+        direction: "sender_reviews_traveler" as const,
+        rating: 5,
+        comment: "Simultaneous test",
+        createdAt: "2026-09-16T12:00:00Z",
+        updatedAt: "2026-09-16T12:00:00Z",
+      };
+
+      let created = false;
+      vi.mocked(mockReviewRepository.create).mockImplementation(async () => {
+        created = true;
+        return createdReview;
+      });
+      vi.mocked(mockReviewRepository.listByBooking).mockImplementation(async () => {
+        return created ? [createdReview] : [];
+      });
+
+      const [res1, res2] = await Promise.all([
+        service.submit({
+          bookingId: completedBooking.id,
+          reviewerId: "sender-1",
+          revieweeId: "traveler-1",
+          direction: "sender_reviews_traveler",
+          rating: 5,
+          comment: "Simultaneous test 1",
+        }),
+        service.submit({
+          bookingId: completedBooking.id,
+          reviewerId: "sender-1",
+          revieweeId: "traveler-1",
+          direction: "sender_reviews_traveler",
+          rating: 5,
+          comment: "Simultaneous test 2",
+        }),
+      ]);
+
+      expect(res1.id).toBe("rev-concurrent");
+      expect(res2.id).toBe("rev-concurrent");
+      expect(mockReviewRepository.create).toHaveBeenCalledTimes(1);
+      expect(mockEvents.publish).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("Server-Derived Reputation Integration", () => {
@@ -277,26 +370,24 @@ describe("ReviewService (R10 Post-Delivery Review & Reputation Integrity)", () =
       expect(mockReputationRepository.findById).toHaveBeenCalledWith("traveler-1");
     });
 
-    it("falls back to calculating reputation from reviews if repository returns null", async () => {
+    it("returns null if reputation repository has no record and does not fabricate completion stats", async () => {
       vi.mocked(mockReputationRepository.findById).mockResolvedValueOnce(null);
-      vi.mocked(mockReviewRepository.listByReviewee).mockResolvedValueOnce([
-        { id: "r1", rating: 5 } as any,
-        { id: "r2", rating: 4 } as any,
-      ]);
 
       const rep = await service.getReputation("traveler-1");
-      expect(rep).toBeDefined();
-      expect(rep?.reviewCount).toBe(2);
-      expect(rep?.averageRating).toBe(4.5);
-      expect(rep?.distribution[5]).toBe(1);
-      expect(rep?.distribution[4]).toBe(1);
+      expect(rep).toBeNull();
+      // Verifies client does NOT fabricate completedBookingsCount or completionRate
     });
 
-    it("returns null if user has no reviews in fallback mode", async () => {
-      vi.mocked(mockReputationRepository.findById).mockResolvedValueOnce(null);
-      vi.mocked(mockReviewRepository.listByReviewee).mockResolvedValueOnce([]);
+    it("returns null when no reputation repository is configured", async () => {
+      const serviceWithoutRepo = new ReviewService(
+        mockReviewRepository,
+        mockBookingRepository,
+        mockEvents,
+        clock,
+        undefined,
+      );
 
-      const rep = await service.getReputation("brand-new-user");
+      const rep = await serviceWithoutRepo.getReputation("brand-new-user");
       expect(rep).toBeNull();
     });
   });

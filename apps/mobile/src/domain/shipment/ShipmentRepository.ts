@@ -2,7 +2,7 @@ import type { NewShipment, Shipment } from "./Shipment";
 
 export interface ShipmentRepository {
   create(shipment: NewShipment, operationId?: string): Promise<Shipment>;
-  findById(shipmentId: string): Promise<Shipment | null>;
+  findById(shipmentId: string, authoritative?: boolean): Promise<Shipment | null>;
   listActive(): Promise<ReadonlyArray<Shipment>>;
   listByOwner(ownerId: string): Promise<ReadonlyArray<Shipment>>;
   watchByOwner(

@@ -15,6 +15,8 @@ import { systemClock } from "./Clock";
 import { DomainValidationError, optionalText } from "./validation";
 
 export class ReviewService {
+  private readonly inFlight = new Map<string, Promise<Review>>();
+
   constructor(
     private readonly reviews: ReviewRepository,
     private readonly bookings: BookingRepository,
@@ -24,6 +26,22 @@ export class ReviewService {
   ) {}
 
   async submit(input: SubmitReviewDto): Promise<Review> {
+    const flightKey = `${input.bookingId}__${input.reviewerId}`;
+    const active = this.inFlight.get(flightKey);
+    if (active) {
+      return active;
+    }
+
+    const promise = this.executeSubmit(input);
+    this.inFlight.set(flightKey, promise);
+    try {
+      return await promise;
+    } finally {
+      this.inFlight.delete(flightKey);
+    }
+  }
+
+  private async executeSubmit(input: SubmitReviewDto): Promise<Review> {
     const booking = await this.bookings.findById(input.bookingId);
 
     if (!booking || booking.status !== BookingStatus.Completed) {
@@ -98,37 +116,9 @@ export class ReviewService {
 
   async getReputation(userId: string): Promise<UserReputation | null> {
     if (this.reputationRepo) {
-      const persisted = await this.reputationRepo.findById(userId);
-      if (persisted) {
-        return persisted;
-      }
+      return await this.reputationRepo.findById(userId);
     }
-
-    // Fallback: derive dynamically from reviews if server cache not yet populated
-    const reviews = await this.reviews.listByReviewee(userId);
-    if (reviews.length === 0) {
-      return null;
-    }
-
-    const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-    let sum = 0;
-    for (const r of reviews) {
-      if (r.rating >= 1 && r.rating <= 5) {
-        dist[r.rating as keyof typeof dist] += 1;
-        sum += r.rating;
-      }
-    }
-
-    return {
-      userId,
-      averageRating: Math.round((sum / reviews.length) * 100) / 100,
-      reviewCount: reviews.length,
-      distribution: dist,
-      completedBookingsCount: reviews.length,
-      cancelledBookingsCount: 0,
-      completionRate: 1,
-      updatedAt: this.clock.now(),
-    };
+    return null;
   }
 
   watchReputation(
@@ -139,10 +129,7 @@ export class ReviewService {
     if (this.reputationRepo) {
       return this.reputationRepo.watchById(userId, onData, onError);
     }
-    // Fallback: fetch once
-    this.getReputation(userId)
-      .then(onData)
-      .catch(onError);
+    onData(null);
     return () => {};
   }
 

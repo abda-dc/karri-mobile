@@ -5,6 +5,41 @@ export class DomainValidationError extends Error {
   }
 }
 
+export function isDefinitiveNonCommit(error: unknown): boolean {
+  if (error instanceof DomainValidationError) {
+    return true;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const err = error as {
+      code?: unknown;
+      retryable?: unknown;
+      name?: unknown;
+    };
+
+    if (err.retryable === false) {
+      return true;
+    }
+
+    if (typeof err.code === "string") {
+      const code = err.code.replace(/^firestore\//, "");
+      const definitiveFirestoreCodes = [
+        "permission-denied",
+        "invalid-argument",
+        "failed-precondition",
+        "out-of-range",
+        "unauthenticated",
+        "unimplemented",
+      ];
+      if (definitiveFirestoreCodes.includes(code)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 export function requireText(value: string, field: string, maximumLength = 500): string {
   const cleaned = value.trim().replace(/\s+/g, " ");
 

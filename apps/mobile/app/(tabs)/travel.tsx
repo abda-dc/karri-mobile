@@ -32,6 +32,7 @@ import { useAuthSession } from "../../src/presentation/hooks/useAuthSession";
 import { useProfile } from "../../src/presentation/hooks/useProfile";
 import { reportFriendlyError } from "../../src/presentation/errors/getFriendlyError";
 import { mobileServices } from "../../src/presentation/services/mobileServices";
+import { isDefinitiveNonCommit } from "../../src/application/services/validation";
 import { TrustSummaryCard } from "../../src/presentation/components/TrustSummaryCard";
 import { colors, radii, spacing, touchTargets, typography } from "../../src/theme/tokens";
 import type { Trip } from "../../src/types/models";
@@ -188,6 +189,8 @@ export default function TravelScreen() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [listRetryKey, setListRetryKey] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<"definitive" | "ambiguous" | null>(null);
+  const [checkingStatus, setCheckingStatus] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [matchFilters, setMatchFilters] = useState<MatchDiscoveryFilters>(
@@ -447,10 +450,49 @@ export default function TravelScreen() {
       setCapacityMode("preset");
       setCustomCapacityValue("");
       setSuccessMessage("Trip published. It is now available for corridor matching.");
+      setErrorType(null);
     } catch (error) {
+      const isDefinitive = isDefinitiveNonCommit(error);
+      setErrorType(isDefinitive ? "definitive" : "ambiguous");
       setFormError(reportFriendlyError(error, "travel.create-trip"));
     } finally {
       setSaving(false);
+    }
+  }
+
+  function handleDiscardDefinitive() {
+    setForm(emptyForm);
+    setCapacityMode("preset");
+    setCustomCapacityValue("");
+    setFormError(null);
+    setErrorType(null);
+    setSuccessMessage(null);
+  }
+
+  async function handleCheckStatus() {
+    if (!auth.user?.uid || checkingStatus || saving) {
+      return;
+    }
+    setCheckingStatus(true);
+    try {
+      const result = await mobileServices.trip.reconcilePendingOperation(auth.user.uid);
+      if (result.status === "found") {
+        setForm(emptyForm);
+        setFormError(null);
+        setErrorType(null);
+        setSuccessMessage("Trip confirmed on server and recovered.");
+      } else if (result.status === "absent") {
+        setForm(emptyForm);
+        setFormError(null);
+        setErrorType(null);
+        setSuccessMessage("No trip was recorded. Starting fresh.");
+      } else {
+        setFormError("Status could not be confirmed. Check connection and retry.");
+      }
+    } catch {
+      setFormError("Status could not be confirmed. Check connection and retry.");
+    } finally {
+      setCheckingStatus(false);
     }
   }
 
@@ -593,7 +635,29 @@ export default function TravelScreen() {
             />
 
             {formError ? (
-              <Banner message={formError} title="Review trip details" variant="error" />
+              <View style={styles.errorBannerContainer}>
+                <Banner message={formError} title="Review trip details" variant="error" />
+                {errorType === "definitive" ? (
+                  <PrimaryButton
+                    accessibilityHint="Discards the invalid trip attempt and starts a fresh form."
+                    disabled={saving}
+                    onPress={handleDiscardDefinitive}
+                    variant="ghost"
+                  >
+                    Discard & start fresh
+                  </PrimaryButton>
+                ) : (
+                  <PrimaryButton
+                    accessibilityHint="Checks if trip was committed before allowing a new trip."
+                    disabled={saving}
+                    loading={checkingStatus}
+                    onPress={handleCheckStatus}
+                    variant="ghost"
+                  >
+                    Check status
+                  </PrimaryButton>
+                )}
+              </View>
             ) : null}
             {successMessage ? (
               <Banner message={successMessage} title="Trip ready" variant="success" />
@@ -806,6 +870,9 @@ const styles = StyleSheet.create({
   mutedText: {
     color: colors.textSecondary,
     ...typography.caption,
+  },
+  errorBannerContainer: {
+    gap: spacing.sm,
   },
 });
 
