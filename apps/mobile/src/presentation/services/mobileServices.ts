@@ -20,6 +20,7 @@ import { HandoffService } from "../../application/services/HandoffService";
 import { EventBus } from "../../domain/events/EventBus";
 import { FirebaseAuthSessionGateway } from "../../infrastructure/firebase/auth";
 import {
+  FirebaseAdminOperationsRepository,
   FirebaseBookingRepository,
   FirebaseCustodyRepository,
   FirebaseHandoffRepository,
@@ -55,6 +56,7 @@ import { systemClock } from "../../application/services/Clock";
 import { defaultPendingOperationStorage } from "../../infrastructure/storage/PendingOperationStorage";
 
 const eventBus = new EventBus();
+const adminOperationsRepository = new FirebaseAdminOperationsRepository();
 const bookingRepository = new FirebaseBookingRepository();
 const custodyRepository = new FirebaseCustodyRepository();
 const notificationRepository = new FirebaseNotificationRepository();
@@ -147,6 +149,7 @@ const notificationService = new NotificationService(
 notificationService.start();
 
 export const mobileServices = {
+  adminOperations: adminOperationsRepository,
   auth: new AuthSessionService(
     new FirebaseAuthSessionGateway(),
     pushRegistrationService,

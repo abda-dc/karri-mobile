@@ -1,3 +1,4 @@
+export { FirebaseAdminOperationsRepository } from "./FirebaseAdminOperationsRepository";
 export { FirebaseBookingRepository } from "./FirebaseBookingRepository";
 export { FirebaseCustodyRepository } from "./FirebaseCustodyRepository";
 export { FirebaseNotificationRepository } from "./FirebaseNotificationRepository";
